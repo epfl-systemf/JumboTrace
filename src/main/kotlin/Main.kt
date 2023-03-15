@@ -15,8 +15,8 @@ fun main(args: Array<String>) {
         reportError()
     }
 
-    val debugger = Debugger(className, Path.of(filePath))
-    debugger.run()
+    val debugSession = DebugSession(className, Path.of(filePath))
+    debugSession.run()
 
 }
 

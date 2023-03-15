@@ -5,7 +5,7 @@ import com.sun.jdi.event.BreakpointEvent
 import com.sun.jdi.event.ClassPrepareEvent
 import java.nio.file.Path
 
-class Debugger(private val debugClassName: String, filePath: Path) {
+class DebugSession(private val debugClassName: String, filePath: Path) {
     private val srcLines: List<String>
     private val vm: VirtualMachine
 
@@ -64,7 +64,7 @@ class Debugger(private val debugClassName: String, filePath: Path) {
                             "   \t" +
                             visibleVars
                                 .map { (localVar, value) -> "${localVar.name()} = $value" }
-                                .joinToString(prefix = "[", separator = ",", postfix = "]")
+                                .joinToString(prefix = "[", separator = ", ", postfix = "]")
                     )
             println(lineDescr)
         }
