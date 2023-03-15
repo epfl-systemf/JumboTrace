@@ -46,8 +46,7 @@ class Debugger(private val debugClassName: String, filePath: Path) {
         for (lineNum in 1..(srcLines.size)) {
             val locationsOfLine = refType.locationsOfLine(lineNum)
             if (locationsOfLine.isNotEmpty()) {
-                val location = locationsOfLine[0]
-                val breakReq = vm.eventRequestManager().createBreakpointRequest(location)
+                val breakReq = vm.eventRequestManager().createBreakpointRequest(locationsOfLine[0])
                 breakReq.enable()
             }
         }
