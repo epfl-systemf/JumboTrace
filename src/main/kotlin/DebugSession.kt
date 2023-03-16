@@ -9,6 +9,11 @@ class DebugSession(private val debugClassName: String, filePath: Path) {
     private val srcLines: List<String>
     private val vm: VirtualMachine
 
+    private var lastEncounteredLine: Int = -1
+
+    private val ansiYellow = "\u001B[33m"
+    private val ansiReset = "\u001B[0m"
+
     init {
         srcLines = filePath.toFile().readLines()
 
@@ -33,7 +38,7 @@ class DebugSession(private val debugClassName: String, filePath: Path) {
             for (event in eventSet) {
                 when (event) {
                     is ClassPrepareEvent -> setBreakpoints(event)
-                    is BreakpointEvent -> displayStatement(event)
+                    is BreakpointEvent -> displayStatementIfLineChanged(event)
                 }
                 vm.resume()
             }
@@ -46,25 +51,29 @@ class DebugSession(private val debugClassName: String, filePath: Path) {
         for (lineNum in 1..(srcLines.size)) {
             val locationsOfLine = refType.locationsOfLine(lineNum)
             if (locationsOfLine.isNotEmpty()) {
-                val breakReq = vm.eventRequestManager().createBreakpointRequest(locationsOfLine[0])
-                breakReq.enable()
+                for (location in locationsOfLine) {
+                    val breakReq = vm.eventRequestManager().createBreakpointRequest(location)
+                    breakReq.enable()
+                }
             }
         }
     }
 
-    private fun displayStatement(breakpointEvent: BreakpointEvent) {
+    private fun displayStatementIfLineChanged(breakpointEvent: BreakpointEvent) {
         val stackFrame = breakpointEvent.thread().frame(0)
         val location = stackFrame.location()
-        if (location.toString().contains(debugClassName)) {
+        if (location.lineNumber() != lastEncounteredLine && location.toString().contains(debugClassName)) {
+            lastEncounteredLine = location.lineNumber()
             val lineNumber = location.lineNumber()
             val visibleVars = stackFrame.getValues(stackFrame.visibleVariables())
             val lineDescr = (
                     "$lineNumber:\t" +
                             srcLines[lineNumber - 1] +
-                            "   \t" +
+                            "   \t" + ansiYellow +
                             visibleVars
                                 .map { (localVar, value) -> "${localVar.name()} = $value" }
-                                .joinToString(prefix = "[", separator = ", ", postfix = "]")
+                                .joinToString(prefix = "[", separator = ", ", postfix = "]") +
+                            ansiReset
                     )
             println(lineDescr)
         }
