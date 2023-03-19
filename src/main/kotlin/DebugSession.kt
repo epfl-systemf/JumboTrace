@@ -52,14 +52,14 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
                     is BreakpointEvent -> {
                         val thread = event.thread()
                         displayStatementIfLineChanged(thread)
-                        disableBreakpoints()
+                        deleteBreakpoints()
                         requestStep(thread)
                     }
                     // stepping: schedule a step on the next statement
                     is StepEvent -> {
                         val thread = event.thread()
                         displayStatementIfLineChanged(thread)
-                        disableStepRequests()
+                        deleteStepRequests()
                         requestStep(thread)
                     }
                 }
@@ -80,10 +80,8 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
         }
     }
 
-    private fun disableBreakpoints() {
-        for (request in vm.eventRequestManager().breakpointRequests()) {
-            request.disable()
-        }
+    private fun deleteBreakpoints() {
+        vm.eventRequestManager().deleteAllBreakpoints()
     }
 
     private fun requestStep(thread: ThreadReference) {
@@ -92,10 +90,9 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
             .enable()
     }
 
-    private fun disableStepRequests() {
-        for (request in vm.eventRequestManager().stepRequests()) {
-            request.disable()
-        }
+    private fun deleteStepRequests() {
+        val manager = vm.eventRequestManager()
+        manager.deleteEventRequests(manager.stepRequests())
     }
 
     private fun displayStatementIfLineChanged(thread: ThreadReference) {
