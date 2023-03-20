@@ -22,6 +22,6 @@ fun main(args: Array<String>) {
 }
 
 fun reportError(){
-    println("Usage: DemoTracer <main class> <main file> <other files>*  |  e.g. DemoTracer Main ./Main.java ./Aux.java")
+    System.err.println("Usage: DemoTracer <main class> <main file> <other files>*  |  e.g. DemoTracer Main ./Main.java ./Aux.java")
     exitProcess(-1)
 }
