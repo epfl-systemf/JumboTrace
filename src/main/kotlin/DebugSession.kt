@@ -36,7 +36,7 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
         classPrepareRequest.enable()
     }
 
-    fun run() {
+    tailrec fun run() {
         val eventSet = try {
             vm.eventQueue().remove()
         } catch (vmde: VMDisconnectedException) {
