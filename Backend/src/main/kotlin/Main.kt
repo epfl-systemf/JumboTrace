@@ -17,7 +17,8 @@ fun main(args: Array<String>) {
     }
 
     val debugSession = DebugSession(mainClassName, mainFileName, filenames.map(Path::of))
-    debugSession.run()
+    val trace = debugSession.run()
+    JsonWriter.write(Path.of("./trace/${mainClassName}-trace.json"), trace)
 
 }
 

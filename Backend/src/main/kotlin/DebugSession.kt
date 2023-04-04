@@ -14,6 +14,8 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
     private val vm: VirtualMachine
     private val maxSrcFileNameLength: Int
 
+    private val trace: MutableTrace = mutableListOf()
+
     private var lastDisplayedLine: LineInfo? = null
 
     private val ansiYellow = "\u001B[33m"
@@ -36,14 +38,16 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
         classPrepareRequest.enable()
     }
 
-    tailrec fun run() {
+    tailrec fun run(): Trace {
         val eventSet = try {
             vm.eventQueue().remove()
         } catch (vmde: VMDisconnectedException) {
             println("VM is disconnected")
             null
         }
-        if (eventSet != null) {
+        return if (eventSet == null){
+            trace
+        } else {
             for (event in eventSet) {
                 when (event) {
                     // at initialization, ClassPrepareEvent => set breakpoints to stop at first executed statement
@@ -125,6 +129,10 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
                         ansiReset
                 )
         println(lineDescr)
+        trace.add(TraceElement(
+            location.sourceName(),
+            lineNumber, visibleVars.map { (localVar, value) -> localVar.name() to value.toString() }.toMap()
+        ))
     }
 
     private fun hasInfo(location: Location): Boolean = location.lineNumber() != -1
