@@ -1,0 +1,33 @@
+
+<!DOCTYPE html>
+
+<html>
+
+    <head>
+        <title>Visualizer</title>
+    </head>
+
+
+    <body>
+        <input class="" type="file" id="trace-file-picker" @change="loadSelectedFile">
+    </body>
+
+    <script lang="javascript">
+        document.getElementById("trace-file-picker").addEventListener("change", function(event){
+            let file = event.target.files[0];
+            if (!file){
+                return;
+            };
+            let reader = new FileReader();
+            reader.onload = function(event){
+                let fileContents = event.target.result;
+                let json = JSON.parse(fileContents);
+                console.log(json);
+            };
+            reader.readAsText(file);
+        })
+    </script>
+
+
+</html>
+
