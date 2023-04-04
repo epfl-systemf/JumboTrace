@@ -130,8 +130,8 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
                 )
         println(lineDescr)
         trace.add(TraceElement(
-            location.sourceName(),
-            lineNumber, visibleVars.map { (localVar, value) -> localVar.name() to value.toString() }.toMap()
+            location.sourceName(), lineNumber,
+            visibleVars.map { (localVar, value) -> localVar.name() to value.toString() }.toMap()
         ))
     }
 
