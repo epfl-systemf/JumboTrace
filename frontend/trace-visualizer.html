@@ -9,10 +9,14 @@
 
 
     <body>
-        <input class="" type="file" id="trace-file-picker" @change="loadSelectedFile">
+        <input type="file" id="trace-file-picker" @change="loadSelectedFile">
+        <br><br>
+        <div id="trace-display"></div>
+        <br><br>
     </body>
 
     <script lang="javascript">
+
         document.getElementById("trace-file-picker").addEventListener("change", function(event){
             let file = event.target.files[0];
             if (!file){
@@ -21,11 +25,29 @@
             let reader = new FileReader();
             reader.onload = function(event){
                 let fileContents = event.target.result;
-                let json = JSON.parse(fileContents);
-                console.log(json);
+                let trace = JSON.parse(fileContents);
+                displayTrace(trace);
             };
             reader.readAsText(file);
-        })
+            document.title = "Visualizer: " + file.name.slice(0, -5);
+        });
+
+        function displayTrace(trace){
+            let traceDisplay = document.getElementById("trace-display");
+            // clear children
+            while (traceDisplay.lastElementChild){
+                traceDisplay.removeChild(traceDisplay.lastElementChild);
+            };
+            // add new children
+            for (elemIdx in trace) {
+                let element = trace[elemIdx];
+                let div = document.createElement("div");
+                let varEntries = Object.entries(element.varsState).map(([variable, value]) => `${variable}=${value}`);
+                div.textContent = `${element.filename}-${element.line}:    ${varEntries}`;
+                traceDisplay.appendChild(div);
+            };
+        }
+
     </script>
 
 
