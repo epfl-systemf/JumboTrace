@@ -6,7 +6,7 @@ import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
 
-class DebugSession(programDir: String, mainClassName: String, private val mainFileName: String, filePaths: List<Path>) {
+class DebugSession(programDir: Path, mainClassName: String, private val mainFileName: Path, filePaths: List<Path>) {
     /**
      * Maps file name to list of lines
      */
@@ -29,7 +29,7 @@ class DebugSession(programDir: String, mainClassName: String, private val mainFi
         val launchingConnector = Bootstrap.virtualMachineManager().defaultConnector()
         val args = launchingConnector.defaultArguments()
         args["main"]!!.setValue(mainClassName)
-        args["home"]!!.setValue(programDir)
+        args["options"]!!.setValue("-cp $programDir")
         vm = launchingConnector.launch(args)
 
         val classPrepareRequest = vm.eventRequestManager().createClassPrepareRequest()
@@ -74,7 +74,7 @@ class DebugSession(programDir: String, mainClassName: String, private val mainFi
 
     private fun setBreakpointsInMainClass(classPrepareEvent: ClassPrepareEvent) {
         val refType = classPrepareEvent.referenceType()
-        for (lineNum in 1..(filesContent[mainFileName]!!.size)) {
+        for (lineNum in 1..(filesContent[mainFileName.toString()]!!.size)) {
             val locationsOfLine = refType.locationsOfLine(lineNum)
             for (location in locationsOfLine) {
                 val breakReq = vm.eventRequestManager().createBreakpointRequest(location)

@@ -7,9 +7,8 @@ class FilesCopyManager(private val tmpDirPath: Path) {
 
     fun scanAndCopyToTmp(dirToScan: Path) {
 
-
         val tmpDir = tmpDirPath.toFile()
-        if (tmpDir.exists()){
+        if (tmpDir.exists()) {
             throw IOException("path provided for temporary directory already exists")
         }
         Files.createDirectories(tmpDirPath)
@@ -17,9 +16,9 @@ class FilesCopyManager(private val tmpDirPath: Path) {
         Files.createDirectories(tmpBinDirPath)
         val tmpBinDir = tmpBinDirPath.toFile()
 
-        fun searchAndCopyRecursively(dir: File){
+        fun searchAndCopyRecursively(dir: File) {
             require(dir.isDirectory)
-            for (sub in dir.listFiles()!!){
+            for (sub in dir.listFiles()!!) {
                 when {
                     sub.isFile && sub.extension == "java" -> {
                         sub.copyTo(tmpDir.resolve(sub.name))
@@ -29,8 +28,7 @@ class FilesCopyManager(private val tmpDirPath: Path) {
                         sub.copyTo(tmpBinDir.resolve(sub.name))
                     }
 
-                    sub.isDirectory ->
-                        searchAndCopyRecursively(sub)
+                    sub.isDirectory -> searchAndCopyRecursively(sub)
                 }
             }
         }
@@ -38,9 +36,9 @@ class FilesCopyManager(private val tmpDirPath: Path) {
         searchAndCopyRecursively(dirToScan.toFile())
     }
 
-    fun deleteTmpDir(){
+    fun deleteTmpDir() {
 
-        fun deleteRecursively(file: File){
+        fun deleteRecursively(file: File) {
             file.listFiles()?.forEach(::deleteRecursively)
             file.delete()
         }
