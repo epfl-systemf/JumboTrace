@@ -74,7 +74,7 @@ class DebugSession(programDir: Path, mainClassName: String, private val mainFile
 
     private fun setBreakpointsInMainClass(classPrepareEvent: ClassPrepareEvent) {
         val refType = classPrepareEvent.referenceType()
-        for (lineNum in 1..(filesContent[mainFileName.toString()]!!.size)) {
+        for (lineNum in 1..(filesContent[mainFileName.name]!!.size)) {
             val locationsOfLine = refType.locationsOfLine(lineNum)
             for (location in locationsOfLine) {
                 val breakReq = vm.eventRequestManager().createBreakpointRequest(location)
