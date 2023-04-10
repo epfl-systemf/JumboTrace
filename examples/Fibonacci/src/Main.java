@@ -1,6 +1,6 @@
 import java.util.InputMismatchException;
 
-public class Debuggee {
+public class Main {
 
     public static void main(String[] args) {
         args = new String[]{"ITER", "15"};  // FIXME

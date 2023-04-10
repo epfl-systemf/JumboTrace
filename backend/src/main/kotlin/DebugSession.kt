@@ -6,7 +6,7 @@ import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
 
-class DebugSession(mainClassName: String, private val mainFileName: String, filePaths: List<Path>) {
+class DebugSession(programDir: Path, mainClassName: String, private val mainFileName: Path, filePaths: List<Path>) {
     /**
      * Maps file name to list of lines
      */
@@ -23,14 +23,13 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
 
     init {
 
-        require(filePaths.any { it.name == mainFileName })
-
         filesContent = filePaths.associate { Pair(it.name, it.toFile().readLines()) }
         maxSrcFileNameLength = filePaths.maxOf { it.name.length }
 
         val launchingConnector = Bootstrap.virtualMachineManager().defaultConnector()
         val args = launchingConnector.defaultArguments()
         args["main"]!!.setValue(mainClassName)
+        args["options"]!!.setValue("-cp $programDir")
         vm = launchingConnector.launch(args)
 
         val classPrepareRequest = vm.eventRequestManager().createClassPrepareRequest()
@@ -75,7 +74,7 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
 
     private fun setBreakpointsInMainClass(classPrepareEvent: ClassPrepareEvent) {
         val refType = classPrepareEvent.referenceType()
-        for (lineNum in 1..(filesContent[mainFileName]!!.size)) {
+        for (lineNum in 1..(filesContent[mainFileName.name]!!.size)) {
             val locationsOfLine = refType.locationsOfLine(lineNum)
             for (location in locationsOfLine) {
                 val breakReq = vm.eventRequestManager().createBreakpointRequest(location)
@@ -134,6 +133,15 @@ class DebugSession(mainClassName: String, private val mainFileName: String, file
             visibleVars.map { (localVar, value) -> localVar.name() to value.toString() }.toMap()
         ))
     }
+
+//    private fun stringDescrOf(value: Value, thread: ThreadReference): String {
+//        val tpe = value.type()
+//        when (tpe){
+//            is PrimitiveType -> value.toString()
+//            is ClassType ->
+//                tpe.invokeMethod(thread, tpe.methodsByName("toString"))
+//        }
+//    }
 
     private fun hasInfo(location: Location): Boolean = location.lineNumber() != -1
 

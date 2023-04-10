@@ -1,5 +1,9 @@
 # JavaTracer
 
+*<b> Disclaimer: this project is currently under development and the readme may thus not be up to date. </b>*
+
+<br>
+
 Tracing debugger for the Java language, using the [Java debug interface](https://docs.oracle.com/javase/7/docs/jdk/api/jpda/jdi/)
 
 Usage:
