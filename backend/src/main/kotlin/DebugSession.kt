@@ -6,7 +6,7 @@ import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
 
-class DebugSession(programDir: Path, mainClassName: String, private val mainFileName: Path, filePaths: List<Path>) {
+class DebugSession(programDir: Path, mainClassName: String, filePaths: List<Path>) {
     /**
      * Maps file name to list of lines
      */
@@ -50,7 +50,8 @@ class DebugSession(programDir: Path, mainClassName: String, private val mainFile
             for (event in eventSet) {
                 when (event) {
                     // at initialization, ClassPrepareEvent => set breakpoints to stop at first executed statement
-                    is ClassPrepareEvent -> setBreakpointsInMainClass(event)
+                    is ClassPrepareEvent ->
+                        requestStep(event.thread())
                     // when reaching the first statement, stop using breakpoints and move to stepping
                     is BreakpointEvent -> {
                         val thread = event.thread()
@@ -69,17 +70,6 @@ class DebugSession(programDir: Path, mainClassName: String, private val mainFile
                 vm.resume()
             }
             run()
-        }
-    }
-
-    private fun setBreakpointsInMainClass(classPrepareEvent: ClassPrepareEvent) {
-        val refType = classPrepareEvent.referenceType()
-        for (lineNum in 1..(filesContent[mainFileName.name]!!.size)) {
-            val locationsOfLine = refType.locationsOfLine(lineNum)
-            for (location in locationsOfLine) {
-                val breakReq = vm.eventRequestManager().createBreakpointRequest(location)
-                breakReq.enable()
-            }
         }
     }
 

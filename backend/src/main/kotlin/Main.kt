@@ -11,9 +11,8 @@ fun main(args: Array<String>) {
     val programDir = Path.of(args[0])
     val mainClassName = args[1]
     val srcFiles = args.drop(2).map(Path::of)
-    val mainFileName = srcFiles.first()
 
-    val debugSession = DebugSession(programDir, mainClassName, mainFileName, srcFiles)
+    val debugSession = DebugSession(programDir, mainClassName, srcFiles)
     val trace = debugSession.run()
     JsonWriter.write(Path.of("./trace/${mainClassName}-trace.json"), trace)
 }
