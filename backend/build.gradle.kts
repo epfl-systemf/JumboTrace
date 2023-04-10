@@ -4,7 +4,7 @@ plugins {
     application
 }
 
-group = "com.github.valentinaebi"
+group = "ch.epfl.systemf"   // TODO name project   jview???
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -13,6 +13,7 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.0")
+    implementation("com.github.javaparser:javaparser-core:3.25.2")
     testImplementation(kotlin("test"))
 }
 
