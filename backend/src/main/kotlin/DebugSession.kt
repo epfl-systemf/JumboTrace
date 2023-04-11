@@ -1,24 +1,19 @@
 import com.github.javaparser.ast.CompilationUnit
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration
-import com.github.javaparser.ast.body.TypeDeclaration
 import com.sun.jdi.*
+import com.sun.jdi.event.BreakpointEvent
 import com.sun.jdi.event.ClassPrepareEvent
 import com.sun.jdi.event.MethodEntryEvent
 import com.sun.jdi.event.MethodExitEvent
-import com.sun.jdi.event.StepEvent
-import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
+import kotlin.jvm.Throws
 
-class DebugSession(programDir: Path, mainClassName: String, private val inspectedFiles: Map<Path, CompilationUnit>) {
+class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<Path, CompilationUnit>) {
 
     private val inspectedFilesNames: Set<String> = inspectedFiles.map { it.key.name }.toSet()
-    private val maxSrcFileNameLength: Int = inspectedFilesNames.maxOf(String::length)
     private val vm: VirtualMachine
 
     private val trace: MutableTrace = mutableListOf()
-
-    private var lastStopInfo: StopInfo = StopInfo(null, null, null)
 
     init {
 
@@ -28,9 +23,9 @@ class DebugSession(programDir: Path, mainClassName: String, private val inspecte
         args["options"]!!.setValue("-cp $programDir")
         vm = launchingConnector.launch(args)
 
-        val classPrepareRequest = vm.eventRequestManager().createClassPrepareRequest()
-        classPrepareRequest.addClassFilter(mainClassName)
-        classPrepareRequest.enable()
+        vm.eventRequestManager()
+            .createClassPrepareRequest()
+            .enable()
     }
 
     tailrec fun run(): Trace {
@@ -47,15 +42,20 @@ class DebugSession(programDir: Path, mainClassName: String, private val inspecte
                 when (event) {
 
                     is ClassPrepareEvent -> {
-//                        requestStep(event.thread())
-                        createFunEntryAndExitEventsRequest()
+                        val loadedClass = event.referenceType()
+                        try {
+                            if (loadedClass.sourceName() in inspectedFilesNames) {
+                                addMonitoringToClass(loadedClass)
+                            }
+                        } catch (_: AbsentInformationException) {
+                            // ignore (intended behavior when loading a class that has not been compiled with the -g option)
+                        }
                     }
 
-                    is StepEvent -> {
-                        val thread = event.thread()
-                        inspectProgramState(thread)
-                        deleteStepRequests()
-                        requestStep(thread)
+                    is BreakpointEvent -> {
+                        if (debugInfoArePresent(event.location())) {
+                            println("visited line ${event.location()}")
+                        }
                     }
 
                     is MethodEntryEvent -> {
@@ -72,55 +72,22 @@ class DebugSession(programDir: Path, mainClassName: String, private val inspecte
         }
     }
 
-    private fun createFunEntryAndExitEventsRequest() {
-        val classesToMonitor =
-            inspectedFiles
-                .flatMap { it.value.findAll(TypeDeclaration::class.java) }
-                .map { it.name.id }
-        for (classToMonitor in classesToMonitor) {
-            with(vm.eventRequestManager()) {
-                createMethodEntryRequest()
-                    .apply { addClassFilter(classToMonitor) }
-                    .enable()
-                createMethodExitRequest()
-                    .apply { addClassFilter(classToMonitor) }
-                    .enable()
-            }
+    @Throws(AbsentInformationException::class)
+    private fun addMonitoringToClass(loadedClass: ReferenceType) {
+        val eventRequestManager = vm.eventRequestManager()
+        for (location in loadedClass.allLineLocations()) {
+            eventRequestManager
+                .createBreakpointRequest(location)
+                .enable()
         }
-    }
-
-    private fun requestStep(thread: ThreadReference) {
-        vm.eventRequestManager()
-            .createStepRequest(thread, StepRequest.STEP_LINE, StepRequest.STEP_INTO)
+        eventRequestManager
+            .createMethodEntryRequest()
+            .apply { addClassFilter(loadedClass) }
             .enable()
-    }
-
-    private fun deleteStepRequests() {
-        val manager = vm.eventRequestManager()
-        manager.deleteEventRequests(manager.stepRequests())
-    }
-
-    private fun inspectProgramState(thread: ThreadReference) {
-        val stackFrame = thread.frame(0)
-        val currStopLocation = stackFrame.location()
-        val stackDepth = thread.frameCount()
-        if (!(debugInfoArePresent(currStopLocation) && currStopLocation.sourceName() in inspectedFilesNames)) {
-            lastStopInfo = StopInfo(null, lastStopInfo.lastKnownEnclosingCall, stackDepth)
-            return
-        }
-        val lastStopInfoBefore = lastStopInfo
-        if ((lastStopInfoBefore.stackDepth != null) && (stackDepth < lastStopInfoBefore.stackDepth)) {
-            val argsValues =
-                currStopLocation
-                    .method()
-                    .arguments()
-                    .map { it.name() to stringOf(stackFrame.getValue(it)) }
-            trace.add(FunCallEvent(currStopLocation.method().name(), argsValues))
-        }
-//        if (lastStopInfoBefore.stackDepth != null && stackDepth > lastStopInfoBefore.stackDepth){
-//            trace.add(FunExitEvent())
-//        }
-
+        eventRequestManager
+            .createMethodExitRequest()
+            .apply { addClassFilter(loadedClass) }
+            .enable()
     }
 
     private fun debugInfoArePresent(currStopLocation: Location): Boolean = currStopLocation.lineNumber() != -1
