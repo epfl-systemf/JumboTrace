@@ -88,6 +88,22 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
             .enable()
     }
 
+    private fun disableRequests(){
+        with(vm.eventRequestManager()){
+            breakpointRequests().forEach { it.disable() }
+            methodEntryRequests().forEach { it.disable() }
+            methodExitRequests().forEach { it.disable() }
+        }
+    }
+
+    private fun enableRequests(){
+        with(vm.eventRequestManager()){
+            breakpointRequests().forEach { it.enable() }
+            methodEntryRequests().forEach { it.enable() }
+            methodExitRequests().forEach { it.enable() }
+        }
+    }
+
     private fun handleFunctionEntered(event: MethodEntryEvent) {
         val methodArgs = event.method().arguments()
         // this weird trick with empty args list is an attempt to prevent nondeterministic crashes (not sure if it works)
@@ -98,26 +114,26 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
                 it.name() to evaluate(thread.frame(0).getValue(it), thread)
             }
         val methodName = event.method().name()
-        val callEvent = FunCallEvent(methodName, args)
+        val callEvent = FunCallEvent(methodName, args, eventsUidStack.lastOrNull())
         trace.add(callEvent)
         eventsUidStack.add(callEvent.uid)
     }
 
     private fun handleFunctionExited(event: MethodExitEvent) {
+        eventsUidStack.removeLast()
         trace.add(
             FunExitEvent(
                 event.method().name(),
-                evaluate(event.returnValue(), event.thread())
+                evaluate(event.returnValue(), event.thread()),
+                eventsUidStack.lastOrNull()
             )
         )
-        eventsUidStack.removeLast()
     }
 
     private fun handleBreakpoint(event: BreakpointEvent) {
         val location = event.location()
         if (debugInfoIsPresent(location)) {
             val lineRef = LineRef(location.sourceName(), location.lineNumber())
-            val parentCallUid = eventsUidStack.last()
             val visibleVars: Map<String, String>? = try {
                 val thread = event.thread()
                 val frame = thread.frame(0)
@@ -125,7 +141,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
             } catch (_: IncompatibleThreadStateException){  // FIXME if possible
                 null
             }
-            trace.add(LineVisitedEvent(lineRef, parentCallUid, visibleVars))
+            trace.add(LineVisitedEvent(lineRef, visibleVars, eventsUidStack.lastOrNull()))
         }
     }
 

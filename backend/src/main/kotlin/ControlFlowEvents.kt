@@ -10,6 +10,8 @@ typealias MutableTrace = MutableList<ControlFlowEvent>
 sealed class ControlFlowEvent {
     val uid: CFEventUid = uidGenerator.incrementAndGet()
 
+    abstract val stackParentUid: CFEventUid?
+
     companion object {
         private val uidGenerator = AtomicLong()
     }
@@ -18,21 +20,25 @@ sealed class ControlFlowEvent {
 @Serializable
 data class LineVisitedEvent(
     val newLine: LineRef,
-    val stackParentUid: CFEventUid?,
-    val visibleVars: Map<String, String>?
+    val visibleVars: Map<String, String>?,
+    override val stackParentUid: CFEventUid?
 ) : ControlFlowEvent() {
     override fun toString(): String =
-        "[$uid] VISIT $newLine (stack parent: $stackParentUid) " +
+        "[$uid ($stackParentUid)] VISIT $newLine " +
                 (visibleVars
                     ?.map { (n, v) -> "$n = $v" }
-                    ?.joinToString(prefix = "[", separator = ", ", postfix = "]")
+                    ?.joinToString(prefix = "{ ", separator = ", ", postfix = " }")
                     ?: "<missing variables info>")
 }
 
 @Serializable
-data class FunCallEvent(val funId: String, val args: List<Pair<String, String>>) : ControlFlowEvent() {
+data class FunCallEvent(
+    val funId: String,
+    val args: List<Pair<String, String>>,
+    override val stackParentUid: CFEventUid?
+) : ControlFlowEvent() {
     override fun toString(): String =
-        "[$uid] CALL $funId" + args.joinToString(
+        "[$uid ($stackParentUid)] CALL $funId" + args.joinToString(
             prefix = "(",
             postfix = ")",
             separator = ",",
@@ -42,22 +48,35 @@ data class FunCallEvent(val funId: String, val args: List<Pair<String, String>>)
 }
 
 @Serializable
-data class FunExitEvent(val funId: String, val retVal: String?) : ControlFlowEvent() {
-    override fun toString(): String = "[$uid] EXIT $funId --> return $retVal"
+data class FunExitEvent(
+    val funId: String,
+    val retVal: String?,
+    override val stackParentUid: CFEventUid?
+) : ControlFlowEvent() {
+    override fun toString(): String = "[$uid ($stackParentUid)] EXIT $funId --> return $retVal"
 }
 
 @Serializable
-data class LoopEnterEvent(val loopLine: LineRef) : ControlFlowEvent() {
+data class LoopEnterEvent(
+    val loopLine: LineRef,
+    override val stackParentUid: CFEventUid?
+) : ControlFlowEvent() {
     // TODO toString
 }
 
 @Serializable
-data class LoopNewIterEvent(val loopLine: LineRef) : ControlFlowEvent() {
+data class LoopNewIterEvent(
+    val loopLine: LineRef,
+    override val stackParentUid: CFEventUid?
+) : ControlFlowEvent() {
     // TODO toString
 }
 
 @Serializable
-data class LoopExitEvent(val loopLine: LineRef) : ControlFlowEvent() {
+data class LoopExitEvent(
+    val loopLine: LineRef,
+    override val stackParentUid: CFEventUid?
+) : ControlFlowEvent() {
     // TODO toString
 }
 
