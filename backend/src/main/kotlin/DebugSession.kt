@@ -14,6 +14,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
     private val vm: VirtualMachine
 
     private val trace: MutableTrace = mutableListOf()
+    private val eventsUidStack: MutableList<CFEventUid> = mutableListOf()
 
     init {
 
@@ -53,17 +54,15 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
                     }
 
                     is BreakpointEvent -> {
-                        if (debugInfoArePresent(event.location())) {
-                            println("visited line ${event.location()}")
-                        }
+                        handleBreakpoint(event)
                     }
 
                     is MethodEntryEvent -> {
-                        println("entered ${event.method().name()}")
+                        handleFunctionEntered(event)
                     }
 
                     is MethodExitEvent -> {
-                        println("exited ${event.method().name()}")
+                        handleFunctionExited(event)
                     }
                 }
                 vm.resume()
@@ -90,15 +89,50 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
             .enable()
     }
 
-    private fun debugInfoArePresent(currStopLocation: Location): Boolean = currStopLocation.lineNumber() != -1
+    private fun handleFunctionEntered(event: MethodEntryEvent) {
+        val methodArgs = event.method().arguments()
+        // this weird trick with empty args list is an attempt to prevent nondeterministic crashes (not sure if it works)
+        val args: List<Pair<String, String>> =
+            if (methodArgs.isEmpty()) emptyList()
+            else methodArgs.map {
+                it.name() to stringOf(event.thread().frame(0).getValue(it))
+            }
+        val methodName = event.method().name()
+        val callEvent = FunCallEvent(methodName, args)
+        trace.add(callEvent)
+        eventsUidStack.add(callEvent.uid)
+    }
+
+    private fun handleFunctionExited(event: MethodExitEvent) {
+        trace.add(
+            FunExitEvent(
+                event.method().name(),
+                stringOf(event.returnValue())
+            )
+        )
+        eventsUidStack.removeLast()
+    }
+
+    private fun handleBreakpoint(event: BreakpointEvent) {
+        val location = event.location()
+        if (debugInfoIsPresent(location)) {
+            val lineRef = LineRef(location.sourceName(), location.lineNumber())
+            val parentCallUid = eventsUidStack.last()
+            trace.add(LineVisitedEvent(lineRef, parentCallUid))
+        }
+    }
+
+    private fun debugInfoIsPresent(currStopLocation: Location): Boolean = currStopLocation.lineNumber() != -1
 
     private fun stringOf(value: Value): String =
         when (value) {
-            is ArrayReference ->
-                value.values.map(::stringOf).joinToString(prefix = "[", separator = ",", postfix = "]")
 
-            else ->
-                value.toString()
+            is ArrayReference ->
+                value.values.joinToString(prefix = "[", separator = ",", postfix = "]", transform = ::stringOf)
+
+            is VoidValue -> "<void>"
+
+            else -> value.toString()
         }
 
 }
