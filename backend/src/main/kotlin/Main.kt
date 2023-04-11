@@ -2,7 +2,6 @@ import com.github.javaparser.ParserConfiguration
 import com.github.javaparser.Problem
 import java.nio.file.Path
 import kotlin.jvm.optionals.getOrDefault
-import kotlin.system.exitProcess
 
 
 fun main(args: Array<String>) {
@@ -18,8 +17,22 @@ fun main(args: Array<String>) {
     val parser = SourceFilesParser(ParserConfiguration.LanguageLevel.JAVA_17)
     val debugSession = DebugSession(programDir, mainClassName, parser.parse(srcFiles, ::reportParseProblems))
     val trace = debugSession.run()
-    println(trace.joinToString("\n"))
+    displayTrace(trace)
     JsonWriter.write(Path.of("./trace/${mainClassName}-trace.json"), trace)
+}
+
+private fun displayTrace(trace: Trace) {
+    val indentGranularity = 2
+    var indent = 0
+    for (cfe in trace) {
+        if (cfe is FunExitEvent){
+            indent -= indentGranularity
+        }
+        println(" ".repeat(indent) + cfe)
+        if (cfe is FunCallEvent){
+            indent += indentGranularity
+        }
+    }
 }
 
 fun reportArgsError(): Nothing {

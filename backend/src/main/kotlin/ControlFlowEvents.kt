@@ -16,8 +16,17 @@ sealed class ControlFlowEvent {
 }
 
 @Serializable
-data class LineVisitedEvent(val newLine: LineRef, val stackParentUid: CFEventUid) : ControlFlowEvent() {
-    override fun toString(): String = "[$uid] VISIT $newLine (stack parent: $stackParentUid)"
+data class LineVisitedEvent(
+    val newLine: LineRef,
+    val stackParentUid: CFEventUid?,
+    val visibleVars: Map<String, String>?
+) : ControlFlowEvent() {
+    override fun toString(): String =
+        "[$uid] VISIT $newLine (stack parent: $stackParentUid) " +
+                (visibleVars
+                    ?.map { (n, v) -> "$n = $v" }
+                    ?.joinToString(prefix = "[", separator = ", ", postfix = "]")
+                    ?: "<missing variables info>")
 }
 
 @Serializable
@@ -50,20 +59,5 @@ data class LoopNewIterEvent(val loopLine: LineRef) : ControlFlowEvent() {
 @Serializable
 data class LoopExitEvent(val loopLine: LineRef) : ControlFlowEvent() {
     // TODO toString
-}
-
-@Serializable
-data class NewVarDefinedEvent(val varName: String, val value: String?) : ControlFlowEvent() {
-    override fun toString(): String = "[$uid] DEF-VAR $varName = $value"
-}
-
-@Serializable
-data class VarSetEvent(val varName: String, val value: String) : ControlFlowEvent() {
-    override fun toString(): String = "[$uid] SET-VAR $varName = $value"
-}
-
-@Serializable
-data class FieldSetEvent(val owner: String, val field: String, val value: String) : ControlFlowEvent() {
-    override fun toString(): String = "[$uid] SET-FIELD $owner.$field = $value"
 }
 

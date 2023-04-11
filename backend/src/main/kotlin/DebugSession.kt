@@ -33,7 +33,6 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
         val eventSet = try {
             vm.eventQueue().remove()
         } catch (vmde: VMDisconnectedException) {
-            println("VM is disconnected")
             null
         }
         return if (eventSet == null) {
@@ -95,7 +94,8 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
         val args: List<Pair<String, String>> =
             if (methodArgs.isEmpty()) emptyList()
             else methodArgs.map {
-                it.name() to stringOf(event.thread().frame(0).getValue(it))
+                val thread = event.thread()
+                it.name() to evaluate(thread.frame(0).getValue(it), thread)
             }
         val methodName = event.method().name()
         val callEvent = FunCallEvent(methodName, args)
@@ -107,7 +107,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
         trace.add(
             FunExitEvent(
                 event.method().name(),
-                stringOf(event.returnValue())
+                evaluate(event.returnValue(), event.thread())
             )
         )
         eventsUidStack.removeLast()
@@ -118,21 +118,36 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
         if (debugInfoIsPresent(location)) {
             val lineRef = LineRef(location.sourceName(), location.lineNumber())
             val parentCallUid = eventsUidStack.last()
-            trace.add(LineVisitedEvent(lineRef, parentCallUid))
+            val visibleVars: Map<String, String>? = try {
+                val thread = event.thread()
+                val frame = thread.frame(0)
+                frame.visibleVariables().associate { it.name() to evaluate(frame.getValue(it), thread) }
+            } catch (_: IncompatibleThreadStateException){  // FIXME if possible
+                null
+            }
+            trace.add(LineVisitedEvent(lineRef, parentCallUid, visibleVars))
         }
     }
 
-    private fun debugInfoIsPresent(currStopLocation: Location): Boolean = currStopLocation.lineNumber() != -1
+    private fun debugInfoIsPresent(location: Location): Boolean = (location.lineNumber() != -1)
 
-    private fun stringOf(value: Value): String =
-        when (value) {
+    private fun evaluate(value: Value, thread: ThreadReference): String {
+        return when (value) {
 
             is ArrayReference ->
-                value.values.joinToString(prefix = "[", separator = ",", postfix = "]", transform = ::stringOf)
+                value.values.joinToString(prefix = "[", separator = ", ", postfix = "]") {
+                    evaluate(it, thread)
+                }
 
             is VoidValue -> "<void>"
 
+//            is ObjectReference -> {
+//                val method = value.referenceType().methodsByName("toString").first()
+//                value.invokeMethod(thread, method, emptyList(), 0x0).toString()
+//            }
+
             else -> value.toString()
         }
+    }
 
 }
