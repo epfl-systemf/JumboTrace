@@ -1,30 +1,26 @@
+import com.github.javaparser.ast.CompilationUnit
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration
+import com.github.javaparser.ast.body.TypeDeclaration
 import com.sun.jdi.*
-import com.sun.jdi.event.BreakpointEvent
 import com.sun.jdi.event.ClassPrepareEvent
+import com.sun.jdi.event.MethodEntryEvent
+import com.sun.jdi.event.MethodExitEvent
 import com.sun.jdi.event.StepEvent
 import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
 
-class DebugSession(programDir: Path, mainClassName: String, filePaths: List<Path>) {
-    /**
-     * Maps file name to list of lines
-     */
-    private val filesContent: Map<String, List<String>>
+class DebugSession(programDir: Path, mainClassName: String, private val inspectedFiles: Map<Path, CompilationUnit>) {
+
+    private val inspectedFilesNames: Set<String> = inspectedFiles.map { it.key.name }.toSet()
+    private val maxSrcFileNameLength: Int = inspectedFilesNames.maxOf(String::length)
     private val vm: VirtualMachine
-    private val maxSrcFileNameLength: Int
 
     private val trace: MutableTrace = mutableListOf()
 
-    private var lastDisplayedLine: LineInfo? = null
-
-    private val ansiYellow = "\u001B[33m"
-    private val ansiReset = "\u001B[0m"
+    private var lastStopInfo: StopInfo = StopInfo(null, null, null)
 
     init {
-
-        filesContent = filePaths.associate { Pair(it.name, it.toFile().readLines()) }
-        maxSrcFileNameLength = filePaths.maxOf { it.name.length }
 
         val launchingConnector = Bootstrap.virtualMachineManager().defaultConnector()
         val args = launchingConnector.defaultArguments()
@@ -44,27 +40,30 @@ class DebugSession(programDir: Path, mainClassName: String, filePaths: List<Path
             println("VM is disconnected")
             null
         }
-        return if (eventSet == null){
+        return if (eventSet == null) {
             trace
         } else {
             for (event in eventSet) {
                 when (event) {
-                    // at initialization, ClassPrepareEvent => set breakpoints to stop at first executed statement
-                    is ClassPrepareEvent ->
-                        requestStep(event.thread())
-                    // when reaching the first statement, stop using breakpoints and move to stepping
-                    is BreakpointEvent -> {
-                        val thread = event.thread()
-                        displayStatementIfLineChanged(thread)
-                        deleteBreakpoints()
-                        requestStep(thread)
+
+                    is ClassPrepareEvent -> {
+//                        requestStep(event.thread())
+                        createFunEntryAndExitEventsRequest()
                     }
-                    // stepping: schedule a step on the next statement
+
                     is StepEvent -> {
                         val thread = event.thread()
-                        displayStatementIfLineChanged(thread)
+                        inspectProgramState(thread)
                         deleteStepRequests()
                         requestStep(thread)
+                    }
+
+                    is MethodEntryEvent -> {
+                        println("entered ${event.method().name()}")
+                    }
+
+                    is MethodExitEvent -> {
+                        println("exited ${event.method().name()}")
                     }
                 }
                 vm.resume()
@@ -73,8 +72,21 @@ class DebugSession(programDir: Path, mainClassName: String, filePaths: List<Path
         }
     }
 
-    private fun deleteBreakpoints() {
-        vm.eventRequestManager().deleteAllBreakpoints()
+    private fun createFunEntryAndExitEventsRequest() {
+        val classesToMonitor =
+            inspectedFiles
+                .flatMap { it.value.findAll(TypeDeclaration::class.java) }
+                .map { it.name.id }
+        for (classToMonitor in classesToMonitor) {
+            with(vm.eventRequestManager()) {
+                createMethodEntryRequest()
+                    .apply { addClassFilter(classToMonitor) }
+                    .enable()
+                createMethodExitRequest()
+                    .apply { addClassFilter(classToMonitor) }
+                    .enable()
+            }
+        }
     }
 
     private fun requestStep(thread: ThreadReference) {
@@ -88,60 +100,38 @@ class DebugSession(programDir: Path, mainClassName: String, filePaths: List<Path
         manager.deleteEventRequests(manager.stepRequests())
     }
 
-    private fun displayStatementIfLineChanged(thread: ThreadReference) {
+    private fun inspectProgramState(thread: ThreadReference) {
         val stackFrame = thread.frame(0)
-        val location = stackFrame.location()
-        if (hasInfo(location) && location.sourceName() in filesContent && lastDisplayedLine?.matches(location) != true) {
-            lastDisplayedLine = lineInfoFromLocation(location, thread.frameCount())
-            actuallyDisplayStatement(location, stackFrame)
-        } else if (
-            (!hasInfo(location) || location.sourceName() !in filesContent)
-            && lastDisplayedLine != null
-            // as long as we are deeper in the stack than the last time a line was displayed, is considered as a nested call
-            && thread.frameCount() <= lastDisplayedLine!!.frameCnt
-        ) {
-            lastDisplayedLine = null
+        val currStopLocation = stackFrame.location()
+        val stackDepth = thread.frameCount()
+        if (!(debugInfoArePresent(currStopLocation) && currStopLocation.sourceName() in inspectedFilesNames)) {
+            lastStopInfo = StopInfo(null, lastStopInfo.lastKnownEnclosingCall, stackDepth)
+            return
         }
-    }
-
-    private fun actuallyDisplayStatement(location: Location, stackFrame: StackFrame) {
-        require(location.sourceName() in filesContent)
-        val lineNumber = location.lineNumber()
-        val visibleVars = stackFrame.getValues(stackFrame.visibleVariables())
-        val lineDescr = (
-                "${location.sourceName().padStart(maxSrcFileNameLength)} : $lineNumber:\t" +
-                        filesContent[location.sourceName()]!![lineNumber - 1] +
-                        "   \t" + ansiYellow +
-                        visibleVars
-                            .map { (localVar, value) -> "${localVar.name()} = $value" }
-                            .joinToString(prefix = "[", separator = ", ", postfix = "]") +
-                        ansiReset
-                )
-        println(lineDescr)
-        trace.add(TraceElement(
-            location.sourceName(), lineNumber,
-            visibleVars.map { (localVar, value) -> localVar.name() to value.toString() }.toMap()
-        ))
-    }
-
-//    private fun stringDescrOf(value: Value, thread: ThreadReference): String {
-//        val tpe = value.type()
-//        when (tpe){
-//            is PrimitiveType -> value.toString()
-//            is ClassType ->
-//                tpe.invokeMethod(thread, tpe.methodsByName("toString"))
+        val lastStopInfoBefore = lastStopInfo
+        if ((lastStopInfoBefore.stackDepth != null) && (stackDepth < lastStopInfoBefore.stackDepth)) {
+            val argsValues =
+                currStopLocation
+                    .method()
+                    .arguments()
+                    .map { it.name() to stringOf(stackFrame.getValue(it)) }
+            trace.add(FunCallEvent(currStopLocation.method().name(), argsValues))
+        }
+//        if (lastStopInfoBefore.stackDepth != null && stackDepth > lastStopInfoBefore.stackDepth){
+//            trace.add(FunExitEvent())
 //        }
-//    }
 
-    private fun hasInfo(location: Location): Boolean = location.lineNumber() != -1
-
-    private data class LineInfo(val sourceName: String, val line: Int, val frameCnt: Int) {
-        fun matches(location: Location): Boolean {
-            return location.sourceName() == this.sourceName && location.lineNumber() == this.line
-        }
     }
 
-    private fun lineInfoFromLocation(location: Location, frameCnt: Int): LineInfo =
-        LineInfo(location.sourceName(), location.lineNumber(), frameCnt)
+    private fun debugInfoArePresent(currStopLocation: Location): Boolean = currStopLocation.lineNumber() != -1
+
+    private fun stringOf(value: Value): String =
+        when (value) {
+            is ArrayReference ->
+                value.values.map(::stringOf).joinToString(prefix = "[", separator = ",", postfix = "]")
+
+            else ->
+                value.toString()
+        }
 
 }
