@@ -7,6 +7,7 @@ import com.sun.jdi.event.MethodExitEvent
 import java.nio.file.Path
 import kotlin.io.path.name
 
+// TODO is access to parsed files really necessary here?
 class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<Path, CompilationUnit>) {
 
     private val inspectedFilesNames: Set<String> = inspectedFiles.map { it.key.name }.toSet()
@@ -76,6 +77,9 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         /*
          * TODO investigate incompatibilities between breakpoints and call/return events
          *  Also step seems even more incompatible
+         * TODO try to set watchpoints on all methods to be notified when variables are updated
+         *  Maybe (seems unlikely) this allows avoiding calls to frame.getVariables and similar and breakpoints can be used only
+         *  to know what path the control-flow followed
          */
         for (location in loadedClass.allLineLocations()) {
             eventRequestManager
@@ -113,7 +117,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val args = nullOn(IncompatibleThreadStateException::class.java) {
             val frame = thread.frame(0)
             methodArgs.map { localVar ->
-                val value = nullOn(IllegalArgumentException::class.java){
+                val value = nullOn(IllegalArgumentException::class.java) {
                     frame.getValue(localVar)
                 }
                 localVar.name() to value?.let { evaluate(it, thread) }
@@ -144,7 +148,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
                 val thread = event.thread()
                 val frame = thread.frame(0)
                 frame.visibleVariables().associate { localVar ->
-                    val value = nullOn(InvalidStackFrameException::class.java){
+                    val value = nullOn(InvalidStackFrameException::class.java) {
                         frame.getValue(localVar)
                     }
                     localVar.name() to value?.let { evaluate(it, thread) }
@@ -182,15 +186,16 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         }
     }
 
-    private fun <E: Throwable, T> nullOn(excClass: Class<E>, action: () -> T): T? =
-        try {
+    private fun <E : Throwable, T> nullOn(excClass: Class<E>, action: () -> T): T? {
+        return try {
             action()
-        } catch (e: Throwable){
-            if (e::class.java == excClass){
+        } catch (e: Throwable) {
+            if (e::class.java == excClass) {
                 null
             } else {
                 throw e
             }
         }
+    }
 
 }
