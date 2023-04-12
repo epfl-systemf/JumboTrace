@@ -113,8 +113,9 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val method = event.method()
         val methodArgs = method.arguments()
         val args = try {
+            val frame = thread.frame(0)
             methodArgs.map {
-                it.name() to evaluate(thread.frame(0).getValue(it), thread)
+                it.name() to evaluate(frame.getValue(it), thread)
             }
         } catch (e: Exception){  // FIXME if possible
             if (e is IllegalArgumentException || e is IncompatibleThreadStateException) null
