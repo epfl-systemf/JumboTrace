@@ -34,17 +34,20 @@ data class LineVisitedEvent(
 @Serializable
 data class FunCallEvent(
     val funId: String,
-    val args: List<Pair<String, String>>,
+    val args: List<Pair<String, String>>?,
     override val stackParentUid: CFEventUid?
 ) : ControlFlowEvent() {
     override fun toString(): String =
-        "[$uid ($stackParentUid)] CALL $funId" + args.joinToString(
-            prefix = "(",
-            postfix = ")",
-            separator = ",",
-            transform = { (name, value) ->
-                "$name = $value"
-            })
+        "[$uid ($stackParentUid)] CALL $funId" + (
+                args?.joinToString(
+                    prefix = "(",
+                    postfix = ")",
+                    separator = ",",
+                    transform = { (name, value) ->
+                        "$name = $value"
+                    })
+                    ?: "<unknown args values>"
+                )
 }
 
 @Serializable

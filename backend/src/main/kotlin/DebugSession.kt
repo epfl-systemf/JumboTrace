@@ -4,6 +4,8 @@ import com.sun.jdi.event.BreakpointEvent
 import com.sun.jdi.event.ClassPrepareEvent
 import com.sun.jdi.event.MethodEntryEvent
 import com.sun.jdi.event.MethodExitEvent
+import java.lang.Exception
+import java.lang.IllegalArgumentException
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -77,11 +79,11 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
          * TODO investigate incompatibilities between breakpoints and call/return events
          *  Also step seems even more incompatible
          */
-//        for (location in loadedClass.allLineLocations()) {
-//            eventRequestManager
-//                .createBreakpointRequest(location)
-//                .enable()
-//        }
+        for (location in loadedClass.allLineLocations()) {
+            eventRequestManager
+                .createBreakpointRequest(location)
+                .enable()
+        }
         eventRequestManager
             .createMethodEntryRequest()
             .apply { addClassFilter(loadedClass) }
@@ -110,10 +112,14 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val thread = event.thread()
         val method = event.method()
         val methodArgs = method.arguments()
-        val args =
+        val args = try {
             methodArgs.map {
                 it.name() to evaluate(thread.frame(0).getValue(it), thread)
             }
+        } catch (e: Exception){  // FIXME if possible
+            if (e is IllegalArgumentException || e is IncompatibleThreadStateException) null
+            else throw e
+        }
         val methodName = method.name()
         val callEvent = FunCallEvent(methodName, args, eventsUidStack.lastOrNull())
         trace.add(callEvent)
@@ -139,8 +145,9 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
                 val thread = event.thread()
                 val frame = thread.frame(0)
                 frame.visibleVariables().associate { it.name() to evaluate(frame.getValue(it), thread) }
-            } catch (_: IncompatibleThreadStateException){  // FIXME if possible
-                null
+            } catch (e: Exception){  // FIXME if possible
+                if (e is IncompatibleThreadStateException || e is InvalidStackFrameException) null
+                else throw e
             }
             trace.add(LineVisitedEvent(lineRef, visibleVars, eventsUidStack.lastOrNull()))
         }
