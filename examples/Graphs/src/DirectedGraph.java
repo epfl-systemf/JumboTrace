@@ -34,4 +34,18 @@ public class DirectedGraph {
         }
     }
 
+    @Override
+    public String toString() {
+        var verticesStrJ = new StringJoiner(", ", "{ ", " }");
+        var edgesStrJ = new StringJoiner(", ", "{ ", " }");
+        for (var e : adjList.entrySet()) {
+            int from = e.getKey();
+            verticesStrJ.add(Integer.toString(from));
+            for (var to : e.getValue()) {
+                edgesStrJ.add(String.format("%d -> %d", from, to));
+            }
+        }
+        return String.format("( %s ; %s )", verticesStrJ, edgesStrJ);
+    }
+
 }

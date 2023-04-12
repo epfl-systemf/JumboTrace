@@ -6,9 +6,8 @@ import com.sun.jdi.event.MethodEntryEvent
 import com.sun.jdi.event.MethodExitEvent
 import java.nio.file.Path
 import kotlin.io.path.name
-import kotlin.jvm.Throws
 
-class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<Path, CompilationUnit>) {
+class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<Path, CompilationUnit>) {
 
     private val inspectedFilesNames: Set<String> = inspectedFiles.map { it.key.name }.toSet()
     private val vm: VirtualMachine
@@ -21,7 +20,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
         val launchingConnector = Bootstrap.virtualMachineManager().defaultConnector()
         val args = launchingConnector.defaultArguments()
         args["main"]!!.setValue(mainClassName)
-        args["options"]!!.setValue("-cp $programDir")
+        args["options"]!!.setValue("-cp $classPath -Xint")     // TODO is Xint really needed?
         vm = launchingConnector.launch(args)
 
         vm.eventRequestManager()
@@ -73,11 +72,15 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
     @Throws(AbsentInformationException::class)
     private fun addMonitoringToClass(loadedClass: ReferenceType) {
         val eventRequestManager = vm.eventRequestManager()
-        for (location in loadedClass.allLineLocations()) {
-            eventRequestManager
-                .createBreakpointRequest(location)
-                .enable()
-        }
+        /*
+         * TODO investigate incompatibilities between breakpoints and call/return events
+         *  Also step seems even more incompatible
+         */
+//        for (location in loadedClass.allLineLocations()) {
+//            eventRequestManager
+//                .createBreakpointRequest(location)
+//                .enable()
+//        }
         eventRequestManager
             .createMethodEntryRequest()
             .apply { addClassFilter(loadedClass) }
@@ -93,6 +96,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
             breakpointRequests().forEach { it.disable() }
             methodEntryRequests().forEach { it.disable() }
             methodExitRequests().forEach { it.disable() }
+            classPrepareRequests().forEach { it.disable() }
         }
     }
 
@@ -101,6 +105,7 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
             breakpointRequests().forEach { it.enable() }
             methodEntryRequests().forEach { it.enable() }
             methodExitRequests().forEach { it.enable() }
+            classPrepareRequests().forEach { it.enable() }
         }
     }
 
@@ -149,18 +154,24 @@ class DebugSession(programDir: Path, mainClassName: String, inspectedFiles: Map<
 
     private fun evaluate(value: Value, thread: ThreadReference): String {
         return when (value) {
-
-            is ArrayReference ->
-                value.values.joinToString(prefix = "[", separator = ", ", postfix = "]") {
-                    evaluate(it, thread)
-                }
+            is ArrayReference -> value.values.joinToString(prefix = "[", separator = ", ", postfix = "]") {
+                evaluate(it, thread)
+            }
 
             is VoidValue -> "<void>"
 
-//            is ObjectReference -> {
-//                val method = value.referenceType().methodsByName("toString").first()
-//                value.invokeMethod(thread, method, emptyList(), 0x0).toString()
-//            }
+            is StringReference -> value.toString()
+
+            is ObjectReference -> {
+                val classType = value.referenceType() as ClassType
+                val method = classType.concreteMethodByName("toString", "()Ljava/lang/String;")
+                disableRequests()
+                val str = value.invokeMethod(thread, method, emptyList(), 0x0)
+                    .toString().drop(1).dropLast(1)
+                enableRequests()
+                val valUid = value.uniqueID()
+                "[${classType.name()}-$valUid: $str]"
+            }
 
             else -> value.toString()
         }

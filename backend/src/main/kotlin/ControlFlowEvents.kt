@@ -24,7 +24,7 @@ data class LineVisitedEvent(
     override val stackParentUid: CFEventUid?
 ) : ControlFlowEvent() {
     override fun toString(): String =
-        "[$uid ($stackParentUid)] VISIT $newLine " +
+        "[$uid ($stackParentUid)] VISIT $newLine => " +
                 (visibleVars
                     ?.map { (n, v) -> "$n = $v" }
                     ?.joinToString(prefix = "{ ", separator = ", ", postfix = " }")

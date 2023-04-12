@@ -10,12 +10,12 @@ fun main(args: Array<String>) {
         reportArgsError()
     }
 
-    val programDir = Path.of(args[0])
+    val classPath = Path.of(args[0])
     val mainClassName = args[1]
     val srcFiles = args.drop(2).map(Path::of)
 
     val parser = SourceFilesParser(ParserConfiguration.LanguageLevel.JAVA_17)
-    val debugSession = DebugSession(programDir, mainClassName, parser.parse(srcFiles, ::reportParseProblems))
+    val debugSession = DebugSession(classPath, mainClassName, parser.parse(srcFiles, ::reportParseProblems))
     val trace = debugSession.run()
     displayTrace(trace)
     JsonWriter.write(Path.of("./trace/${mainClassName}-trace.json"), trace)
