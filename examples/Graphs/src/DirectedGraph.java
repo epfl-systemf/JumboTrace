@@ -45,7 +45,7 @@ public class DirectedGraph {
                 edgesStrJ.add(String.format("%d -> %d", from, to));
             }
         }
-        return String.format("( %s ; %s )", verticesStrJ, edgesStrJ);
+        return String.format("( V = %s ; E = %s )", verticesStrJ, edgesStrJ);
     }
 
 }

@@ -17,6 +17,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
 
     init {
 
+        // TODO redirect VM stdin/stdout/stderr
         val launchingConnector = Bootstrap.virtualMachineManager().defaultConnector()
         val args = launchingConnector.defaultArguments()
         args["main"]!!.setValue(mainClassName)
@@ -91,34 +92,29 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
             .enable()
     }
 
-    private fun disableRequests(){
-        with(vm.eventRequestManager()){
-            breakpointRequests().forEach { it.disable() }
-            methodEntryRequests().forEach { it.disable() }
-            methodExitRequests().forEach { it.disable() }
-            classPrepareRequests().forEach { it.disable() }
+    private fun <T> withRequestsDisabled(action: () -> T): T {
+        val requests = with(vm.eventRequestManager()) {
+            breakpointRequests() +
+                    methodEntryRequests() +
+                    methodExitRequests() +
+                    classPrepareRequests() +
+                    stepRequests()
         }
-    }
-
-    private fun enableRequests(){
-        with(vm.eventRequestManager()){
-            breakpointRequests().forEach { it.enable() }
-            methodEntryRequests().forEach { it.enable() }
-            methodExitRequests().forEach { it.enable() }
-            classPrepareRequests().forEach { it.enable() }
-        }
+        requests.forEach { it.disable() }
+        val ret = action()
+        requests.forEach { it.enable() }
+        return ret
     }
 
     private fun handleFunctionEntered(event: MethodEntryEvent) {
-        val methodArgs = event.method().arguments()
-        // this weird trick with empty args list is an attempt to prevent nondeterministic crashes (not sure if it works)
-        val args: List<Pair<String, String>> =
-            if (methodArgs.isEmpty()) emptyList()
-            else methodArgs.map {
-                val thread = event.thread()
+        val thread = event.thread()
+        val method = event.method()
+        val methodArgs = method.arguments()
+        val args =
+            methodArgs.map {
                 it.name() to evaluate(thread.frame(0).getValue(it), thread)
             }
-        val methodName = event.method().name()
+        val methodName = method.name()
         val callEvent = FunCallEvent(methodName, args, eventsUidStack.lastOrNull())
         trace.add(callEvent)
         eventsUidStack.add(callEvent.uid)
@@ -154,6 +150,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
 
     private fun evaluate(value: Value, thread: ThreadReference): String {
         return when (value) {
+
             is ArrayReference -> value.values.joinToString(prefix = "[", separator = ", ", postfix = "]") {
                 evaluate(it, thread)
             }
@@ -165,10 +162,10 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
             is ObjectReference -> {
                 val classType = value.referenceType() as ClassType
                 val method = classType.concreteMethodByName("toString", "()Ljava/lang/String;")
-                disableRequests()
-                val str = value.invokeMethod(thread, method, emptyList(), 0x0)
-                    .toString().drop(1).dropLast(1)
-                enableRequests()
+                val str = withRequestsDisabled {
+                    value.invokeMethod(thread, method, emptyList(), ClassType.INVOKE_SINGLE_THREADED)
+                        .toString().drop(1).dropLast(1)
+                }
                 val valUid = value.uniqueID()
                 "[${classType.name()}-$valUid: $str]"
             }
