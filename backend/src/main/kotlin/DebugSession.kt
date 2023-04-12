@@ -4,8 +4,6 @@ import com.sun.jdi.event.BreakpointEvent
 import com.sun.jdi.event.ClassPrepareEvent
 import com.sun.jdi.event.MethodEntryEvent
 import com.sun.jdi.event.MethodExitEvent
-import java.lang.Exception
-import java.lang.IllegalArgumentException
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -112,14 +110,14 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val thread = event.thread()
         val method = event.method()
         val methodArgs = method.arguments()
-        val args = try {
+        val args = nullOn(IncompatibleThreadStateException::class.java) {
             val frame = thread.frame(0)
-            methodArgs.map {
-                it.name() to evaluate(frame.getValue(it), thread)
+            methodArgs.map { localVar ->
+                val value = nullOn(IllegalArgumentException::class.java){
+                    frame.getValue(localVar)
+                }
+                localVar.name() to value?.let { evaluate(it, thread) }
             }
-        } catch (e: Exception){  // FIXME if possible
-            if (e is IllegalArgumentException || e is IncompatibleThreadStateException) null
-            else throw e
         }
         val methodName = method.name()
         val callEvent = FunCallEvent(methodName, args, eventsUidStack.lastOrNull())
@@ -142,13 +140,15 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val location = event.location()
         if (debugInfoIsPresent(location)) {
             val lineRef = LineRef(location.sourceName(), location.lineNumber())
-            val visibleVars: Map<String, String>? = try {
+            val visibleVars = nullOn(IncompatibleThreadStateException::class.java) {
                 val thread = event.thread()
                 val frame = thread.frame(0)
-                frame.visibleVariables().associate { it.name() to evaluate(frame.getValue(it), thread) }
-            } catch (e: Exception){  // FIXME if possible
-                if (e is IncompatibleThreadStateException || e is InvalidStackFrameException) null
-                else throw e
+                frame.visibleVariables().associate { localVar ->
+                    val value = nullOn(InvalidStackFrameException::class.java){
+                        frame.getValue(localVar)
+                    }
+                    localVar.name() to value?.let { evaluate(it, thread) }
+                }
             }
             trace.add(LineVisitedEvent(lineRef, visibleVars, eventsUidStack.lastOrNull()))
         }
@@ -175,11 +175,22 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
                         .toString().drop(1).dropLast(1)
                 }
                 val valUid = value.uniqueID()
-                "[${classType.name()}-$valUid: $str]"
+                "[${classType.name().takeLastWhile { it != '.' }}-$valUid: $str]"
             }
 
             else -> value.toString()
         }
     }
+
+    private fun <E: Throwable, T> nullOn(excClass: Class<E>, action: () -> T): T? =
+        try {
+            action()
+        } catch (e: Throwable){
+            if (e::class.java == excClass){
+                null
+            } else {
+                throw e
+            }
+        }
 
 }

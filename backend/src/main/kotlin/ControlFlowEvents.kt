@@ -20,21 +20,21 @@ sealed class ControlFlowEvent {
 @Serializable
 data class LineVisitedEvent(
     val newLine: LineRef,
-    val visibleVars: Map<String, String>?,
+    val visibleVars: Map<String, String?>?,
     override val stackParentUid: CFEventUid?
 ) : ControlFlowEvent() {
     override fun toString(): String =
         "[$uid ($stackParentUid)] VISIT $newLine => " +
                 (visibleVars
-                    ?.map { (n, v) -> "$n = $v" }
+                    ?.map { (n, v) -> "$n = ${v ?: "??"}" }
                     ?.joinToString(prefix = "{ ", separator = ", ", postfix = " }")
-                    ?: "<missing variables info>")
+                    ?: "<?? missing vars>")
 }
 
 @Serializable
 data class FunCallEvent(
     val funId: String,
-    val args: List<Pair<String, String>>?,
+    val args: List<Pair<String, String?>>?,
     override val stackParentUid: CFEventUid?
 ) : ControlFlowEvent() {
     override fun toString(): String =
@@ -44,9 +44,9 @@ data class FunCallEvent(
                     postfix = ")",
                     separator = ",",
                     transform = { (name, value) ->
-                        "$name = $value"
+                        "$name = ${value ?: "<??>"}"
                     })
-                    ?: "<unknown args values>"
+                    ?: "<?? missing args>"
                 )
 }
 
