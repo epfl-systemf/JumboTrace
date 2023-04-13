@@ -1,9 +1,6 @@
 import com.github.javaparser.ast.CompilationUnit
 import com.sun.jdi.*
-import com.sun.jdi.event.BreakpointEvent
-import com.sun.jdi.event.ClassPrepareEvent
-import com.sun.jdi.event.MethodEntryEvent
-import com.sun.jdi.event.MethodExitEvent
+import com.sun.jdi.event.*
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -24,10 +21,6 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         args["main"]!!.setValue(mainClassName)
         args["options"]!!.setValue("-cp $classPath -Xint")     // TODO is Xint really needed?
         vm = launchingConnector.launch(args)
-
-        vm.eventRequestManager()
-            .createClassPrepareRequest()
-            .enable()
     }
 
     tailrec fun run(): Trace {
@@ -41,6 +34,12 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         } else {
             for (event in eventSet) {
                 when (event) {
+
+                    is VMStartEvent -> {
+                        vm.eventRequestManager()
+                            .createClassPrepareRequest()
+                            .enable()
+                    }
 
                     is ClassPrepareEvent -> {
                         val loadedClass = event.referenceType()
