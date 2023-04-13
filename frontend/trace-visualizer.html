@@ -17,6 +17,50 @@
 
     <script lang="javascript">
 
+        // TODO expand/collapse
+
+        var trace = [];
+
+        debugger;   // TODO remove
+
+        class LineVisitedEvent {
+            constructor(newLine, visibleVars, stackParentUid){
+                this.newLine = newLine;
+                this.visibleVars = visibleVars;
+                this.stackParentUid = stackParentUid;
+            };
+            toString() {
+                return `VISIT ${this.newLine}`   // FIXME also display vars
+            }
+        };
+
+        class FunCallEvent {
+            constructor(funId, args, stackParentUid){
+                this.funId = funId;
+                this.args = args;
+                this.stackParentUid = stackParentUid;
+            }
+            toString(){
+                let argsDescr = (
+                    this.args == null ?
+                        "<?? missing arguments>"
+                    :   this.args.map(e => `${e.first} = ${e.second}`).join(', ')
+                );
+                return `CALL ${this.funId}(${argsDescr})`;
+            }
+        };
+
+        class FunExitEvent {
+            constructor(funId, retVal, stackParentUid){
+                this.funId = funId;
+                this.retVal = retVal;
+                this.stackParentUid = stackParentUid;
+            }
+            toString(){
+                return `RETURN ${this.retVal} from ${this.funId}`;
+            }
+        };
+
         document.getElementById("trace-file-picker").addEventListener("change", function(event){
             let file = event.target.files[0];
             if (!file){
@@ -25,27 +69,54 @@
             let reader = new FileReader();
             reader.onload = function(event){
                 let fileContents = event.target.result;
-                let trace = JSON.parse(fileContents);
-                displayTrace(trace);
+                let json = JSON.parse(fileContents);
+                populateTrace(json);
+                displayTrace();
             };
             reader.readAsText(file);
             document.title = "Visualizer: " + file.name.slice(0, -5);
         });
 
-        function displayTrace(trace){
+        function populateTrace(json){
+            trace = [];
+            for (evIdx in json){
+                let jEvent = json[evIdx];
+                switch(jEvent.type){
+                    case "LineVisitedEvent":
+                        trace.push(new LineVisitedEvent(
+                            `${jEvent.newLine.filename}:${jEvent.newLine.lineIdx}`,
+                            jEvent.visibleVars,
+                            jEvent.stackParentUid
+                        ));
+                        break;
+                    case "FunCallEvent":
+                        trace.push(new FunCallEvent(jEvent.funId, jEvent.args, jEvent.stackParentUid));
+                        break;
+                    case "FunExitEvent":
+                        trace.push(new FunExitEvent(jEvent.funId, jEvent.retVal, jEvent.stackParentUid));
+                        break;
+                }
+            }
+        }
+
+        function displayTrace(){
             let traceDisplay = document.getElementById("trace-display");
             // clear children
             while (traceDisplay.lastElementChild){
                 traceDisplay.removeChild(traceDisplay.lastElementChild);
             };
             // add new children
-            for (elemIdx in trace) {
-                let element = trace[elemIdx];
+            for (evIdx in trace) {
+                let event = trace[evIdx];
                 let div = document.createElement("div");
-                let varEntries = Object.entries(element.varsState).map(([variable, value]) => `${variable}=${value}`);
-                div.textContent = `${element.filename}-${element.line}:    ${varEntries}`;
+                div.id = eventDivId(event.uid);
+                div.textContent = event.toString();
                 traceDisplay.appendChild(div);
             };
+        }
+
+        function eventDivId(eventUid){
+            return `event-${eventUid}`;
         }
 
     </script>
