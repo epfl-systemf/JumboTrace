@@ -24,11 +24,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
     }
 
     tailrec fun run(): Trace {
-        val eventSet = try {
-            vm.eventQueue().remove()
-        } catch (vmde: VMDisconnectedException) {
-            null
-        }
+        val eventSet = vm.eventQueue().remove()
         return if (eventSet == null) {
             trace
         } else {
@@ -39,6 +35,10 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
                         vm.eventRequestManager()
                             .createClassPrepareRequest()
                             .enable()
+                    }
+
+                    is VMDisconnectEvent -> {
+                        return trace
                     }
 
                     is ClassPrepareEvent -> {
