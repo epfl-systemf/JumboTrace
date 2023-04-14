@@ -129,12 +129,11 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
     }
 
     private fun handleFunctionExited(event: MethodExitEvent) {
-        eventsUidStack.removeLast()
         trace.add(
             FunExitEvent(
                 event.method().name(),
                 evaluate(event.returnValue(), event.thread()),
-                eventsUidStack.lastOrNull()
+                eventsUidStack.removeLast()
             )
         )
     }

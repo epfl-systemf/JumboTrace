@@ -9,17 +9,20 @@
 
 
     <body>
-        <font face="Microsoft sans serif">
+        <div style="font-family: Consolas;">
             <input type="file" id="trace-file-picker" @change="loadSelectedFile">
             <br><br>
             <div id="trace-display"></div>
             <br><br>
-        </font>
+        </div>
     </body>
 
     <script lang="javascript">
 
-        var trace = [];
+        const HIGHLIGHT_COLOR = "#F4E98F";
+
+        var traceDict = {};
+        var highlighted = [];
 
         debugger;   // TODO remove
 
@@ -73,42 +76,47 @@
             reader.onload = function(event){
                 let fileContents = event.target.result;
                 let json = JSON.parse(fileContents);
-                populateTrace(json);
-                displayTrace();
+                let trace = readJson(json);
+                displayTrace(trace);
             };
             reader.readAsText(file);
             document.title = "Visualizer: " + file.name.slice(0, -5);
         });
 
-        function populateTrace(json){
-            trace = [];
+        function readJson(json){
+            traceDict = {};
+            let trace = [];
             for (evIdx in json){
                 let jEvent = json[evIdx];
+                let event = null;
                 switch(jEvent.type){
                     case "LineVisitedEvent":
-                        trace.push(new LineVisitedEvent(jEvent));
+                        event = new LineVisitedEvent(jEvent);
                         break;
                     case "FunCallEvent":
-                        trace.push(new FunCallEvent(jEvent));
+                        event = new FunCallEvent(jEvent);
                         break;
                     case "FunExitEvent":
-                        trace.push(new FunExitEvent(jEvent));
+                        event = new FunExitEvent(jEvent);
                         break;
                 };
+                trace.push(event);
+                traceDict[event.uid] = event;
             };
+            return trace;
         };
 
-        function displayTrace(){
+        function displayTrace(trace){
             let traceDisplay = document.getElementById("trace-display");
             // clear children
             while (traceDisplay.lastElementChild){
                 traceDisplay.removeChild(traceDisplay.lastElementChild);
             };
             // add new children
-            traceDisplay.appendChild(traceElementsLayered(0).layerNode);
+            traceDisplay.appendChild(traceElementsLayered(trace, 0).layerNode);
         };
 
-        function traceElementsLayered(startIdx, indent){
+        function traceElementsLayered(trace, startIdx){
             let layerNode = document.createElement("div");
             layerNode.style.paddingLeft = "25px";
             let idx = startIdx;
@@ -119,16 +127,27 @@
                     let details = document.createElement("details");
                     let summary = document.createElement("summary");
                     summary.id = eventNodeId(event.uid);
-                    summary.textContent = event.toString()
+                    summary.textContent = event.toString();
+                    summary.style.border = "1px solid white";
+                    summary.addEventListener("mouseenter", function(){
+                        highlight(event.uid);
+                        details.style.border = "1px solid lightblue";
+                    });
+                    summary.addEventListener("mouseleave", function(){
+                        removeHighlighting();
+                        details.style.border = "1px solid white";
+                    });
                     details.appendChild(summary);
-                    let recRes = traceElementsLayered(idx + 1);
+                    let recRes = traceElementsLayered(trace, idx + 1);
                     details.appendChild(recRes.layerNode);
                     layerNode.appendChild(details);
                     idx = recRes.idx;
                 } else if (event instanceof LineVisitedEvent || event instanceof FunExitEvent) {
-                    let eventNode = document.createElement("p");
+                    let eventNode = document.createElement("div");
                     eventNode.id = eventNodeId(event.uid);
                     eventNode.textContent = event.toString();
+                    eventNode.addEventListener("mouseenter", function(){ highlight(event.uid); });
+                    eventNode.addEventListener("mouseleave", function(){ removeHighlighting(); });
                     layerNode.appendChild(eventNode);
                     reachedExit = (event instanceof FunExitEvent);
                     idx += 1;
@@ -137,6 +156,24 @@
                 };
             };
             return { layerNode, idx };
+        };
+
+        function highlight(leafEventUid){
+            let eventUid = leafEventUid;
+            while (eventUid){
+                let id = eventNodeId(eventUid);
+                let eventNode = document.getElementById(id);
+                eventNode.style.backgroundColor = HIGHLIGHT_COLOR;
+                highlighted.push(eventNode);
+                eventUid = traceDict[eventUid].stackParentUid;
+            };
+        };
+
+        function removeHighlighting(){
+            while (highlighted.length > 0){
+                let child = highlighted.pop();
+                child.style.backgroundColor = "";
+            };
         };
 
         function eventNodeId(eventUid){
