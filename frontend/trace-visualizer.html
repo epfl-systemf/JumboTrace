@@ -9,15 +9,15 @@
 
 
     <body>
-        <input type="file" id="trace-file-picker" @change="loadSelectedFile">
-        <br><br>
-        <div id="trace-display"></div>
-        <br><br>
+        <font face="Microsoft sans serif">
+            <input type="file" id="trace-file-picker" @change="loadSelectedFile">
+            <br><br>
+            <div id="trace-display"></div>
+            <br><br>
+        </font>
     </body>
 
     <script lang="javascript">
-
-        // TODO expand/collapse
 
         var trace = [];
 
@@ -46,7 +46,7 @@
                 let argsDescr = (
                     this.args == null ?
                         "<?? missing arguments>"
-                    :   this.args.map(e => `${e.first} = ${e.second}`).join(', ')
+                    :   this.args.map(e => `${e.first} = ${e.second == null ? "<??>" : e.second}`).join(', ')
                 );
                 return `CALL ${this.funId}(${argsDescr})`;
             };
@@ -110,36 +110,33 @@
 
         function traceElementsLayered(startIdx, indent){
             let layerNode = document.createElement("div");
-            layerNode.style.paddingLeft = "15px";
+            layerNode.style.paddingLeft = "25px";
             let idx = startIdx;
             let reachedExit = false;
             while (idx < trace.length && !reachedExit){
                 let event = trace[idx];
-                let eventNode = document.createElement("p");
-                eventNode.id = eventNodeId(event.uid);
-                eventNode.textContent = event.toString();
                 if (event instanceof FunCallEvent){
                     let details = document.createElement("details");
                     let summary = document.createElement("summary");
-                    summary.style.display = "block";
-                    summary.appendChild(eventNode);
+                    summary.id = eventNodeId(event.uid);
+                    summary.textContent = event.toString()
                     details.appendChild(summary);
                     let recRes = traceElementsLayered(idx + 1);
                     details.appendChild(recRes.layerNode);
                     layerNode.appendChild(details);
                     idx = recRes.idx;
-                } else if (event instanceof LineVisitedEvent) {
+                } else if (event instanceof LineVisitedEvent || event instanceof FunExitEvent) {
+                    let eventNode = document.createElement("p");
+                    eventNode.id = eventNodeId(event.uid);
+                    eventNode.textContent = event.toString();
                     layerNode.appendChild(eventNode);
-                    idx += 1;
-                } else if (event instanceof FunExitEvent){
-                    layerNode.appendChild(eventNode);
-                    reachedExit = true;
+                    reachedExit = (event instanceof FunExitEvent);
                     idx += 1;
                 } else {
-                    throw "unexpected " + (typeof event);
+                    throw "unexpected " + event.toString();
                 };
             };
-            return {layerNode, idx};
+            return { layerNode, idx };
         };
 
         function eventNodeId(eventUid){
