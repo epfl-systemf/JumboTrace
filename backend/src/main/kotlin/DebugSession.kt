@@ -145,12 +145,12 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
             val visibleVars = nullOn(IncompatibleThreadStateException::class.java) {
                 val thread = event.thread()
                 val frame = thread.frame(0)
-                frame.visibleVariables().associate { localVar ->
-                    val value = nullOn(InvalidStackFrameException::class.java) {
-                        frame.getValue(localVar)
+                frame.visibleVariables()
+                    .map { localVar ->
+                        localVar.name() to frame.getValue(localVar)
+                    }.associate { (name, value) ->
+                        name to (value?.let { evaluate(it, thread) })
                     }
-                    localVar.name() to value?.let { evaluate(it, thread) }
-                }
             }
             trace.add(LineVisitedEvent(lineRef, visibleVars, eventsUidStack.lastOrNull()))
         }
