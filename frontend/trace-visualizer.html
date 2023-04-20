@@ -33,7 +33,7 @@
                 this.visibleVars = event.visibleVars;
                 this.stackParentUid = event.stackParentUid;
             };
-            toString() {
+            display() {
                 return `VISIT ${this.newLine}`   // FIXME also display vars
             };
         };
@@ -45,7 +45,7 @@
                 this.args = event.args;
                 this.stackParentUid = event.stackParentUid;
             };
-            toString(){
+            display(){
                 let argsDescr = (
                     this.args == null ?
                         "<?? missing arguments>"
@@ -62,7 +62,7 @@
                 this.retVal = event.retVal;
                 this.stackParentUid = event.stackParentUid;
             };
-            toString(){
+            display(){
                 return `RETURN ${this.retVal} from ${this.funId}`;
             };
         };
@@ -127,7 +127,7 @@
                     let details = document.createElement("details");
                     let summary = document.createElement("summary");
                     summary.id = eventNodeId(event.uid);
-                    summary.textContent = event.toString();
+                    summary.textContent = event.display();
                     summary.style.border = "1px solid white";
                     summary.addEventListener("mouseenter", function(){
                         highlight(event.uid);
@@ -145,14 +145,14 @@
                 } else if (event instanceof LineVisitedEvent || event instanceof FunExitEvent) {
                     let eventNode = document.createElement("div");
                     eventNode.id = eventNodeId(event.uid);
-                    eventNode.textContent = event.toString();
+                    eventNode.textContent = event.display();
                     eventNode.addEventListener("mouseenter", function(){ highlight(event.uid); });
                     eventNode.addEventListener("mouseleave", function(){ removeHighlighting(); });
                     layerNode.appendChild(eventNode);
                     reachedExit = (event instanceof FunExitEvent);
                     idx += 1;
                 } else {
-                    throw "unexpected " + event.toString();
+                    throw "unexpected";
                 };
             };
             return { layerNode, idx };
