@@ -4,7 +4,7 @@ plugins {
     application
 }
 
-group = "ch.epfl.systemf"   // TODO name project   jview???
+group = "ch.epfl.systemf.jumbotrace"
 version = "1.0-SNAPSHOT"
 
 repositories {

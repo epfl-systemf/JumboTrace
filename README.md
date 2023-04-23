@@ -1,4 +1,4 @@
-# JavaTracer
+# JumboTrace
 
 *<b> Disclaimer: this project is currently under development and the readme may thus not be up to date. </b>*
 
