@@ -1,6 +1,7 @@
 import com.github.javaparser.ast.CompilationUnit
 import com.sun.jdi.*
 import com.sun.jdi.event.*
+import com.sun.jdi.request.StepRequest
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -12,6 +13,7 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
 
     private val trace: MutableTrace = mutableListOf()
     private val eventsUidStack: MutableList<CFEventUid> = mutableListOf()
+    private val classesStack: MutableList<ReferenceType> = mutableListOf()
 
     init {
 
@@ -32,35 +34,45 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
                 when (event) {
 
                     is VMStartEvent -> {
+                        println("VM start")
                         vm.eventRequestManager()
                             .createClassPrepareRequest()
                             .enable()
                     }
 
                     is VMDisconnectEvent -> {
+                        println("VM disconnect")
                         return trace
                     }
 
                     is ClassPrepareEvent -> {
                         val loadedClass = event.referenceType()
+                        println("Loading class: $loadedClass")
                         try {
                             if (loadedClass.sourceName() in inspectedFilesNames) {
-                                addMonitoringToClass(loadedClass)
+                                addMonitoringToClass(loadedClass, event.thread())
                             }
                         } catch (_: AbsentInformationException) {
                             // ignore (intended behavior when loading a class that has not been compiled with the -g option)
                         }
                     }
 
-                    is BreakpointEvent -> {
-                        handleBreakpoint(event)
+//                    is BreakpointEvent -> {
+//                        handleStop(event)
+//                    }
+
+                    is StepEvent -> {
+                        println("Step: ${event.location()}")
+                        handleStop(event)
                     }
 
                     is MethodEntryEvent -> {
+                        println("Method call: ${event.method().name()}")
                         handleFunctionEntered(event)
                     }
 
                     is MethodExitEvent -> {
+                        println("Method return: ${event.method().name()}")
                         handleFunctionExited(event)
                     }
                 }
@@ -70,21 +82,20 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         }
     }
 
-    @Throws(AbsentInformationException::class)
-    private fun addMonitoringToClass(loadedClass: ReferenceType) {
+    private fun newStepRequest(thread: ThreadReference?, targetClass: ReferenceType): StepRequest {
         val eventRequestManager = vm.eventRequestManager()
-        /*
-         * TODO investigate incompatibilities between breakpoints and call/return events
-         *  Also step seems even more incompatible
-         * TODO try to set watchpoints on all methods to be notified when variables are updated
-         *  Maybe (seems unlikely) this allows avoiding calls to frame.getVariables and similar and breakpoints can be used only
-         *  to know what path the control-flow followed
-         */
-        for (location in loadedClass.allLineLocations()) {
-            eventRequestManager
-                .createBreakpointRequest(location)
-                .enable()
-        }
+        eventRequestManager.deleteEventRequests(eventRequestManager.stepRequests())
+        return eventRequestManager
+            .createStepRequest(thread, StepRequest.STEP_LINE, StepRequest.STEP_OVER)
+            .apply {
+                addClassFilter(targetClass)
+                enable()
+            }
+    }
+
+    @Throws(AbsentInformationException::class)
+    private fun addMonitoringToClass(loadedClass: ReferenceType, thread: ThreadReference) {
+        val eventRequestManager = vm.eventRequestManager()
         eventRequestManager
             .createMethodEntryRequest()
             .apply { addClassFilter(loadedClass) }
@@ -113,19 +124,20 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         val thread = event.thread()
         val method = event.method()
         val methodArgs = method.arguments()
-        val args = nullOn(IncompatibleThreadStateException::class.java) {
-            val frame = thread.frame(0)
-            methodArgs.map { localVar ->
-                val value = nullOn(IllegalArgumentException::class.java) {
-                    frame.getValue(localVar)
+        val frame = thread.frame(0)
+        val values = methodArgs.map(frame::getValue)
+        val args =
+            methodArgs.zip(values)
+                .map { (localVar, value) ->
+                    localVar.name() to value?.let { evaluate(it, thread) }
                 }
-                localVar.name() to value?.let { evaluate(it, thread) }
-            }
-        }
         val methodName = method.name()
         val callEvent = FunCallEvent(methodName, args, eventsUidStack.lastOrNull())
         trace.add(callEvent)
         eventsUidStack.add(callEvent.uid)
+        val currClass = method.declaringType()
+        classesStack.add(currClass)
+        newStepRequest(thread, currClass)
     }
 
     private fun handleFunctionExited(event: MethodExitEvent) {
@@ -138,20 +150,19 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
         )
     }
 
-    private fun handleBreakpoint(event: BreakpointEvent) {
+    private fun handleStop(event: LocatableEvent) {
         val location = event.location()
         if (debugInfoIsPresent(location)) {
             val lineRef = LineRef(location.sourceName(), location.lineNumber())
-            val visibleVars = nullOn(IncompatibleThreadStateException::class.java) {
-                val thread = event.thread()
-                val frame = thread.frame(0)
+            val thread = event.thread()
+            val frame = thread.frame(0)
+            val visibleVars =
                 frame.visibleVariables()
                     .map { localVar ->
                         localVar.name() to frame.getValue(localVar)
                     }.associate { (name, value) ->
                         name to (value?.let { evaluate(it, thread) })
                     }
-            }
             trace.add(LineVisitedEvent(lineRef, visibleVars, eventsUidStack.lastOrNull()))
         }
     }
@@ -181,18 +192,6 @@ class DebugSession(classPath: Path, mainClassName: String, inspectedFiles: Map<P
             }
 
             else -> value.toString()
-        }
-    }
-
-    private fun <E : Throwable, T> nullOn(excClass: Class<E>, action: () -> T): T? {
-        return try {
-            action()
-        } catch (e: Throwable) {
-            if (e::class.java == excClass) {
-                null
-            } else {
-                throw e
-            }
         }
     }
 
