@@ -11,7 +11,7 @@ final class MethodTable(
                          val ownerClass: ClassName,
                          val methodName: MethodName,
                          val methodDescr: MethodDescriptor,
-                         val localVars: Seq[LocalVariable]
+                         val localVars: Map[Int, LocalVariable]
                        ){
   override def toString: String = {
     s"$ownerClass::$methodName$methodDescr " + localVars.mkString("[", ",", "]")
@@ -22,7 +22,7 @@ object MethodTable {
 
   final class Builder(val ownerClass: ClassName, val methodName: MethodName, val methodDescr: MethodDescriptor) {
 
-    private val localVars = ListBuffer.empty[LocalVariable]
+    private val localVars = mutable.Map.empty[Int, LocalVariable]   // var index to variable info
     private val labels = mutable.Map.empty[Label, Int]  // label to line index
 
     private var currLineIdx: Int = -1
@@ -39,19 +39,19 @@ object MethodTable {
     def visitVarInfoInstr(varName: String, descriptorStr: String, scopeStart: Label, scopeEnd: Label, idx: Int): Unit = {
       val descriptor = TypeDescriptor.parse(descriptorStr).get
       val scope = Scope(labels.apply(scopeStart), labels.apply(scopeEnd))
-      localVars.addOne(LocalVariable(varName, descriptor, scope, idx))
+      localVars(idx) = LocalVariable(varName, descriptor, scope, idx)
     }
-    
-    def built: MethodTable = new MethodTable(ownerClass, methodName, methodDescr, localVars.toSeq)
+
+    def built: MethodTable = new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap)
 
   }
 
   final case class Scope(startLine: Int, lastLine: Int){
-    override def toString: String = s"[$startLine ; $lastLine]"
+    override def toString: String = s"[$startLine;$lastLine]"
   }
 
   final case class LocalVariable(name: String, descriptor: TypeDescriptor, scope: Scope, idx: Int){
-    override def toString: String = s"$name ($descriptor) scope=$scope idx=$idx"
+    override def toString: String = s"{$name $scope idx=$idx ($descriptor)}"
   }
 
 }

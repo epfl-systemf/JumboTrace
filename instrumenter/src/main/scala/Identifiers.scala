@@ -2,33 +2,51 @@ package com.epfl.systemf.jumbotrace.instrumenter
 
 import org.objectweb.asm.Type
 
-final case class ClassName(name: String) extends AnyVal
+import scala.collection.mutable.ListBuffer
 
-final case class MethodName(name: String) extends AnyVal
+final case class ClassName(name: String) extends AnyVal {
+  override def toString: String = name
+}
+
+final case class MethodName(name: String) extends AnyVal {
+  override def toString: String = name
+}
 
 final case class MethodDescriptor(args: Seq[TypeDescriptor], ret: TypeDescriptor) {
   override def toString: String = args.mkString("(", "", ")") ++ ret.toString
 }
 
 object MethodDescriptor {
+  private val uniqueCharArgDesciptors = Set('Z', 'C', 'B', 'S', 'I', 'F', 'J', 'D')
 
-  def parse(str: String): Option[MethodDescriptor] = {
+  def parse(str: String): Option[MethodDescriptor] = {  // TODO tests
     if (str.startsWith("(") && str.count(_ == '(') == 1 && str.count(_ == ')') == 1) {
       val Array(argsStr, retStr) = str.tail.split(')')
-      val descriptorStartIndices = argsStr.indices.filter(idx => argsStr(idx) == '[' || argsStr(idx).isUpper)
-      val argsDescr =
-        if descriptorStartIndices.isEmpty then Seq.empty[Option[TypeDescriptor]]
-        else (
-          (descriptorStartIndices :+ argsStr.length)
-            .sliding(2)
-            .map(sl => argsStr.slice(sl(0), sl(1)))
-            .map(TypeDescriptor.parse)
-            .toSeq
-          )
-      val retDescr = TypeDescriptor.parse(retStr)
-      if (argsDescr.forall(_.isDefined) && retDescr.isDefined) {
-        Some(MethodDescriptor(argsDescr.map(_.get), retDescr.get))
-      } else None
+      val argsDescriptors = ListBuffer.empty[TypeDescriptor]
+      var argsStrIter = argsStr.iterator
+      var isArray = false
+      while (argsStrIter.hasNext){
+        val curr = argsStrIter.next()
+        if (uniqueCharArgDesciptors.contains(curr) && isArray){
+          argsDescriptors.addOne(TypeDescriptor.Array(TypeDescriptor.parse(curr.toString).get))
+          isArray = false
+        } else if (uniqueCharArgDesciptors.contains(curr)){
+          argsDescriptors.addOne(TypeDescriptor.parse(curr.toString).get)
+        } else if (curr == '['){
+          isArray = true
+        } else if (curr == 'L'){
+          val (className, rem) = argsStrIter.span(_ != ';')
+          if (rem.isEmpty){
+            return None
+          }
+          argsDescriptors.addOne(TypeDescriptor.parse(s"L$className;").get)
+          argsStrIter = rem.iterator
+          argsStrIter.next() // drop ';'
+        } else {
+          return None
+        }
+      }
+      TypeDescriptor.parse(retStr).map(MethodDescriptor(argsDescriptors.toSeq, _))
     } else None
   }
 

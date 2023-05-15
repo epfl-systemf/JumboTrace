@@ -13,4 +13,10 @@ final class MethodExplorer(tableB: MethodTable.Builder) extends MethodVisitor(Co
     tableB.visitVarInfoInstr(name, descriptor, start, end, index)
     super.visitLocalVariable(name, descriptor, signature, start, end, index)
   }
+
+  override def visitLineNumber(line: Int, start: Label): Unit = {
+    tableB.visitLineNumberInstr(line, start)
+    super.visitLineNumber(line, start)
+  }
+  
 }
