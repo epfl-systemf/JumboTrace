@@ -89,5 +89,8 @@ object TypeDescriptor {
       }
       case _ => None
   }
+  
+  val String: TypeDescriptor = Class(Seq("java", "lang"), "String")
+  val Object: TypeDescriptor = Class(Seq("java", "lang"), "Object")
 
 }
