@@ -11,16 +11,23 @@ final class MethodTable(
                          val ownerClass: ClassName,
                          val methodName: MethodName,
                          val methodDescr: MethodDescriptor,
-                         val localVars: Map[Int, LocalVariable]
+                         val localVars: Map[Int, LocalVariable],
+                         val isMainMethod: Boolean
                        ){
   override def toString: String = {
-    s"$ownerClass::$methodName$methodDescr " + localVars.mkString("[", ",", "]")
+    val mainMethodSymbol = if isMainMethod then "*" else ""
+    s"$ownerClass::$methodName$mainMethodSymbol$methodDescr " + localVars.mkString("[", ",", "]")
   }
 }
 
 object MethodTable {
 
-  final class Builder(val ownerClass: ClassName, val methodName: MethodName, val methodDescr: MethodDescriptor) {
+  final class Builder(
+                       val ownerClass: ClassName,
+                       val methodName: MethodName,
+                       val methodDescr: MethodDescriptor,
+                       val isMainMethod: Boolean
+                     ) {
 
     private val localVars = mutable.Map.empty[Int, LocalVariable]   // var index to variable info
     private val labels = mutable.Map.empty[Label, Int]  // label to line index
@@ -42,7 +49,9 @@ object MethodTable {
       localVars(idx) = LocalVariable(varName, descriptor, scope, idx)
     }
 
-    def built: MethodTable = new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap)
+    def built: MethodTable = {
+      new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap, isMainMethod)
+    }
 
   }
 

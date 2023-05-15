@@ -4,7 +4,8 @@ import scala.collection.mutable
 
 final class ClassTable(
                         val className: ClassName,
-                        val methodTables: Map[(MethodName, MethodDescriptor), MethodTable]
+                        val methodTables: Map[(MethodName, MethodDescriptor), MethodTable],
+                        val isMainClass: Boolean
                       ){
   def getMethodTable(methodName: MethodName, methodDescriptor: MethodDescriptor): Option[MethodTable] = {
     methodTables.get((methodName, methodDescriptor))
@@ -12,7 +13,8 @@ final class ClassTable(
 
   override def toString: String = {
     val width = 50
-    val header = s"-- $className ".padTo(width, '-')
+    val mainClassSymbol = if isMainClass then "*" else ""
+    val header = s"-- $className$mainClassSymbol ".padTo(width, '-')
     val footer = "-" * width
     methodTables.values.mkString(header + "\n", "\n", "\n" + footer)
   }
@@ -20,7 +22,7 @@ final class ClassTable(
 
 object ClassTable {
 
-  final class Builder(val className: ClassName) {
+  final class Builder(val className: ClassName, val isMainClass: Boolean) {
     private val methodTables = mutable.Map.empty[(MethodName, MethodDescriptor), MethodTable.Builder]
 
     def addMethodTable(methodTableB: MethodTable.Builder): Unit = {
@@ -29,7 +31,7 @@ object ClassTable {
 
     def built: ClassTable = {
       val builtMethodTables = methodTables.toMap.map((id, tb) => (id, tb.built))
-      new ClassTable(className, builtMethodTables)
+      new ClassTable(className, builtMethodTables, isMainClass)
     }
 
   }

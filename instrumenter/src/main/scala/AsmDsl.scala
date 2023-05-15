@@ -1,13 +1,14 @@
 package com.epfl.systemf.jumbotrace.instrumenter
 
-import org.objectweb.asm.{MethodVisitor, Opcodes}
+import org.objectweb.asm.{Label, MethodVisitor, Opcodes}
 
 object AsmDsl {
 
   /**
    * Push a constant onto the stack
    */
-  def LDC(constant: Any)(using mv: MethodVisitor): Unit = {
+  def LDC(constant: (Integer | Byte | Character | Short | Boolean | Float | Long | Double | String))(using mv: MethodVisitor): Unit = {
+    // the list of accepted types is a little more restrictive than needed (see SymbolTable::addConstant)
     mv.visitLdcInsn(constant)
   }
 
@@ -30,6 +31,22 @@ object AsmDsl {
    */
   def SWAP(using mv: MethodVisitor): Unit = {
     mv.visitInsn(Opcodes.SWAP)
+  }
+
+  def TRY_CATCH(start: Label, end: Label, handler: Label, typeInternalName: String)(using mv: MethodVisitor): Unit = {
+    mv.visitTryCatchBlock(start, end, handler, typeInternalName)
+  }
+
+  def LABEL(label: Label)(using mv: MethodVisitor): Unit = {
+    mv.visitLabel(label)
+  }
+
+  def GOTO(label: Label)(using mv: MethodVisitor): Unit = {
+    mv.visitJumpInsn(Opcodes.GOTO, label)
+  }
+
+  def RETURN(using mv: MethodVisitor): Unit = {
+    mv.visitInsn(Opcodes.RETURN)
   }
 
 }

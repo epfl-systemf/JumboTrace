@@ -2,8 +2,11 @@ package com.epfl.systemf.jumbotrace.instrumenter
 
 import org.objectweb.asm.Opcodes
 
-final case class Config(asmVersion: Int)
+final case class Config(asmVersion: Int, transformedClassesDirName: String)
 
 object Config {
-  val current: Config = Config(Opcodes.ASM9)
+  val current: Config = Config(
+    asmVersion = Opcodes.ASM9,
+    transformedClassesDirName = "jumbotracer-transformed"
+  )
 }
