@@ -11,7 +11,7 @@ final class MethodTransformer(
                                methodTable: MethodTable
                              ) extends MethodVisitor(Config.current.asmVersion, underlying) {
 
-  import methodTable.{ownerClass, methodName, isMainMethod}
+  import methodTable.{ownerClass, methodName, isMainMethod, methodDescr}
   private given MethodVisitor = underlying
 
   private lazy val tryCatchLabels = (new Label(), new Label())
@@ -26,8 +26,17 @@ final class MethodTransformer(
   }
 
   override def visitInsn(opcode: Int): Unit = {
-    if (isMainMethod && isReturnInstr(opcode)) {
-      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void))   // TODO remove (just for debugging)
+    val isRetInstr = isReturnInstr(opcode)
+    if (isRetInstr){
+      if (methodDescr.ret == TD.Void){
+        INVOKE_STATIC(jumboTracer, returnedVoid, MethodDescriptor(Seq(), TD.Void))
+      } else {
+        DUP
+        INVOKE_STATIC(jumboTracer, returned, MethodDescriptor(Seq(methodDescr.ret), TD.Void)) // TODO test when returning an array
+      }
+    }
+    if (isMainMethod && isRetInstr) {
+      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void)) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, MethodDescriptor(Seq.empty, TD.Void))
     }
     super.visitInsn(opcode)
@@ -37,7 +46,7 @@ final class MethodTransformer(
     if (isMainMethod){
       LABEL(tryCatchLabels._2)
       INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void))
-      RETURN
+      RETURN(TD.Void)
     }
     super.visitMaxs(maxStack, maxLocals)
   }

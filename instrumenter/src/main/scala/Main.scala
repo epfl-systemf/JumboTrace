@@ -10,6 +10,8 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
+    // TODO add inner classes to the array of classes
+
     var isMain = true // main class is given by the first argument
 
     for (className <- args.map(ClassName.apply)) do {

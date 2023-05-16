@@ -45,8 +45,18 @@ object AsmDsl {
     mv.visitJumpInsn(Opcodes.GOTO, label)
   }
 
-  def RETURN(using mv: MethodVisitor): Unit = {
-    mv.visitInsn(Opcodes.RETURN)
+  def RETURN(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    import TypeDescriptor.*
+    val opcode = (
+      td match
+        case Boolean | Char | Byte | Short | Int => Opcodes.IRETURN
+        case Float => Opcodes.FRETURN
+        case Long => Opcodes.LRETURN
+        case Double => Opcodes.DRETURN
+        case Void => Opcodes.RETURN
+        case _ : (Array | Class) => Opcodes.ARETURN
+    )
+    mv.visitInsn(opcode)
   }
 
 }
