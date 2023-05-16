@@ -27,7 +27,8 @@ final class MethodTransformer(
 
   override def visitInsn(opcode: Int): Unit = {
     if (isMainMethod && isReturnInstr(opcode)) {
-      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void))
+      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void))   // TODO remove (just for debugging)
+      INVOKE_STATIC(jumboTracer, writeJsonTrace, MethodDescriptor(Seq.empty, TD.Void))
     }
     super.visitInsn(opcode)
   }

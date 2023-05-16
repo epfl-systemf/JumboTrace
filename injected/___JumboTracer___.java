@@ -1,9 +1,14 @@
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
 
 public final class ___JumboTracer___ {
+
+    private static final String JSON_FILE_PATH = "./trace/trace.json";
 
     private static final String ANSI_CYAN = "\u001B[36m";
     private static final String ANSI_RESET = "\u001B[0m";
@@ -43,6 +48,19 @@ public final class ___JumboTracer___ {
         System.out.println("JSON display");
         System.out.println(toJson());
         System.out.println(ANSI_RESET);
+    }
+
+    static void writeJsonTrace(){
+        var file = new File(JSON_FILE_PATH);
+        file.getParentFile().mkdirs();
+        try(var writer = new FileWriter(file)){
+            writer.write(toJson());
+        } catch (IOException e){
+            System.err.println("JUMBOTRACER: LOGGING ERROR");
+            System.err.println("Could not write log to " + JSON_FILE_PATH);
+            System.err.println("Error message was:");
+            e.printStackTrace();
+        }
     }
 
     private interface JsonWritable {

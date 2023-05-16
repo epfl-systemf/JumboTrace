@@ -10,6 +10,7 @@ object Injection {
   val variableSet: MethodName = MethodName("variableSet")
   val returned: MethodName = MethodName("returned")
   val display: MethodName = MethodName("display")
+  val writeJsonTrace: MethodName = MethodName("writeJsonTrace")
 
   val stringIntToVoid: MethodDescriptor = MethodDescriptor(Seq(TD.String, TD.Int), TD.Void)
   val stringObjToVoid: MethodDescriptor = MethodDescriptor(Seq(TD.String, TD.Object), TD.Void)
