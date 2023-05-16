@@ -1,19 +1,23 @@
 // C-like macros. Use cpp -P to expand before compiling
 
-#define VARIABLE_SET(_tpe, _class)                             \
-static void variableSet(String varId, _tpe value){             \
-    trace.add(new VarSet(varId, _class.toString(value)));      \
+import java.util.Objects;
+import java.util.StringJoiner;
+
+// =====================================================================================================================
+
+#define VARIABLE_SET(_tpe)                                      \
+static void variableSet(String varId, _tpe value){              \
+    trace.add(new VarSet(varId, convertToString(value)));       \
 }
 
-#define RETURNED(_tpe, _class)                                  \
+#define RETURNED(_tpe)                                          \
 static void returned(String methodName, _tpe value){            \
-    trace.add(new Return(methodName, _class.toString(value)));  \
+    trace.add(new Return(methodName, convertToString(value)));  \
 }
 
 // boolean char byte short int float long double Object
 
 
-// ========================================================================================================================
 // ========================================================================================================================
 
 import java.io.File;
@@ -40,26 +44,26 @@ public final class ___JumboTracer___ {
         trace.add(new LineVisited(className, lineNum));
     }
 
-    VARIABLE_SET(boolean, Boolean)
-    VARIABLE_SET(char, Character)
-    VARIABLE_SET(byte, Byte)
-    VARIABLE_SET(short, Short)
-    VARIABLE_SET(int, Integer)
-    VARIABLE_SET(float, Float)
-    VARIABLE_SET(long, Long)
-    VARIABLE_SET(double, Double)
-    VARIABLE_SET(Object, Objects)
+    VARIABLE_SET(boolean)
+    VARIABLE_SET(char)
+    VARIABLE_SET(byte)
+    VARIABLE_SET(short)
+    VARIABLE_SET(int)
+    VARIABLE_SET(float)
+    VARIABLE_SET(long)
+    VARIABLE_SET(double)
+    VARIABLE_SET(Object)
 
 
-    RETURNED(boolean, Boolean)
-    RETURNED(char, Character)
-    RETURNED(byte, Byte)
-    RETURNED(short, Short)
-    RETURNED(int, Integer)
-    RETURNED(float, Float)
-    RETURNED(long, Long)
-    RETURNED(double, Double)
-    RETURNED(Object, Objects)
+    RETURNED(boolean)
+    RETURNED(char)
+    RETURNED(byte)
+    RETURNED(short)
+    RETURNED(int)
+    RETURNED(float)
+    RETURNED(long)
+    RETURNED(double)
+    RETURNED(Object)
 
     static void returnedVoid(String methodName){ trace.add(new ReturnVoid(methodName)); }
 
@@ -155,6 +159,24 @@ public final class ___JumboTracer___ {
             joiner.add(fieldIndentStr + fieldStr);
         }
         return joiner.toString();
+    }
+
+    private static String convertToString(Object o){
+        if (o instanceof Object[] array){
+            var sj = new StringJoiner(",", "[", "]");
+            for (var e: array){
+                sj.add(convertToString(e));
+            }
+            return sj.toString();
+        } else if (o instanceof Iterable<?> iterable){
+            var sj = new StringJoiner(",", "[", "]");
+            for (var e: iterable){
+                sj.add(convertToString(e));
+            }
+            return sj.toString();
+        } else {
+            return Objects.toString(o);
+        }
     }
 
 }
