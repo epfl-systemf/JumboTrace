@@ -11,6 +11,10 @@ final class MethodTransformer(
                                methodTable: MethodTable
                              ) extends MethodVisitor(Config.current.asmVersion, underlying) {
 
+  private val ansiYellow = "\u001B[33m"
+  private val ansiRed = "\u001B[31m"
+  private val ansiReset = "\u001B[0m"
+
   import methodTable.{ownerClass, methodName, isMainMethod, methodDescr}
   private given MethodVisitor = underlying
 
@@ -29,13 +33,18 @@ final class MethodTransformer(
     val isRetInstr = isReturnInstr(opcode)
     if (isRetInstr){
       if (methodDescr.ret == TD.Void){
-        INVOKE_STATIC(jumboTracer, returnedVoid, MethodDescriptor(Seq(), TD.Void))
+        LDC(methodName.name)
+        INVOKE_STATIC(jumboTracer, returnedVoid, MethodDescriptor(Seq(TD.String), TD.Void))
       } else {
-        DUP
-        INVOKE_STATIC(jumboTracer, returned, MethodDescriptor(Seq(methodDescr.ret), TD.Void)) // TODO test when returning an array
+        val returnedTypeDescr = unpreciseTypingReturnTypeDescriptorFor(methodDescr.ret)
+        DUP(returnedTypeDescr)
+        LDC(methodName.name)
+        SWAP(returnedTypeDescr)
+        INVOKE_STATIC(jumboTracer, returned, MethodDescriptor(Seq(TD.String, returnedTypeDescr), TD.Void))
       }
     }
     if (isMainMethod && isRetInstr) {
+      PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
       INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void)) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, MethodDescriptor(Seq.empty, TD.Void))
     }
@@ -45,7 +54,9 @@ final class MethodTransformer(
   override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {
     if (isMainMethod){
       LABEL(tryCatchLabels._2)
-      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void))
+      PRINTLN(s"$ansiYellow JumboTracer: $ansiRed[ERROR]$ansiYellow: program terminating with an exception$ansiReset")
+      INVOKE_STATIC(jumboTracer, display, MethodDescriptor(Seq.empty, TD.Void)) // TODO remove (just for debugging)
+      INVOKE_STATIC(jumboTracer, writeJsonTrace, MethodDescriptor(Seq.empty, TD.Void))
       RETURN(TD.Void)
     }
     super.visitMaxs(maxStack, maxLocals)
@@ -56,6 +67,12 @@ final class MethodTransformer(
     LDC(line)
     INVOKE_STATIC(jumboTracer, lineVisited, stringIntToVoid)
     super.visitLineNumber(line, start)
+  }
+
+  private def unpreciseTypingReturnTypeDescriptorFor(td: TypeDescriptor): TypeDescriptor = {
+    td match
+      case _: (TD.Array | TD.Class) => TD.Object
+      case primitive => primitive
   }
 
   private def isReturnInstr(opcode: Int): Boolean = {
