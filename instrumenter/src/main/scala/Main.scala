@@ -10,18 +10,21 @@ object Main {
 
   def main(args: Array[String]): Unit = {
 
-    // TODO add inner classes to the array of classes
+    if (args.length != 1){
+      System.err.println("Usage: single argument is the name of the main class")
+      System.exit(-1)
+    }
 
-    var isMain = true // main class is given by the first argument
+    val mainClass = ClassName(args(0))
 
-    for (className <- args.map(ClassName.apply)) do {
+    for (className <- allClassesInCurrDir()) do {
 
       val inputPath = Paths.get(".").resolve(s"$className.class")
       val outputPath = Paths.get(".").resolve(Config.current.transformedClassesDirName).resolve(s"$className.class")
 
       val inputBytes = Files.readAllBytes(inputPath)
 
-      val classTableB = new ClassTable.Builder(className, isMain)
+      val classTableB = new ClassTable.Builder(className, isMainClass = (className == mainClass))
       val classExplorer = new ClassExplorer(classTableB)
 
       val explorationReader = new ClassReader(inputBytes)
@@ -39,8 +42,13 @@ object Main {
       outFile.getParentFile.mkdirs()
       outFile.createNewFile()
       Files.write(outputPath, transformationWriter.toByteArray)
+    }
+  }
 
-      isMain = false
+  private def allClassesInCurrDir(): Seq[ClassName] = {
+    val currDir = Paths.get(".").toFile
+    for sub <- currDir.listFiles() if sub.isFile && sub.getName.endsWith(".class") yield {
+      ClassName(sub.getName.takeWhile(_ != '.'))
     }
   }
 

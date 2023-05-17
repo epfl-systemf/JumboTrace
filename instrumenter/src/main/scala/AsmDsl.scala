@@ -23,7 +23,7 @@ object AsmDsl {
    * Duplicate the element at the top of the stack (or the topmost 2 elements if `td` is a double word element)
    */
   def DUP(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    if (isDoubleWordType(td)){
+    if (isDoubleWordType(td)) {
       mv.visitInsn(Opcodes.DUP2)
     } else {
       mv.visitInsn(Opcodes.DUP)
@@ -35,7 +35,7 @@ object AsmDsl {
    *
    * @param secondStackElemTypeDescr type descriptor of the second element (on the stack, indexed from the beginning)
    *
-   * <b>ASSUMES that the topmost element of the stack is a single-word element (i.e. neither a double nor a long)</b>
+   *                                 <b>ASSUMES that the topmost element of the stack is a single-word element (i.e. neither a double nor a long)</b>
    */
   def SWAP(secondStackElemTypeDescr: TypeDescriptor)(using mv: MethodVisitor): Unit = {
     if (isDoubleWordType(secondStackElemTypeDescr)) {
@@ -69,9 +69,13 @@ object AsmDsl {
         case Long => Opcodes.LRETURN
         case Double => Opcodes.DRETURN
         case Void => Opcodes.RETURN
-        case _ : (Array | Class) => Opcodes.ARETURN
-    )
+        case _: (Array | Class) => Opcodes.ARETURN
+      )
     mv.visitInsn(opcode)
+  }
+  
+  def ATHROW(using mv: MethodVisitor): Unit = {
+    mv.visitInsn(Opcodes.ATHROW)
   }
 
   def PRINTLN(str: String)(using mv: MethodVisitor): Unit = {

@@ -1,25 +1,5 @@
 // C-like macros. Use cpp -P to expand before compiling
 
-import java.util.Objects;
-import java.util.StringJoiner;
-
-// =====================================================================================================================
-
-#define VARIABLE_SET(_tpe)                                      \
-static void variableSet(String varId, _tpe value){              \
-    trace.add(new VarSet(varId, convertToString(value)));       \
-}
-
-#define RETURNED(_tpe)                                          \
-static void returned(String methodName, _tpe value){            \
-    trace.add(new Return(methodName, convertToString(value)));  \
-}
-
-// boolean char byte short int float long double Object
-
-
-// ========================================================================================================================
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -28,6 +8,31 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.Objects;
+
+// =====================================================================================================================
+
+#define VARIABLE_SET(_type)                                      \
+static void variableSet(String varId, _type value){              \
+    trace.add(new VarSet(varId, convertToString(value)));        \
+}
+
+#define ARRAY_ELEMENT_SET(_elemType)                                                \
+static void arrayElemSet(String preciseElemTypeName, int idx, _elemType[] array){   \
+    trace.add(new ArrayElemSet(preciseElemTypeName, idx, convertToString(array)));  \
+}
+
+#define STATIC_FIELD_SET(_type)                                                        \
+static void staticFieldSet(String fieldOwner, String fieldName, _type value){          \
+    trace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value)));      \
+}
+
+#define RETURNED(_tpe)                                           \
+static void returned(String methodName, _tpe value){             \
+    trace.add(new Return(methodName, convertToString(value)));   \
+}
+
+// boolean char byte short int float long double Object
+
 
 public final class ___JumboTracer___ {
 
@@ -53,6 +58,27 @@ public final class ___JumboTracer___ {
     VARIABLE_SET(long)
     VARIABLE_SET(double)
     VARIABLE_SET(Object)
+
+    ARRAY_ELEMENT_SET(boolean)
+    ARRAY_ELEMENT_SET(char)
+    ARRAY_ELEMENT_SET(byte)
+    ARRAY_ELEMENT_SET(short)
+    ARRAY_ELEMENT_SET(int)
+    ARRAY_ELEMENT_SET(float)
+    ARRAY_ELEMENT_SET(long)
+    ARRAY_ELEMENT_SET(double)
+    ARRAY_ELEMENT_SET(Object)
+
+
+    STATIC_FIELD_SET(boolean)
+    STATIC_FIELD_SET(char)
+    STATIC_FIELD_SET(byte)
+    STATIC_FIELD_SET(short)
+    STATIC_FIELD_SET(int)
+    STATIC_FIELD_SET(float)
+    STATIC_FIELD_SET(long)
+    STATIC_FIELD_SET(double)
+    STATIC_FIELD_SET(Object)
 
 
     RETURNED(boolean)
@@ -114,6 +140,28 @@ public final class ___JumboTracer___ {
         @Override
         public String toJson(int indent) {
             return jsonObject("VarSet", indent + 1, fld("varId", varId), fld("value", value));
+        }
+    }
+
+    private record ArrayElemSet(String elemTypeName, int idx, String value) implements TraceElement {
+        @Override
+        public String toJson(int indent) {
+            return jsonObject("ArrayElemSet", indent + 1,
+                    fld("elemTypeName", elemTypeName),
+                    fld("idx", idx),
+                    fld("value", value)
+            );
+        }
+    }
+
+    private record StaticFieldSet(String owner, String fieldName, String value) implements TraceElement {
+        @Override
+        public String toJson(int indent) {
+            return jsonObject("StaticFieldSet", indent + 1,
+                    fld("owner", owner),
+                    fld("fieldName", fieldName),
+                    fld("value", value)
+            );
         }
     }
 

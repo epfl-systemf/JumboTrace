@@ -9,6 +9,7 @@ object Injection {
   enum EventMethod(methodNameStr: String) {
     case LineVisited extends EventMethod("lineVisited")
     case VariableSet extends EventMethod("variableSet")
+    case StaticFieldSet extends EventMethod("staticFieldSet")
     case Returned extends EventMethod("returned")
     case ReturnedVoid extends EventMethod("returnedVoid")
     

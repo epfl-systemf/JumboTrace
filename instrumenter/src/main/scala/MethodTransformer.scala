@@ -5,6 +5,7 @@ import AsmDsl.*
 import Injection.*
 import Injection.EventMethod.*
 
+import com.epfl.systemf.jumbotrace.instrumenter.MethodDescriptor.==>
 import com.epfl.systemf.jumbotrace.instrumenter.MethodTable.LocalVariable
 import com.epfl.systemf.jumbotrace.instrumenter.TypeDescriptor as TD
 
@@ -36,19 +37,19 @@ final class MethodTransformer(
     if (isRetInstr){
       if (methodDescr.ret == TD.Void){
         LDC(methodName.name)
-        INVOKE_STATIC(jumboTracer, ReturnedVoid.methodName, stringToVoidDescriptor)
+        INVOKE_STATIC(jumboTracer, ReturnedVoid.methodName, Seq(TD.String) ==> TD.Void)
       } else {
         val returnedTypeDescr = unpreciseTypingReturnTypeDescriptorFor(methodDescr.ret)
         DUP(returnedTypeDescr)
         LDC(methodName.name)
         SWAP(returnedTypeDescr)
-        INVOKE_STATIC(jumboTracer, Returned.methodName, stringCustomToVoidDescriptor(returnedTypeDescr))
+        INVOKE_STATIC(jumboTracer, Returned.methodName, Seq(TD.String, returnedTypeDescr) ==> TD.Void)
       }
     }
     if (isMainMethod && isRetInstr) {
       PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
-      INVOKE_STATIC(jumboTracer, display, emptyToVoidDescriptor) // TODO remove (just for debugging)
-      INVOKE_STATIC(jumboTracer, writeJsonTrace, emptyToVoidDescriptor)
+      INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
+      INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
     }
     super.visitInsn(opcode)
   }
@@ -60,7 +61,7 @@ final class MethodTransformer(
         DUP(typeDescr)
         LDC(localVar.name)
         SWAP(typeDescr)
-        INVOKE_STATIC(jumboTracer, VariableSet.methodName, stringCustomToVoidDescriptor(typeDescr))
+        INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
       } else if (isArrayStoreInstr(opcode)) {
         // TODO
         ???
@@ -69,13 +70,26 @@ final class MethodTransformer(
     super.visitVarInsn(opcode, varIndex)
   }
 
+  override def visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
+    if (opcode == Opcodes.PUTSTATIC){
+      val unpreciseTypeDescr = unpreciseTypingReturnTypeDescriptorFor(TypeDescriptor.parse(descriptor).get)
+      DUP(unpreciseTypeDescr)
+      LDC(owner)
+      SWAP(unpreciseTypeDescr)
+      LDC(name)
+      SWAP(unpreciseTypeDescr)
+      INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+    }
+    super.visitFieldInsn(opcode, owner, name, descriptor)
+  }
+
   override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {
     if (isMainMethod){
       LABEL(tryCatchLabels._2)
       PRINTLN(s"$ansiYellow JumboTracer: $ansiRed[ERROR]$ansiYellow: program terminating with an exception$ansiReset")
-      INVOKE_STATIC(jumboTracer, display, emptyToVoidDescriptor) // TODO remove (just for debugging)
-      INVOKE_STATIC(jumboTracer, writeJsonTrace, emptyToVoidDescriptor)
-      RETURN(TD.Void)
+      INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
+      INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
+      ATHROW
     }
     super.visitMaxs(maxStack, maxLocals)
   }
@@ -83,7 +97,7 @@ final class MethodTransformer(
   override def visitLineNumber(line: Int, start: Label): Unit = {
     LDC(ownerClass.name)
     LDC(line)
-    INVOKE_STATIC(jumboTracer, LineVisited.methodName, stringCustomToVoidDescriptor(TD.Int))
+    INVOKE_STATIC(jumboTracer, LineVisited.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
     super.visitLineNumber(line, start)
   }
 
@@ -92,14 +106,6 @@ final class MethodTransformer(
       case _: (TD.Array | TD.Class) => TD.Object
       case primitive => primitive
   }
-
-  private def stringCustomToVoidDescriptor(customTypeDescriptor: TypeDescriptor): MethodDescriptor = {
-    MethodDescriptor(Seq(TD.String, customTypeDescriptor), TD.Void)
-  }
-
-  private val stringToVoidDescriptor: MethodDescriptor = MethodDescriptor(Seq(TD.String), TD.Void)
-
-  private val emptyToVoidDescriptor: MethodDescriptor = MethodDescriptor(Seq.empty, TD.Void)
 
   private def isReturnInstr(opcode: Int): Boolean = {
     Opcodes.IRETURN <= opcode && opcode <= Opcodes.RETURN

@@ -18,6 +18,10 @@ final case class MethodDescriptor(args: Seq[TypeDescriptor], ret: TypeDescriptor
 
 object MethodDescriptor {
   private val uniqueCharArgDesciptors = Set('Z', 'C', 'B', 'S', 'I', 'F', 'J', 'D')
+  
+  extension(args: Seq[TypeDescriptor]) def ==>(ret: TypeDescriptor): MethodDescriptor = {
+    MethodDescriptor(args, ret)
+  }
 
   def parse(str: String): Option[MethodDescriptor] = {  // TODO tests
     if (str.startsWith("(") && str.count(_ == '(') == 1 && str.count(_ == ')') == 1) {
