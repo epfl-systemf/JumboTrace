@@ -10,6 +10,7 @@ object Injection {
     case LineVisited extends EventMethod("lineVisited")
     case VariableSet extends EventMethod("variableSet")
     case StaticFieldSet extends EventMethod("staticFieldSet")
+    case InstanceFieldSet extends EventMethod("instanceFieldSet")
     case Returned extends EventMethod("returned")
     case ReturnedVoid extends EventMethod("returnedVoid")
     

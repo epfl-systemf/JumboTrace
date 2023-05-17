@@ -71,14 +71,15 @@ final class MethodTransformer(
   }
 
   override def visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
-    if (opcode == Opcodes.PUTSTATIC){
+    if (opcode == Opcodes.PUTSTATIC || opcode == Opcodes.PUTFIELD){
+      val loggingMethod = if opcode == Opcodes.PUTSTATIC then StaticFieldSet.methodName else InstanceFieldSet.methodName
       val unpreciseTypeDescr = unpreciseTypingReturnTypeDescriptorFor(TypeDescriptor.parse(descriptor).get)
       DUP(unpreciseTypeDescr)
       LDC(owner)
       SWAP(unpreciseTypeDescr)
       LDC(name)
       SWAP(unpreciseTypeDescr)
-      INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+      INVOKE_STATIC(jumboTracer, loggingMethod, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
     }
     super.visitFieldInsn(opcode, owner, name, descriptor)
   }

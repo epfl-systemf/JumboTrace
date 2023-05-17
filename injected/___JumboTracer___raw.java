@@ -26,6 +26,11 @@ static void staticFieldSet(String fieldOwner, String fieldName, _type value){   
     trace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value)));      \
 }
 
+#define INSTANCE_FIELD_SET(_type)                                                      \
+static void instanceFieldSet(String fieldOwner, String fieldName, _type value){        \
+    trace.add(new InstanceFieldSet(fieldOwner, fieldName, convertToString(value)));    \
+}
+
 #define RETURNED(_tpe)                                           \
 static void returned(String methodName, _tpe value){             \
     trace.add(new Return(methodName, convertToString(value)));   \
@@ -79,6 +84,16 @@ public final class ___JumboTracer___ {
     STATIC_FIELD_SET(long)
     STATIC_FIELD_SET(double)
     STATIC_FIELD_SET(Object)
+
+    INSTANCE_FIELD_SET(boolean)
+    INSTANCE_FIELD_SET(char)
+    INSTANCE_FIELD_SET(byte)
+    INSTANCE_FIELD_SET(short)
+    INSTANCE_FIELD_SET(int)
+    INSTANCE_FIELD_SET(float)
+    INSTANCE_FIELD_SET(long)
+    INSTANCE_FIELD_SET(double)
+    INSTANCE_FIELD_SET(Object)
 
 
     RETURNED(boolean)
@@ -158,6 +173,17 @@ public final class ___JumboTracer___ {
         @Override
         public String toJson(int indent) {
             return jsonObject("StaticFieldSet", indent + 1,
+                    fld("owner", owner),
+                    fld("fieldName", fieldName),
+                    fld("value", value)
+            );
+        }
+    }
+
+    private record InstanceFieldSet(String owner, String fieldName, String value) implements TraceElement {
+        @Override
+        public String toJson(int indent) {
+            return jsonObject("InstanceFieldSet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
                     fld("value", value)
