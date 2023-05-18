@@ -1,6 +1,6 @@
 package com.epfl.systemf.jumbotrace.instrumenter
 
-import MethodTable.LocalVariable
+import MethodTable.{LocalVariable, TryCatch}
 import TypeDescriptor.isDoubleWordType
 
 import org.objectweb.asm.{Label, Opcodes}
@@ -13,6 +13,7 @@ final class MethodTable(
                          val methodName: MethodName,
                          val methodDescr: MethodDescriptor,
                          val localVars: Map[Int, LocalVariable],
+                         val tryCatches: Seq[TryCatch],
                          val isStatic: Boolean,
                          val isMainMethod: Boolean
                        ){
@@ -35,7 +36,7 @@ final class MethodTable(
   override def toString: String = {
     val mainMethodSymbol = if isMainMethod then "*" else ""
     val staticSymbol = if isStatic then "static " else ""
-    s"$staticSymbol$ownerClass::$methodName$mainMethodSymbol$methodDescr " + localVars.mkString("[", ",", "]")
+    s"$staticSymbol$ownerClass::$methodName$mainMethodSymbol$methodDescr " + localVars.mkString("[", ",", "]") + tryCatches.mkString("[", ", ", "]")
   }
 }
 
@@ -50,6 +51,7 @@ object MethodTable {
                      ) {
 
     private val localVars = mutable.Map.empty[Int, LocalVariable]   // var index to variable info
+    private val tryCatches = mutable.ListBuffer.empty[TryCatch]
     private val labels = mutable.Map.empty[Label, Int]  // label to line index
 
     private var currLineIdx: Int = -1
@@ -68,9 +70,13 @@ object MethodTable {
       val scope = Scope(labels.apply(scopeStart), labels.apply(scopeEnd))
       localVars(idx) = LocalVariable(varName, descriptor, scope, idx)
     }
+    
+    def visitTryCatch(start: Label, end: Label, handler: Label, exceptionType: String): Unit = {
+      tryCatches.addOne(TryCatch(start, end, handler, exceptionType))
+    }
 
     def built: MethodTable = {
-      new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap, isStatic = isStatic, isMainMethod = isMainMethod)
+      new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap, tryCatches.toSeq, isStatic = isStatic, isMainMethod = isMainMethod)
     }
 
   }
@@ -81,6 +87,10 @@ object MethodTable {
 
   final case class LocalVariable(name: String, descriptor: TypeDescriptor, scope: Scope, idx: Int){
     override def toString: String = s"{$name $scope idx=$idx ($descriptor)}"
+  }
+  
+  final case class TryCatch(start: Label, end: Label, handler: Label, excType: String){
+    override def toString: String = s"$start - $end H:$handler [$excType]"
   }
 
 }

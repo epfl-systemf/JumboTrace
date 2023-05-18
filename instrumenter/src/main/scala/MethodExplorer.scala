@@ -18,5 +18,10 @@ final class MethodExplorer(tableB: MethodTable.Builder) extends MethodVisitor(Co
     tableB.visitLineNumberInstr(line, start)
     super.visitLineNumber(line, start)
   }
+
+  override def visitTryCatchBlock(start: Label, end: Label, handler: Label, exceptionType: String): Unit = {
+    tableB.visitTryCatch(start, end, handler, exceptionType)
+    super.visitTryCatchBlock(start, end, handler, exceptionType)
+  }
   
 }

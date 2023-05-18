@@ -18,7 +18,7 @@ final class MethodTransformer(
   private val ansiRed = "\u001B[31m"
   private val ansiReset = "\u001B[0m"
 
-  import methodTable.{ownerClass, methodName, isMainMethod, methodDescr}
+  import methodTable.{ownerClass, methodName, isMainMethod, methodDescr, tryCatches}
   private given MethodVisitor = underlying
 
   private lazy val tryCatchLabels = (new Label(), new Label())
