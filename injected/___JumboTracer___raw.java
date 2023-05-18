@@ -159,8 +159,7 @@ public final class ___JumboTracer___ {
         String toJson(int indent);
     }
 
-    private interface TraceElement extends JsonWritable {
-    }
+    private interface TraceElement extends JsonWritable {}
 
     private record LineVisited(String className, int lineNum) implements TraceElement {
         @Override
