@@ -21,6 +21,13 @@ object AsmDsl {
   }
 
   /**
+   * Invocation of an instance method
+   */
+  def INVOKE_VIRTUAL(ownerClass: ClassName, methodName: MethodName, methodDescriptor: MethodDescriptor)(using mv: MethodVisitor): Unit = {
+    mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, ownerClass.name, methodName.name, methodDescriptor.toString, false)
+  }
+
+  /**
    * Duplicate the element at the top of the stack (or the topmost 2 elements if `td` is a double word element)
    */
   def DUP(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
