@@ -15,6 +15,7 @@ object Injection {
     case ReturnedVoid extends EventMethod("returnedVoid")
     case SaveArgument extends EventMethod("saveArgument")
     case TerminateMethodCall extends EventMethod("terminateMethodCall")
+    case InstrumentedArrayStore extends EventMethod("instrumentedArrayStore")
     
     val methodName: MethodName = MethodName(methodNameStr)
   }

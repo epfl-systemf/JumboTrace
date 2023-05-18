@@ -16,9 +16,10 @@ static void variableSet(String varId, _type value){              \
     trace.add(new VarSet(varId, convertToString(value)));        \
 }
 
-#define ARRAY_ELEMENT_SET(_elemType)                                                \
-static void arrayElemSet(String preciseElemTypeName, int idx, _elemType[] array){   \
-    trace.add(new ArrayElemSet(preciseElemTypeName, idx, convertToString(array)));  \
+#define INSTRUMENTED_ARRAY_STORE(_elemType)                                             \
+static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){        \
+    trace.add(new ArrayElemSet(Objects.toString(array), idx, convertToString(value)));  \
+    array[idx] = value;                                                                 \
 }
 
 #define STATIC_FIELD_SET(_type)                                                        \
@@ -70,15 +71,15 @@ public final class ___JumboTracer___ {
     VARIABLE_SET(double)
     VARIABLE_SET(Object)
 
-    ARRAY_ELEMENT_SET(boolean)
-    ARRAY_ELEMENT_SET(char)
-    ARRAY_ELEMENT_SET(byte)
-    ARRAY_ELEMENT_SET(short)
-    ARRAY_ELEMENT_SET(int)
-    ARRAY_ELEMENT_SET(float)
-    ARRAY_ELEMENT_SET(long)
-    ARRAY_ELEMENT_SET(double)
-    ARRAY_ELEMENT_SET(Object)
+    INSTRUMENTED_ARRAY_STORE(boolean)
+    INSTRUMENTED_ARRAY_STORE(char)
+    INSTRUMENTED_ARRAY_STORE(byte)
+    INSTRUMENTED_ARRAY_STORE(short)
+    INSTRUMENTED_ARRAY_STORE(int)
+    INSTRUMENTED_ARRAY_STORE(float)
+    INSTRUMENTED_ARRAY_STORE(long)
+    INSTRUMENTED_ARRAY_STORE(double)
+    INSTRUMENTED_ARRAY_STORE(Object)
 
 
     STATIC_FIELD_SET(boolean)
@@ -123,8 +124,8 @@ public final class ___JumboTracer___ {
     SAVE_ARG(double)
     SAVE_ARG(Object)
 
-    static void terminateMethodCall(String ownerClass, String methodName){
-        trace.add(new MethodCalled(ownerClass, methodName, currentArgs));
+    static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
+        trace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic));
         currentArgs = new ArrayList<>();
     }
 
@@ -159,7 +160,7 @@ public final class ___JumboTracer___ {
         String toJson(int indent);
     }
 
-    private interface TraceElement extends JsonWritable {}
+    private interface TraceElement extends JsonWritable { }
 
     private record LineVisited(String className, int lineNum) implements TraceElement {
         @Override
@@ -175,11 +176,11 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record ArrayElemSet(String elemTypeName, int idx, String value) implements TraceElement {
+    private record ArrayElemSet(String arrayId, int idx, String value) implements TraceElement {
         @Override
         public String toJson(int indent) {
             return jsonObject("ArrayElemSet", indent + 1,
-                    fld("elemTypeName", elemTypeName),
+                    fld("arrayId", arrayId),
                     fld("idx", idx),
                     fld("value", value)
             );
@@ -223,19 +224,19 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record MethodCalled(String ownerClass, String methodName, List<String> args) implements TraceElement {
+    private record MethodCalled(String ownerClass, String methodName, List<String> args, boolean isStatic) implements TraceElement {
         @Override
         public String toJson(int indent){
             return jsonObject("MethodCalled", indent + 1,
                     fld("ownerClass", ownerClass),
                     fld("methodName", methodName),
-                    fld("args", args)
+                    fld("args", args),
+                    fld("isStatic", isStatic)
             );
         }
     }
 
-    private record JsonField(String key, Object value) {
-    }
+    private record JsonField(String key, Object value) { }
 
     private static JsonField fld(String key, Object value) {
         return new JsonField(key, value);

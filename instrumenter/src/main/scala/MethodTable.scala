@@ -18,19 +18,10 @@ final class MethodTable(
                          val isMainMethod: Boolean
                        ){
 
-  def localVarsIndices: Seq[Int] = {
-    var skip = (methodName.name == "<init>")  // aload on receiver as the first instruction in <init> crashes the program
-    val indicesCnt = methodDescr.args.size + (if isStatic then 0 else 1)
-    val indices = ListBuffer.empty[Int]
-    var currIdx = 0
-    for ((_, localVar) <- localVars.take(indicesCnt)) do {
-      if (!skip){
-        indices.addOne(currIdx)
-      }
-      currIdx += (if isDoubleWordType(localVar.descriptor) then 2 else 1)
-      skip = false
-    }
-    indices.toSeq
+  def arguments: Seq[LocalVariable] = {
+    val argsCnt = methodDescr.args.size + (if isStatic then 0 else 1)
+    val rawArgs = localVars.values.take(argsCnt).toSeq
+    if methodName.name == "<init>" then rawArgs.tail else rawArgs
   }
 
   override def toString: String = {
@@ -70,7 +61,7 @@ object MethodTable {
       val scope = Scope(labels.apply(scopeStart), labels.apply(scopeEnd))
       localVars(idx) = LocalVariable(varName, descriptor, scope, idx)
     }
-    
+
     def visitTryCatch(start: Label, end: Label, handler: Label, exceptionType: String): Unit = {
       tryCatches.addOne(TryCatch(start, end, handler, exceptionType))
     }
@@ -88,7 +79,7 @@ object MethodTable {
   final case class LocalVariable(name: String, descriptor: TypeDescriptor, scope: Scope, idx: Int){
     override def toString: String = s"{$name $scope idx=$idx ($descriptor)}"
   }
-  
+
   final case class TryCatch(start: Label, end: Label, handler: Label, excType: String){
     override def toString: String = s"$start - $end H:$handler [$excType]"
   }
