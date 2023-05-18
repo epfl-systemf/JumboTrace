@@ -62,6 +62,7 @@ object TypeDescriptor {
 
   val String: TypeDescriptor = Class(Seq("java", "lang"), "String")
   val Object: TypeDescriptor = Class(Seq("java", "lang"), "Object")
+  val Throwable: TypeDescriptor = Class(Seq("java", "lang"), "Throwable")
 
 }
 
