@@ -12,6 +12,6 @@ if __name__ == "__main__":
         for classFile in os.listdir("."):
             if classFile.endswith(".class"):
                 target_path = os.path.join("..", examples_dir_name, example, tranformed_files_dir_name, classFile)
-                open(target_path, "w+").close()
+                open(target_path, "w+").close()  # create file if needed
                 shutil.copyfile(classFile, target_path)
 
