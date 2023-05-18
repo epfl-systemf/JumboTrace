@@ -13,6 +13,8 @@ object Injection {
     case InstanceFieldSet extends EventMethod("instanceFieldSet")
     case Returned extends EventMethod("returned")
     case ReturnedVoid extends EventMethod("returnedVoid")
+    case SaveArgument extends EventMethod("saveArgument")
+    case TerminateMethodCall extends EventMethod("terminateMethodCall")
     
     val methodName: MethodName = MethodName(methodNameStr)
   }

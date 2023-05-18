@@ -36,6 +36,11 @@ static void returned(String methodName, _tpe value){             \
     trace.add(new Return(methodName, convertToString(value)));   \
 }
 
+#define SAVE_ARG(_tpe)                                           \
+static void saveArgument(_tpe value){                            \
+    currentArgs.add(convertToString(value));                     \
+}
+
 // boolean char byte short int float long double Object
 
 
@@ -47,6 +52,7 @@ public final class ___JumboTracer___ {
     private static final String ANSI_RESET = "\u001B[0m";
 
     private static final List<TraceElement> trace = new ArrayList<>();
+    private static List<String> currentArgs = new ArrayList<>();
 
     // -----------------------------------------------------------------------------------------
 
@@ -105,10 +111,22 @@ public final class ___JumboTracer___ {
     RETURNED(long)
     RETURNED(double)
     RETURNED(Object)
-
     static void returnedVoid(String methodName){ trace.add(new ReturnVoid(methodName)); }
 
+    SAVE_ARG(boolean)
+    SAVE_ARG(char)
+    SAVE_ARG(byte)
+    SAVE_ARG(short)
+    SAVE_ARG(int)
+    SAVE_ARG(float)
+    SAVE_ARG(long)
+    SAVE_ARG(double)
+    SAVE_ARG(Object)
 
+    static void terminateMethodCall(String ownerClass, String methodName){
+        trace.add(new MethodCalled(ownerClass, methodName, currentArgs));
+        currentArgs = new ArrayList<>();
+    }
 
 
     // -----------------------------------------------------------------------------------------
@@ -206,6 +224,17 @@ public final class ___JumboTracer___ {
         }
     }
 
+    private record MethodCalled(String ownerClass, String methodName, List<String> args) implements TraceElement {
+        @Override
+        public String toJson(int indent){
+            return jsonObject("MethodCalled", indent + 1,
+                    fld("ownerClass", ownerClass),
+                    fld("methodName", methodName),
+                    fld("args", args)
+            );
+        }
+    }
+
     private record JsonField(String key, Object value) {
     }
 
@@ -237,13 +266,13 @@ public final class ___JumboTracer___ {
 
     private static String convertToString(Object o){
         if (o instanceof Object[] array){
-            var sj = new StringJoiner(",", "[", "]");
+            var sj = new StringJoiner(",", "[", "] (" + Objects.toString(o) + ")");
             for (var e: array){
                 sj.add(convertToString(e));
             }
             return sj.toString();
         } else if (o instanceof Iterable<?> iterable){
-            var sj = new StringJoiner(",", "[", "]");
+            var sj = new StringJoiner(",", "[", "]@" + Objects.toString(o));
             for (var e: iterable){
                 sj.add(convertToString(e));
             }

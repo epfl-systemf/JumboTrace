@@ -1,6 +1,6 @@
 package com.epfl.systemf.jumbotrace.instrumenter
 
-import org.objectweb.asm.{Label, MethodVisitor, Opcodes}
+import org.objectweb.asm.{Handle, Label, MethodVisitor, Opcodes}
 import AsmDsl.*
 import Injection.*
 import Injection.EventMethod.*
@@ -29,8 +29,18 @@ final class MethodTransformer(
       TRY_CATCH(tryCatchLabels._1, tryCatchLabels._2, tryCatchLabels._2, "java/lang/Throwable")
       LABEL(tryCatchLabels._1)
     }
+    val localVarsIter = methodTable.localVars.iterator
+    for (localIdx <- methodTable.localVarsIndices) do {
+      val typeDescr = topmostTypeFor(localVarsIter.next()._2.descriptor)
+      LOAD(typeDescr, localIdx)
+      INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(typeDescr) ==> TD.Void)
+    }
+    LDC(ownerClass.name)
+    LDC(methodName.name)
+    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String) ==> TD.Void)
     super.visitCode()
   }
+
 
   override def visitInsn(opcode: Int): Unit = {
     val isRetInstr = isReturnInstr(opcode)
@@ -39,7 +49,7 @@ final class MethodTransformer(
         LDC(methodName.name)
         INVOKE_STATIC(jumboTracer, ReturnedVoid.methodName, Seq(TD.String) ==> TD.Void)
       } else {
-        val returnedTypeDescr = unpreciseTypingReturnTypeDescriptorFor(methodDescr.ret)
+        val returnedTypeDescr = topmostTypeFor(methodDescr.ret)
         DUP(returnedTypeDescr)
         LDC(methodName.name)
         SWAP(returnedTypeDescr)
@@ -56,7 +66,7 @@ final class MethodTransformer(
 
   override def visitVarInsn(opcode: Int, varIndex: Int): Unit = {
     methodTable.localVars.get(varIndex).foreach { localVar =>
-      val typeDescr = unpreciseTypingReturnTypeDescriptorFor(localVar.descriptor)
+      val typeDescr = topmostTypeFor(localVar.descriptor)
       if (isVarStoreInstr(opcode)) {
         DUP(typeDescr)
         LDC(localVar.name)
@@ -73,7 +83,7 @@ final class MethodTransformer(
   override def visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
     if (opcode == Opcodes.PUTSTATIC || opcode == Opcodes.PUTFIELD){
       val loggingMethod = if opcode == Opcodes.PUTSTATIC then StaticFieldSet.methodName else InstanceFieldSet.methodName
-      val unpreciseTypeDescr = unpreciseTypingReturnTypeDescriptorFor(TypeDescriptor.parse(descriptor).get)
+      val unpreciseTypeDescr = topmostTypeFor(TypeDescriptor.parse(descriptor).get)
       DUP(unpreciseTypeDescr)
       LDC(owner)
       SWAP(unpreciseTypeDescr)
@@ -102,7 +112,7 @@ final class MethodTransformer(
     super.visitLineNumber(line, start)
   }
 
-  private def unpreciseTypingReturnTypeDescriptorFor(td: TypeDescriptor): TypeDescriptor = {
+  private def topmostTypeFor(td: TypeDescriptor): TypeDescriptor = {
     td match
       case _: (TD.Array | TD.Class) => TD.Object
       case primitive => primitive

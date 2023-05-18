@@ -1,6 +1,7 @@
 package com.epfl.systemf.jumbotrace.instrumenter
 
 import org.objectweb.asm.{Label, MethodVisitor, Opcodes}
+import TypeDescriptor.isDoubleWordType
 
 object AsmDsl {
 
@@ -61,17 +62,13 @@ object AsmDsl {
   }
 
   def RETURN(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    import TypeDescriptor.*
-    val opcode = (
-      td match
-        case Boolean | Char | Byte | Short | Int => Opcodes.IRETURN
-        case Float => Opcodes.FRETURN
-        case Long => Opcodes.LRETURN
-        case Double => Opcodes.DRETURN
-        case Void => Opcodes.RETURN
-        case _: (Array | Class) => Opcodes.ARETURN
-      )
+    val opcode = td.getOpcode(Opcodes.IRETURN, Opcodes.ARETURN)
     mv.visitInsn(opcode)
+  }
+
+  def LOAD(td: TypeDescriptor, varIdx: Int)(using mv: MethodVisitor): Unit = {
+    val opcode = td.getOpcode(Opcodes.ILOAD, Opcodes.ALOAD)
+    mv.visitVarInsn(opcode, varIdx)
   }
   
   def ATHROW(using mv: MethodVisitor): Unit = {
@@ -82,12 +79,6 @@ object AsmDsl {
     mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;")
     LDC(str)
     mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false)
-  }
-
-  private def isDoubleWordType(td: TypeDescriptor): Boolean = {
-    td match
-      case TypeDescriptor.Double | TypeDescriptor.Long => true
-      case _ => false
   }
 
 }

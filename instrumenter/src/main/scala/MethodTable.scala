@@ -1,6 +1,7 @@
 package com.epfl.systemf.jumbotrace.instrumenter
 
 import MethodTable.LocalVariable
+import TypeDescriptor.isDoubleWordType
 
 import org.objectweb.asm.{Label, Opcodes}
 
@@ -12,11 +13,29 @@ final class MethodTable(
                          val methodName: MethodName,
                          val methodDescr: MethodDescriptor,
                          val localVars: Map[Int, LocalVariable],
+                         val isStatic: Boolean,
                          val isMainMethod: Boolean
                        ){
+
+  def localVarsIndices: Seq[Int] = {
+    var skip = (methodName.name == "<init>")  // aload on receiver as the first instruction in <init> crashes the program
+    val indicesCnt = methodDescr.args.size + (if isStatic then 0 else 1)
+    val indices = ListBuffer.empty[Int]
+    var currIdx = 0
+    for ((_, localVar) <- localVars.take(indicesCnt)) do {
+      if (!skip){
+        indices.addOne(currIdx)
+      }
+      currIdx += (if isDoubleWordType(localVar.descriptor) then 2 else 1)
+      skip = false
+    }
+    indices.toSeq
+  }
+
   override def toString: String = {
     val mainMethodSymbol = if isMainMethod then "*" else ""
-    s"$ownerClass::$methodName$mainMethodSymbol$methodDescr " + localVars.mkString("[", ",", "]")
+    val staticSymbol = if isStatic then "static " else ""
+    s"$staticSymbol$ownerClass::$methodName$mainMethodSymbol$methodDescr " + localVars.mkString("[", ",", "]")
   }
 }
 
@@ -26,6 +45,7 @@ object MethodTable {
                        val ownerClass: ClassName,
                        val methodName: MethodName,
                        val methodDescr: MethodDescriptor,
+                       val isStatic: Boolean,
                        val isMainMethod: Boolean
                      ) {
 
@@ -50,7 +70,7 @@ object MethodTable {
     }
 
     def built: MethodTable = {
-      new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap, isMainMethod)
+      new MethodTable(ownerClass, methodName, methodDescr, localVars.toMap, isStatic = isStatic, isMainMethod = isMainMethod)
     }
 
   }
