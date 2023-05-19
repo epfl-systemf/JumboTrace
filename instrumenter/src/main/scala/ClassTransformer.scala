@@ -10,16 +10,10 @@ final class ClassTransformer(
                             ) extends ClassVisitor(Config.current.asmVersion, underlying) {
 
   override def visitMethod(access: Int, name: String, descriptor: String, signature: String, exceptions: Array[String]): MethodVisitor = {
-    val defaultVisitor = super.visitMethod(access, name, descriptor, signature, exceptions)
-    val isToString = (name == "toString" && descriptor == (Seq.empty ==> TD.String).toString)
-    if (isToString){  // do not instrument toString since it is called by the instrumentation
-      defaultVisitor
-    } else {
-      new MethodTransformer(
-        defaultVisitor,
-        classTable.getMethodTable(MethodName(name), MethodDescriptor.parse(descriptor).get).get
-      )
-    }
+    new MethodTransformer(
+      super.visitMethod(access, name, descriptor, signature, exceptions),
+      classTable.getMethodTable(MethodName(name), MethodDescriptor.parse(descriptor).get).get
+    )
   }
 
 }

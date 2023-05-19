@@ -11,35 +11,35 @@ import java.util.Objects;
 
 // =====================================================================================================================
 
-#define VARIABLE_SET(_type)                                      \
-static void variableSet(String varId, _type value){              \
-    trace.add(new VarSet(varId, convertToString(value)));        \
+#define VARIABLE_SET(_type)                                                               \
+static void variableSet(String varId, _type value){                                       \
+    handlingSuspended(() -> trace.add(new VarSet(varId, convertToString(value))));        \
 }
 
-#define INSTRUMENTED_ARRAY_STORE(_elemType)                                             \
-static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){        \
-    trace.add(new ArrayElemSet(Objects.toString(array), idx, convertToString(value)));  \
-    array[idx] = value;                                                                 \
+#define INSTRUMENTED_ARRAY_STORE(_elemType)                                                                      \
+static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                                 \
+    handlingSuspended(() -> trace.add(new ArrayElemSet(Objects.toString(array), idx, convertToString(value))));  \
+    array[idx] = value;                                                                                          \
 }
 
-#define STATIC_FIELD_SET(_type)                                                        \
-static void staticFieldSet(String fieldOwner, String fieldName, _type value){          \
-    trace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value)));      \
+#define STATIC_FIELD_SET(_type)                                                                                 \
+static void staticFieldSet(String fieldOwner, String fieldName, _type value){                                   \
+    handlingSuspended(() -> trace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value))));      \
 }
 
-#define INSTANCE_FIELD_SET(_type)                                                      \
-static void instanceFieldSet(String fieldOwner, String fieldName, _type value){        \
-    trace.add(new InstanceFieldSet(fieldOwner, fieldName, convertToString(value)));    \
+#define INSTANCE_FIELD_SET(_type)                                                                               \
+static void instanceFieldSet(String fieldOwner, String fieldName, _type value){                                 \
+    handlingSuspended(() -> trace.add(new InstanceFieldSet(fieldOwner, fieldName, convertToString(value))));    \
 }
 
-#define RETURNED(_tpe)                                           \
-static void returned(String methodName, _tpe value){             \
-    trace.add(new Return(methodName, convertToString(value)));   \
+#define RETURNED(_tpe)                                                                    \
+static void returned(String methodName, _tpe value){                                      \
+    handlingSuspended(() -> trace.add(new Return(methodName, convertToString(value))));   \
 }
 
-#define SAVE_ARG(_tpe)                                           \
-static void saveArgument(_tpe value){                            \
-    currentArgs.add(convertToString(value));                     \
+#define SAVE_ARG(_tpe)                                                                    \
+static void saveArgument(_tpe value){                                                     \
+    handlingSuspended(() -> currentArgs.add(convertToString(value)));                     \
 }
 
 // boolean char byte short int float long double Object
@@ -57,8 +57,23 @@ public final class ___JumboTracer___ {
 
     // -----------------------------------------------------------------------------------------
 
+    private static boolean loggingSuspended = false;
+
+    static void suspendLogging(){ loggingSuspended = true; }
+    static void resumeLogging(){ loggingSuspended = false; }
+
+    static void handlingSuspended(Runnable action){
+        if (!loggingSuspended){
+            suspendLogging();
+            action.run();
+            resumeLogging();
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------
+
     static void lineVisited(String className, int lineNum) {
-        trace.add(new LineVisited(className, lineNum));
+        handlingSuspended(() -> trace.add(new LineVisited(className, lineNum)));
     }
 
     VARIABLE_SET(boolean)
@@ -112,7 +127,9 @@ public final class ___JumboTracer___ {
     RETURNED(long)
     RETURNED(double)
     RETURNED(Object)
-    static void returnedVoid(String methodName){ trace.add(new ReturnVoid(methodName)); }
+    static void returnedVoid(String methodName){
+        handlingSuspended(() -> trace.add(new ReturnVoid(methodName)));
+    }
 
     SAVE_ARG(boolean)
     SAVE_ARG(char)
@@ -125,7 +142,7 @@ public final class ___JumboTracer___ {
     SAVE_ARG(Object)
 
     static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
-        trace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic));
+        handlingSuspended(() -> trace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic)));
         currentArgs = new ArrayList<>();
     }
 
