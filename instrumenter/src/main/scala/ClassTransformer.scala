@@ -1,8 +1,8 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 import org.objectweb.asm.{ClassVisitor, MethodVisitor}
-import com.epfl.systemf.jumbotrace.instrumenter.TypeDescriptor as TD
-import com.epfl.systemf.jumbotrace.instrumenter.MethodDescriptor.*
+import instrumenter.TypeDescriptor as TD
+import instrumenter.MethodDescriptor.*
 
 final class ClassTransformer(
                               underlying: ClassVisitor,

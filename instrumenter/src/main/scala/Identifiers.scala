@@ -1,4 +1,4 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 final case class ClassName(name: String) extends AnyVal {
   override def toString: String = name

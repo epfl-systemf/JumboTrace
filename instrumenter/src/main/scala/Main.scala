@@ -1,4 +1,4 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 import org.objectweb.asm.{ClassReader, ClassWriter}
 
@@ -47,7 +47,7 @@ object Main {
 
   private def allClassesInCurrDir(): Seq[ClassName] = {
     val currDir = Paths.get(".").toFile
-    for sub <- currDir.listFiles() if sub.isFile && sub.getName.endsWith(".class") yield {
+    for sub <- currDir.listFiles().toSeq if sub.isFile && sub.getName.endsWith(".class") yield {
       ClassName(sub.getName.takeWhile(_ != '.'))
     }
   }

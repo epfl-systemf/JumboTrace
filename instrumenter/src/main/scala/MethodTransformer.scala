@@ -1,13 +1,13 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 import org.objectweb.asm.{Handle, Label, MethodVisitor, Opcodes}
 import AsmDsl.*
 import Injection.*
 import Injection.EventMethod.*
 
-import com.epfl.systemf.jumbotrace.instrumenter.MethodDescriptor.==>
-import com.epfl.systemf.jumbotrace.instrumenter.MethodTable.LocalVariable
-import com.epfl.systemf.jumbotrace.instrumenter.TypeDescriptor as TD
+import instrumenter.MethodDescriptor.==>
+import instrumenter.MethodTable.LocalVariable
+import instrumenter.TypeDescriptor as TD
 
 final class MethodTransformer(
                                underlying: MethodVisitor,

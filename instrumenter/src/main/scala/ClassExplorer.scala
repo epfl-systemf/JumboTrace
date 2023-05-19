@@ -1,7 +1,7 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 import org.objectweb.asm.{ClassVisitor, MethodVisitor, Opcodes}
-import com.epfl.systemf.jumbotrace.instrumenter.TypeDescriptor as TD
+import instrumenter.TypeDescriptor as TD
 
 final class ClassExplorer(classTableB: ClassTable.Builder) extends ClassVisitor(Config.current.asmVersion) {
 

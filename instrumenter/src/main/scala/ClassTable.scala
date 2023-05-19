@@ -1,4 +1,4 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
 import scala.collection.mutable
 

@@ -1,6 +1,6 @@
-package com.epfl.systemf.jumbotrace.instrumenter
+package instrumenter
 
-import com.epfl.systemf.jumbotrace.instrumenter.TypeDescriptor as TD
+import instrumenter.TypeDescriptor as TD
 
 object Injection {
 
