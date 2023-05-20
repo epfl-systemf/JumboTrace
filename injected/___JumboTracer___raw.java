@@ -18,7 +18,7 @@ static void variableSet(String varId, _type value){                             
 
 #define INSTRUMENTED_ARRAY_STORE(_elemType)                                                                      \
 static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                                 \
-    handlingSuspended(() -> trace.add(new ArrayElemSet(Objects.toString(array), idx, convertToString(value))));  \
+    handlingSuspended(() -> trace.add(new ArrayElemSet(safeToString(array), idx, convertToString(value))));      \
     array[idx] = value;                                                                                          \
 }
 
@@ -275,7 +275,7 @@ public final class ___JumboTracer___ {
         typeAndFields.addAll(Arrays.asList(fields));
         for (var fieldEntry : typeAndFields) {
             var fieldIndentStr = " ".repeat(indent + 1);
-            var fieldStr = String.format("\"%s\" : \"%s\"", fieldEntry.key, fieldEntry.value.toString());
+            var fieldStr = String.format("\"%s\" : \"%s\"", fieldEntry.key, safeToString(fieldEntry.value));
             joiner.add(fieldIndentStr + fieldStr);
         }
         return joiner.toString();
@@ -283,19 +283,27 @@ public final class ___JumboTracer___ {
 
     private static String convertToString(Object o){
         if (o instanceof Object[] array){
-            var sj = new StringJoiner(",", "[", "] (" + Objects.toString(o) + ")");
+            var sj = new StringJoiner(",", "[", "] (" + safeToString(o) + ")");
             for (var e: array){
                 sj.add(convertToString(e));
             }
             return sj.toString();
         } else if (o instanceof Iterable<?> iterable){
-            var sj = new StringJoiner(",", "[", "]@" + Objects.toString(o));
+            var sj = new StringJoiner(",", "[", "]@" + safeToString(o));
             for (var e: iterable){
                 sj.add(convertToString(e));
             }
             return sj.toString();
         } else {
+            return safeToString(o);
+        }
+    }
+
+    private static String safeToString(Object o){
+        try {
             return Objects.toString(o);
+        } catch (Throwable e){
+            return null;
         }
     }
 
