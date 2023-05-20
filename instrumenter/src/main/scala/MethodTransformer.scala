@@ -94,6 +94,15 @@ final class MethodTransformer(
     super.visitVarInsn(opcode, varIndex)
   }
 
+  override def visitIincInsn(varIndex: Int, increment: Int): Unit = {
+    super.visitIincInsn(varIndex, increment)
+    methodTable.localVars.get(varIndex).foreach { localVar =>
+      LDC(localVar.name)
+      LOAD(TD.Int, varIndex)
+      INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
+    }
+  }
+
   override def visitFieldInsn(opcode: Int, ownerClass: String, name: String, descriptor: String): Unit = {
 
     lazy val unpreciseTypeDescr: TypeDescriptor = topmostTypeFor(TypeDescriptor.parse(descriptor).get)
