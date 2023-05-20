@@ -33,3 +33,12 @@ final case class ReturnVoid(methodName: String) extends TraceElement {
 final case class MethodCalled(ownerClass: String, methodName: String, args: Seq[String], isStatic: Boolean) extends TraceElement {
   override def toString: String = s"CALL $ownerClass :: $methodName(${args.mkString(",")})"
 }
+
+final case class Initialization(dateTime: String) extends TraceElement {
+  // dropWhile thing removes the nanoseconds
+  override def toString: String = s"TRACE INITIALIZED AT ${dateTime.reverse.dropWhile(_ != '.').reverse.init}"
+}
+
+final case class Termination(msg: String) extends TraceElement {
+  override def toString: String = msg
+}

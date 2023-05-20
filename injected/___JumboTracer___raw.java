@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.Objects;
+import java.time.LocalDateTime;
 
 // =====================================================================================================================
 
@@ -54,6 +55,11 @@ public final class ___JumboTracer___ {
 
     private static final List<TraceElement> trace = new ArrayList<>();
     private static List<String> currentArgs = new ArrayList<>();
+
+    static {
+        var time = LocalDateTime.now();
+        trace.add(new Initialization(time.toString()));
+    }
 
     // -----------------------------------------------------------------------------------------
 
@@ -144,6 +150,10 @@ public final class ___JumboTracer___ {
     static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
         handlingSuspended(() -> trace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic)));
         currentArgs = new ArrayList<>();
+    }
+
+    static void saveTermination(String msg){
+        trace.add(new Termination(msg));
     }
 
 
@@ -250,6 +260,20 @@ public final class ___JumboTracer___ {
                     fld("args", args),
                     fld("isStatic", isStatic)
             );
+        }
+    }
+
+    private record Initialization(String dateTime) implements TraceElement {
+        @Override
+        public String toJson(int indent) {
+            return jsonObject("Initialization", indent + 1, fld("dateTime", dateTime));
+        }
+    }
+
+    private record Termination(String msg) implements TraceElement {
+        @java.lang.Override
+        public String toJson(int indent) {
+            return jsonObject("Termination", indent + 1, fld("msg", msg));
         }
     }
 

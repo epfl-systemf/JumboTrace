@@ -41,6 +41,8 @@ object JsonParser {
     def ownerClass = strFld("ownerClass")
     def args = strSeqFld("args")
     def isStatic = boolFld("isStatic")
+    def dateTime = strFld("dateTime")
+    def msg = strFld("msg")
 
     strFld("type") match {
       case "LineVisited" =>
@@ -59,6 +61,10 @@ object JsonParser {
         ReturnVoid(methodName)
       case "MethodCalled" =>
         MethodCalled(ownerClass, methodName, args, isStatic)
+      case "Initialization" =>
+        Initialization(dateTime)
+      case "Termination" =>
+        Termination(msg)
     }
   }
 

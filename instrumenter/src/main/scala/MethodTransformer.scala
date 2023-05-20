@@ -73,6 +73,8 @@ final class MethodTransformer(
     }
     if (isMainMethod && isRetInstr) {
       PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
+      LDC("Program terminating normally")
+      INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
       INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
     }
@@ -126,6 +128,8 @@ final class MethodTransformer(
   override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {
     if (isMainMethod){
       LABEL(tryCatchLabels._2)
+      LDC("Program terminating with an exception")
+      INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
       PRINTLN(s"$ansiYellow JumboTracer: $ansiRed[ERROR]$ansiYellow: program terminating with an exception$ansiReset")
       INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
