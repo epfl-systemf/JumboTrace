@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Display Exceptions" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="DebugCmdlineFrontend" />
+    <module name="debugCmdlineFrontend" />
+    <option name="PROGRAM_PARAMETERS" value="trace.json" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples/Exceptions/jumbotracer-transformed/trace" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

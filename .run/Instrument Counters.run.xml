@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Instrument Counters" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="instrumenter.Main" />
+    <module name="instrumenter" />
+    <option name="PROGRAM_PARAMETERS" value="Main" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples/Counters" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="instrumenter.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
