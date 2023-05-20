@@ -275,7 +275,7 @@ public final class ___JumboTracer___ {
         typeAndFields.addAll(Arrays.asList(fields));
         for (var fieldEntry : typeAndFields) {
             var fieldIndentStr = " ".repeat(indent + 1);
-            var fieldStr = String.format("\"%s\" : \"%s\"", fieldEntry.key, safeToString(fieldEntry.value));
+            var fieldStr = String.format("\"%s\" : \"%s\"", fieldEntry.key, toStringOrGeneric(fieldEntry.value));
             joiner.add(fieldIndentStr + fieldStr);
         }
         return joiner.toString();
@@ -304,6 +304,14 @@ public final class ___JumboTracer___ {
             return Objects.toString(o);
         } catch (Throwable e){
             return null;
+        }
+    }
+
+    private static String toStringOrGeneric(Object o){
+        if (o == null){
+            return "??";
+        } else {
+            return Objects.toString(o);
         }
     }
 
