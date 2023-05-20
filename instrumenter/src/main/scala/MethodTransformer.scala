@@ -115,7 +115,7 @@ final class MethodTransformer(
       SWAP(TD.String, unpreciseTypeDescr)
       INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
     } else if (opcode == Opcodes.PUTFIELD){
-      DUP2(TD.Object, unpreciseTypeDescr)
+      DUP2(unpreciseTypeDescr, TD.Object)
       LDC(name)
       SWAP(TD.String, unpreciseTypeDescr)
       INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
