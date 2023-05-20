@@ -40,19 +40,47 @@ object AsmDsl {
 
   /**
    * Swap the 2 topmost elements of the stack
-   *
-   * @param secondStackElemTypeDescr type descriptor of the second element (on the stack, indexed from the beginning)
-   *
-   *                                 <b>ASSUMES that the topmost element of the stack is a single-word element (i.e. neither a double nor a long)</b>
    */
-  def SWAP(secondStackElemTypeDescr: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    if (isDoubleWordType(secondStackElemTypeDescr)) {
-      // bottom ... top
-      // d2 d1 x  ->  x d2 d1 x  ->  x d2 d1
+  def SWAP(firstStackElemType: TypeDescriptor, secondStackElemType: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    // stack representation in comments: bottom ... top
+    if (isDoubleWordType(firstStackElemType) && isDoubleWordType(secondStackElemType)){
+      // a1 a2 b1 b2 -> b1 b2 a1 a2 b1 b2 -> b1 b2 a1 a2
+      mv.visitInsn(Opcodes.DUP2_X2)
+      mv.visitInsn(Opcodes.POP2)
+    } else if (isDoubleWordType(firstStackElemType)){
+      // x d1 d2 -> d1 d2 x d1 d2 -> d1 d2 x
+      mv.visitInsn(Opcodes.DUP2_X1)
+      mv.visitInsn(Opcodes.POP2)
+    } else if (isDoubleWordType(secondStackElemType)){
+      // d2 d1 x -> x d2 d1 x -> x d2 d1
       mv.visitInsn(Opcodes.DUP_X2)
       mv.visitInsn(Opcodes.POP)
     } else {
       mv.visitInsn(Opcodes.SWAP)
+    }
+  }
+
+  def DUP2(firstStackElemType: TypeDescriptor, secondStackElemType: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    // stack representation in comments: bottom ... top
+    if (isDoubleWordType(firstStackElemType) && isDoubleWordType(secondStackElemType)) {
+      // a1 a2 b1 b2 -> b1 b2 a1 a2 -> a1 a2 b1 b2 a1 a2 -> a1 a2 a1 a2 b1 b2 -> a1 a2 b1 b2 a1 a2 b1 b2
+      SWAP(firstStackElemType, secondStackElemType)
+      mv.visitInsn(Opcodes.DUP2_X2)
+      SWAP(secondStackElemType, firstStackElemType)
+      mv.visitInsn(Opcodes.DUP2_X2)
+    } else if (isDoubleWordType(firstStackElemType)) {
+      // x d1 d2 -> d1 d2 x -> x d1 d2 x -> x x d1 d2 -> x d1 d2 x d1 d2
+      SWAP(firstStackElemType, secondStackElemType)
+      mv.visitInsn(Opcodes.DUP_X2)
+      SWAP(secondStackElemType, firstStackElemType)
+      mv.visitInsn(Opcodes.DUP2_X1)
+    } else if (isDoubleWordType(secondStackElemType)) {
+      // d1 d2 x -> x d1 d2 x -> x x d1 d2 -> x d1 d2 x d1 d2
+      mv.visitInsn(Opcodes.DUP_X2)
+      SWAP(firstStackElemType, secondStackElemType)
+      mv.visitInsn(Opcodes.DUP2_X1)
+    } else {
+      mv.visitInsn(Opcodes.DUP2)
     }
   }
 

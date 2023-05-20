@@ -51,7 +51,7 @@ final class MethodTransformer(
         val returnedTypeDescr = topmostTypeFor(methodDescr.ret)
         DUP(returnedTypeDescr)
         LDC(methodName.name)
-        SWAP(returnedTypeDescr)
+        SWAP(TD.String, returnedTypeDescr)
         INVOKE_STATIC(jumboTracer, Returned.methodName, Seq(TD.String, returnedTypeDescr) ==> TD.Void)
       }
     } else if (opcode == Opcodes.IASTORE){
@@ -87,25 +87,31 @@ final class MethodTransformer(
         val typeDescr = topmostTypeFor(localVar.descriptor)
         DUP(typeDescr)
         LDC(localVar.name)
-        SWAP(typeDescr)
+        SWAP(TD.String, typeDescr)
         INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
       }
     }
     super.visitVarInsn(opcode, varIndex)
   }
 
-  override def visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
-    if (opcode == Opcodes.PUTSTATIC || opcode == Opcodes.PUTFIELD){
-      val loggingMethod = if opcode == Opcodes.PUTSTATIC then StaticFieldSet.methodName else InstanceFieldSet.methodName
-      val unpreciseTypeDescr = topmostTypeFor(TypeDescriptor.parse(descriptor).get)
+  override def visitFieldInsn(opcode: Int, ownerClass: String, name: String, descriptor: String): Unit = {
+
+    lazy val unpreciseTypeDescr: TypeDescriptor = topmostTypeFor(TypeDescriptor.parse(descriptor).get)
+
+    if (opcode == Opcodes.PUTSTATIC){
       DUP(unpreciseTypeDescr)
-      LDC(owner)
-      SWAP(unpreciseTypeDescr)
+      LDC(ownerClass)
+      SWAP(TD.String, unpreciseTypeDescr)
       LDC(name)
-      SWAP(unpreciseTypeDescr)
-      INVOKE_STATIC(jumboTracer, loggingMethod, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+      SWAP(TD.String, unpreciseTypeDescr)
+      INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+    } else if (opcode == Opcodes.PUTFIELD){
+      DUP2(TD.Object, unpreciseTypeDescr)
+      LDC(name)
+      SWAP(TD.String, unpreciseTypeDescr)
+      INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
     }
-    super.visitFieldInsn(opcode, owner, name, descriptor)
+    super.visitFieldInsn(opcode, ownerClass, name, descriptor)
   }
 
   override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {

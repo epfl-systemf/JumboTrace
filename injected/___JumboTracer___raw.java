@@ -27,9 +27,9 @@ static void staticFieldSet(String fieldOwner, String fieldName, _type value){   
     handlingSuspended(() -> trace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value))));      \
 }
 
-#define INSTANCE_FIELD_SET(_type)                                                                               \
-static void instanceFieldSet(String fieldOwner, String fieldName, _type value){                                 \
-    handlingSuspended(() -> trace.add(new InstanceFieldSet(fieldOwner, fieldName, convertToString(value))));    \
+#define INSTANCE_FIELD_SET(_type)                                                                                                \
+static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                                  \
+    handlingSuspended(() -> trace.add(new InstanceFieldSet(convertToString(fieldOwner), fieldName, convertToString(value))));    \
 }
 
 #define RETURNED(_tpe)                                                                    \
