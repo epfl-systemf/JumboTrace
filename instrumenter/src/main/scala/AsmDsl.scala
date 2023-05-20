@@ -28,7 +28,9 @@ object AsmDsl {
   }
 
   /**
-   * Duplicate the element at the top of the stack (or the topmost 2 elements if `td` is a double word element)
+   * Duplicate the element at the top of the stack (handles both single- and double-word elements)
+   *
+   * Stack evolution: [a,... -> [a,a,...
    */
   def DUP(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
     if (isDoubleWordType(td)) {
@@ -39,27 +41,10 @@ object AsmDsl {
   }
 
   /**
-   * Swap the 2 topmost elements of the stack
+   * Duplicate the 2 topmost elements on the stack (handles both single- and double-word elements)
+   *
+   * Stack evolution: [a,b,...  ->  [a,b,a,b,...
    */
-  def SWAP(firstStackElemType: TypeDescriptor, secondStackElemType: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    // stack representation in comments: bottom ... top
-    if (isDoubleWordType(firstStackElemType) && isDoubleWordType(secondStackElemType)){
-      // a1 a2 b1 b2 -> b1 b2 a1 a2 b1 b2 -> b1 b2 a1 a2
-      mv.visitInsn(Opcodes.DUP2_X2)
-      mv.visitInsn(Opcodes.POP2)
-    } else if (isDoubleWordType(firstStackElemType)){
-      // x d1 d2 -> d1 d2 x d1 d2 -> d1 d2 x
-      mv.visitInsn(Opcodes.DUP2_X1)
-      mv.visitInsn(Opcodes.POP2)
-    } else if (isDoubleWordType(secondStackElemType)){
-      // d2 d1 x -> x d2 d1 x -> x d2 d1
-      mv.visitInsn(Opcodes.DUP_X2)
-      mv.visitInsn(Opcodes.POP)
-    } else {
-      mv.visitInsn(Opcodes.SWAP)
-    }
-  }
-
   def DUP2(firstStackElemType: TypeDescriptor, secondStackElemType: TypeDescriptor)(using mv: MethodVisitor): Unit = {
     // stack representation in comments: bottom ... top
     if (isDoubleWordType(firstStackElemType) && isDoubleWordType(secondStackElemType)) {
@@ -84,6 +69,36 @@ object AsmDsl {
     }
   }
 
+  /**
+   * Swap the 2 topmost elements of the stack (handles both single- and double-word elements)
+   *
+   * Stack evolution: [a,b,... -> [b,a,...
+   */
+  def SWAP(firstStackElemType: TypeDescriptor, secondStackElemType: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    // stack representation in comments: bottom ... top
+    if (isDoubleWordType(firstStackElemType) && isDoubleWordType(secondStackElemType)){
+      // a1 a2 b1 b2 -> b1 b2 a1 a2 b1 b2 -> b1 b2 a1 a2
+      mv.visitInsn(Opcodes.DUP2_X2)
+      mv.visitInsn(Opcodes.POP2)
+    } else if (isDoubleWordType(firstStackElemType)){
+      // x d1 d2 -> d1 d2 x d1 d2 -> d1 d2 x
+      mv.visitInsn(Opcodes.DUP2_X1)
+      mv.visitInsn(Opcodes.POP2)
+    } else if (isDoubleWordType(secondStackElemType)){
+      // d1 d2 x -> x d1 d2 x -> x d1 d2
+      mv.visitInsn(Opcodes.DUP_X2)
+      mv.visitInsn(Opcodes.POP)
+    } else {
+      mv.visitInsn(Opcodes.SWAP)
+    }
+  }
+
+  /**
+   * @param start beginning of the code throwing the exception
+   * @param end end of the code throwing the exception
+   * @param handler beginning of the exception handler
+   * @param typeInternalName internal name of the type of the exception
+   */
   def TRY_CATCH(start: Label, end: Label, handler: Label, typeInternalName: String)(using mv: MethodVisitor): Unit = {
     mv.visitTryCatchBlock(start, end, handler, typeInternalName)
   }
