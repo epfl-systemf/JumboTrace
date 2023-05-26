@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Display Fibonacci" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="DebugCmdlineFrontend" />
+    <option name="MAIN_CLASS_NAME" value="debugCmdlineFrontend.DebugCmdlineFrontend" />
     <module name="debugCmdlineFrontend" />
     <option name="PROGRAM_PARAMETERS" value="trace.json" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples/Fibonacci/jumbotracer-transformed/trace" />

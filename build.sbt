@@ -5,7 +5,7 @@ ThisBuild / scalacOptions += "-deprecation"
 
 val asmVersion = "9.5"
 val javaParserVersion = "3.25.3"
-val circeVersion = "0.14.3"
+val playVersion = "2.9.4"
 
 lazy val instrumenter = project
   .settings(
@@ -17,12 +17,9 @@ lazy val instrumenter = project
 lazy val traceElements = project
   .settings(
     name := "traceElements",
+    scalaVersion := "2.13.10",
     idePackagePrefix := Some("traceElements"),
-    libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core",
-      "io.circe" %% "circe-generic",
-      "io.circe" %% "circe-parser"
-    ).map(_ % circeVersion)
+    libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
   )
 
 lazy val debugCmdlineFrontend = project
