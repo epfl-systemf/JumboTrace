@@ -1,0 +1,3 @@
+
+TODO events happening at one line should be subevents of a LineEvent
+TODO properly log exploration and transformation
