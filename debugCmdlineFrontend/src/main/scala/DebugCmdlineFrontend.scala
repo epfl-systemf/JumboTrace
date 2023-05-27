@@ -29,25 +29,35 @@ object DebugCmdlineFrontend {
 
   private def display(traceElement: TraceElement, indent: Int)(using ps: PrintStream): Unit = {
 
-    def println(str: String): Unit = ps.println(" " * (indent * 2) ++ str)
-    def printlnPositioned(str: String, position: Position): Unit = println(s"$str ($position)")
+    def println(str: String): Unit = ps.println(" " * indent ++ str)
 
     traceElement match
-      case VarSet(varId, value, pos) =>
-        printlnPositioned(s"SET $varId = $value", pos)
-      case ArrayElemSet(arrayId, idx, value, pos) =>
-        printlnPositioned(s"SET $arrayId[$idx] = $value", pos)
-      case StaticFieldSet(owner, fieldName, value, pos) =>
-        printlnPositioned(s"SET $owner.$fieldName = $value", pos)
-      case InstanceFieldSet(owner, fieldName, value, pos) =>
-        printlnPositioned(s"SET $owner.$fieldName = $value", pos)
-      case Return(methodName, value, pos) =>
-        printlnPositioned(s"RETURN $value FROM $methodName", pos)
-      case ReturnVoid(methodName, pos) =>
-        printlnPositioned(s"RETURN void FROM $methodName", pos)
-      case MethodCalled(ownerClass, methodName, args, isStatic, pos, subEvents) =>
-        printlnPositioned(s"CALL $ownerClass :: $methodName (${args.mkString(",")})", pos)
+      case LineVisited(className, lineNumber, subEvents) =>
+        println(s"VISIT line $lineNumber in class $className")
         displayAll(subEvents, indent + 1)
+      case VarSet(varId, value) =>
+        println(s"SET $varId = $value")
+      case VarGet(varId, value) =>
+        println(s"GET $varId = $value")
+      case ArrayElemSet(arrayId, idx, value) =>
+        println(s"SET $arrayId[$idx] = $value")
+      case ArrayElemGet(arrayId, idx, value) =>
+        println(s"GET $arrayId[$idx] = $value")
+      case StaticFieldSet(owner, fieldName, value) =>
+        println(s"SET $owner.$fieldName = $value")
+      case StaticFieldGet(owner, fieldName, value) =>
+        println(s"GET $owner.$fieldName = $value")
+      case InstanceFieldSet(owner, fieldName, value) =>
+        println(s"SET $owner.$fieldName = $value")
+      case InstanceFieldGet(owner, fieldName, value) =>
+        println(s"GET $owner.$fieldName = $value")
+      case Return(methodName, value) =>
+        println(s"RETURN $value FROM $methodName")
+      case ReturnVoid(methodName) =>
+        println(s"RETURN void FROM $methodName")
+      case MethodCalled(ownerClass, methodName, args, isStatic, subEvents) =>
+        println(s"CALL $ownerClass :: $methodName (${args.mkString(",")})")
+        displayAll(subEvents, indent + 2)
       case Initialization(dateTime) =>
         println(s"INITIALIZATION: ${formatTime(dateTime)}")
       case Termination(msg) =>

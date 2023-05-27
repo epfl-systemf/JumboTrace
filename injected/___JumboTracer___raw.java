@@ -15,17 +15,17 @@ import java.time.LocalDateTime;
 
 #define VARIABLE_SET(_type)                                                                        \
 static void variableSet(String varId, _type value){                                                \
-    handlingSuspended(() -> currTrace.add(new VarSet(varId, convertToString(value), currPos)));    \
+    handlingSuspended(() -> currTrace.add(new VarSet(varId, convertToString(value))));             \
 }
 
 #define VARIABLE_GET(_type)                                                                        \
 static void variableGet(String varId, _type value){                                                \
-    handlingSuspended(() -> currTrace.add(new VarGet(varId, convertToString(value), currPos)));    \
+    handlingSuspended(() -> currTrace.add(new VarGet(varId, convertToString(value))));             \
 }
 
 #define INSTRUMENTED_ARRAY_STORE(_elemType)                                                                               \
 static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                                          \
-    handlingSuspended(() -> currTrace.add(new ArrayElemSet(safeToString(array), idx, convertToString(value), currPos)));  \
+    handlingSuspended(() -> currTrace.add(new ArrayElemSet(safeToString(array), idx, convertToString(value))));           \
     array[idx] = value;                                                                                                   \
 }
 
@@ -33,37 +33,37 @@ static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){
 static void arrayLoad(_elemType[] array, int idx){                                                       \
     handlingSuspended(() -> {                                                                            \
         var value = array[idx];                                                                          \
-        currTrace.add(new ArrayElemGet(safeToString(array), idx, convertToString(value), currPos));      \
+        currTrace.add(new ArrayElemGet(safeToString(array), idx, convertToString(value)));               \
     });                                                                                                  \
 }
 
 #define STATIC_FIELD_SET(_type)                                                                                          \
 static void staticFieldSet(String fieldOwner, String fieldName, _type value){                                            \
-    handlingSuspended(() -> currTrace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value), currPos)));  \
+    handlingSuspended(() -> currTrace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value))));           \
 }
 
 #define STATIC_FIELD_GET(_type)                                                                                          \
 static void staticFieldGet(String fieldOwner, String fieldName, _type value){                                            \
-    handlingSuspended(() -> currTrace.add(new StaticFieldGet(fieldOwner, fieldName, convertToString(value), currPos)));  \
+    handlingSuspended(() -> currTrace.add(new StaticFieldGet(fieldOwner, fieldName, convertToString(value))));           \
 }
 
 #define INSTANCE_FIELD_SET(_type)                                                                                                           \
 static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                                             \
-    handlingSuspended(() -> currTrace.add(new InstanceFieldSet(convertToString(fieldOwner), fieldName, convertToString(value), currPos)));  \
+    handlingSuspended(() -> currTrace.add(new InstanceFieldSet(convertToString(fieldOwner), fieldName, convertToString(value))));           \
 }
 
 #define INSTANCE_FIELD_GET(_type)                                                                                                           \
 static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){                                                             \
-    handlingSuspended(() -> currTrace.add(new InstanceFieldGet(convertToString(fieldOwner), fieldName, convertToString(value), currPos)));  \
+    handlingSuspended(() -> currTrace.add(new InstanceFieldGet(convertToString(fieldOwner), fieldName, convertToString(value))));           \
 }
 
 #define RETURNED(_tpe)                                                                    \
 static void returned(String methodName, _tpe value){                                      \
     handlingSuspended(() -> {                                                             \
-        currTrace.add(new Return(methodName, convertToString(value), currPos));           \
+        currTrace.add(new Return(methodName, convertToString(value)));                    \
+        traceStack.removeLast();                                                          \
         traceStack.removeLast();                                                          \
         currTrace = traceStack.peekLast();                                                \
-        currPos = positionStack.removeLast();                                             \
     });                                                                                   \
 }
 
@@ -84,16 +84,12 @@ public final class ___JumboTracer___ {
 
     private static final Deque<List<TraceElement>> traceStack;
     private static List<TraceElement> currTrace;
-    private static final Deque<Position> positionStack;
-    private static Position currPos;
     private static List<String> currentArgs;
 
     static {
         traceStack = new LinkedList<>();
         currTrace = new ArrayList<>();
         traceStack.addLast(currTrace);
-        positionStack = new LinkedList<>();
-        currPos = new NoPosition();
         currentArgs = new ArrayList<>();
         var time = LocalDateTime.now();
         currTrace.add(new Initialization(time.toString()));
@@ -118,7 +114,11 @@ public final class ___JumboTracer___ {
 
     static void lineVisited(String className, int lineNum) {
         handlingSuspended(() -> {
-            currPos = new ConcretePosition(className, lineNum);
+            traceStack.removeLast();
+            var newStackFrame = new ArrayList<TraceElement>();
+            traceStack.peekLast().add(new LineVisited(className, lineNum, newStackFrame));
+            currTrace = newStackFrame;
+            traceStack.add(newStackFrame);
         });
     }
 
@@ -213,10 +213,10 @@ public final class ___JumboTracer___ {
     RETURNED(Object)
     static void returnedVoid(String methodName){
         handlingSuspended(() -> {
-            currTrace.add(new ReturnVoid(methodName, currPos));
+            currTrace.add(new ReturnVoid(methodName));
+            traceStack.removeLast();
             traceStack.removeLast();
             currTrace = traceStack.peekLast();
-            currPos = positionStack.removeLast();
         });
     }
 
@@ -233,11 +233,11 @@ public final class ___JumboTracer___ {
     static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
         handlingSuspended(() -> {
             var newStackFrame = new ArrayList<TraceElement>();
-            currTrace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic, currPos, newStackFrame));
+            currTrace.add(new MethodCalled(ownerClass, methodName, currentArgs, isStatic, newStackFrame));
             currTrace = newStackFrame;
             traceStack.addLast(newStackFrame);
+            traceStack.addLast(null);  // will be remove by the first lineEvent
             currentArgs = new ArrayList<>();
-            positionStack.addLast(currPos);
         });
     }
 
@@ -271,141 +271,125 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private interface Position extends JsonWritable { }
-
-    private record ConcretePosition(String className, int lineNum) implements Position {
-        @Override public String toJson(int indent) {
-            return jsonObject("ConcretePosition", indent + 1, fld("className", className), fld("lineNum", lineNum));
-        }
-    }
-
-    private record NoPosition() implements Position {
-        @Override
-        public String toJson(int indent) {
-            return jsonObject("NoPosition", indent + 1);
-        }
-    }
-
     private interface JsonWritable {
         String toJson(int indent);
     }
 
     private interface TraceElement extends JsonWritable { }
 
-    private record VarSet(String varId, String value, Position pos) implements TraceElement {
+    private record LineVisited(String className, int lineNumber, List<TraceElement> subEvents) implements TraceElement {
+        @Override public String toJson(int indent) {
+            return jsonObject("LineVisited", indent + 1,
+                    fld("className", className),
+                    fld("lineNumber", lineNumber),
+                    subListFld("subEvents", subEvents)
+            );
+        }
+    }
+
+    private record VarSet(String varId, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarSet", indent + 1,
                     fld("varId", varId),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record VarGet(String varId, String value, Position pos) implements TraceElement {
+    private record VarGet(String varId, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarGet", indent + 1,
                     fld("varId", varId),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record ArrayElemSet(String arrayId, int idx, String value, Position pos) implements TraceElement {
+    private record ArrayElemSet(String arrayId, int idx, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemSet", indent + 1,
                     fld("arrayId", arrayId),
                     fld("idx", idx),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record ArrayElemGet(String arrayId, int idx, String value, Position pos) implements TraceElement {
+    private record ArrayElemGet(String arrayId, int idx, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemGet", indent + 1,
                     fld("arrayId", arrayId),
                     fld("idx", idx),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record StaticFieldSet(String owner, String fieldName, String value, Position pos) implements TraceElement {
+    private record StaticFieldSet(String owner, String fieldName, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldSet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record StaticFieldGet(String owner, String fieldName, String value, Position pos) implements TraceElement {
+    private record StaticFieldGet(String owner, String fieldName, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldGet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record InstanceFieldSet(String owner, String fieldName, String value, Position pos) implements TraceElement {
+    private record InstanceFieldSet(String owner, String fieldName, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldSet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record InstanceFieldGet(String owner, String fieldName, String value, Position pos) implements TraceElement {
+    private record InstanceFieldGet(String owner, String fieldName, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldGet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record Return(String methodName, String value, Position pos) implements TraceElement {
+    private record Return(String methodName, String value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("Return", indent + 1,
                     fld("methodName", methodName),
-                    fld("value", value),
-                    fld("pos", pos)
+                    fld("value", value)
             );
         }
     }
 
-    private record ReturnVoid(String methodName, Position pos) implements TraceElement {
+    private record ReturnVoid(String methodName) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ReturnVoid", indent + 1,
-                    fld("methodName", methodName),
-                    fld("pos", pos)
+                    fld("methodName", methodName)
             );
         }
     }
 
     private record MethodCalled(String ownerClass, String methodName, List<String> args,
-                                boolean isStatic, Position pos, List<TraceElement> subEvents) implements TraceElement {
+                                boolean isStatic, List<TraceElement> subEvents) implements TraceElement {
         @Override public String toJson(int indent){
             return jsonObject("MethodCalled", indent + 1,
                     fld("ownerClass", ownerClass),
                     fld("methodName", methodName),
                     fld("args", args),
                     fld("isStatic", isStatic),
-                    fld("pos", pos),
                     subListFld("subEvents", subEvents)
             );
         }
@@ -462,13 +446,6 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record JsonPositionField(String key, Position position) implements JsonField {
-        @Override
-        public String jsonValue(int indent) {
-            return position.toJson(indent);
-        }
-    }
-
     private record JsonSubeventsListField(String key, List<TraceElement> traceElements) implements JsonField {
         @Override public String jsonValue(int indent) {
             return jsonList(indent, traceElements);
@@ -489,10 +466,6 @@ public final class ___JumboTracer___ {
 
     private static JsonArgsListField fld(String key, List<String> value){
         return new JsonArgsListField(key, value);
-    }
-
-    private static JsonPositionField fld(String key, Position value){
-        return new JsonPositionField(key, value);
     }
 
     private static JsonSubeventsListField subListFld(String key, List<TraceElement> traceElements){
