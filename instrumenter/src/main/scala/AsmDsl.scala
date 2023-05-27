@@ -130,5 +130,9 @@ object AsmDsl {
     LDC(str)
     mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false)
   }
+  
+  def GETFIELD(owner: String, fieldName: String, td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    mv.visitFieldInsn(Opcodes.GETFIELD, owner, fieldName, td.toString)
+  }
 
 }

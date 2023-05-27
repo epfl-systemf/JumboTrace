@@ -18,11 +18,15 @@ final class MethodTable(
                          val isMainMethod: Boolean
                        ){
 
+  private val initMethodName = MethodName("<init>")
+
   def arguments: Seq[LocalVariable] = {
     val argsCnt = methodDescr.args.size + (if isStatic then 0 else 1)
     val rawArgs = localVars.values.take(argsCnt).toSeq
-    if methodName.name == "<init>" then rawArgs.tail else rawArgs
+    if methodName == initMethodName then rawArgs.tail else rawArgs
   }
+
+  def isInitMethod: Boolean = (methodName == initMethodName)
 
   override def toString: String = {
     val mainMethodSymbol = if isMainMethod then "*" else ""

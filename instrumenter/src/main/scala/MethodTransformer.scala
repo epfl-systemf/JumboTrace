@@ -19,12 +19,13 @@ final class MethodTransformer(
   private val ansiReset = "\u001B[0m"
 
   import methodTable.{ownerClass, methodName, isMainMethod, methodDescr, tryCatches}
+
   private given MethodVisitor = underlying
 
   private lazy val tryCatchLabels = (new Label(), new Label())
 
   override def visitCode(): Unit = {
-    if (isMainMethod){
+    if (isMainMethod) {
       TRY_CATCH(tryCatchLabels._1, tryCatchLabels._2, tryCatchLabels._2, "java/lang/Throwable")
       LABEL(tryCatchLabels._1)
     }
@@ -43,8 +44,8 @@ final class MethodTransformer(
 
   override def visitInsn(opcode: Int): Unit = {
     val isRetInstr = isReturnInstr(opcode)
-    if (isRetInstr){
-      if (methodDescr.ret == TD.Void){
+    if (isRetInstr) {
+      if (methodDescr.ret == TD.Void) {
         LDC(methodName.name)
         INVOKE_STATIC(jumboTracer, ReturnedVoid.methodName, Seq(TD.String) ==> TD.Void)
       } else {
@@ -54,22 +55,26 @@ final class MethodTransformer(
         SWAP(TD.String, returnedTypeDescr)
         INVOKE_STATIC(jumboTracer, Returned.methodName, Seq(TD.String, returnedTypeDescr) ==> TD.Void)
       }
-    } else if (opcode == Opcodes.IASTORE){
+    } else if (opcode == Opcodes.IASTORE) {
       callToInstrumentedArrayStore(TD.Int)
-    } else if (opcode == Opcodes.LASTORE){
+    } else if (opcode == Opcodes.LASTORE) {
       callToInstrumentedArrayStore(TD.Long)
-    } else if (opcode == Opcodes.FASTORE){
+    } else if (opcode == Opcodes.FASTORE) {
       callToInstrumentedArrayStore(TD.Float)
-    } else if (opcode == Opcodes.DASTORE){
+    } else if (opcode == Opcodes.DASTORE) {
       callToInstrumentedArrayStore(TD.Double)
-    } else if (opcode == Opcodes.AASTORE){
+    } else if (opcode == Opcodes.AASTORE) {
       callToInstrumentedArrayStore(TD.Object)
-    } else if (opcode == Opcodes.BASTORE){
+    } else if (opcode == Opcodes.BASTORE) {
       callToInstrumentedArrayStore(TD.Byte)
-    } else if (opcode == Opcodes.CASTORE){
+    } else if (opcode == Opcodes.CASTORE) {
       callToInstrumentedArrayStore(TD.Char)
-    } else if (opcode == Opcodes.SASTORE){
+    } else if (opcode == Opcodes.SASTORE) {
       callToInstrumentedArrayStore(TD.Short)
+    } else if (isArrayLoadInstr(opcode)) {
+      val unpreciseTypeDescr = arrayLoadInstrTypeDescr(opcode)
+      DUP2(TD.Int, TD.Array(unpreciseTypeDescr))
+      INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(unpreciseTypeDescr), TD.Int) ==> TD.Void)
     }
     if (isMainMethod && isRetInstr) {
       PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
@@ -78,7 +83,7 @@ final class MethodTransformer(
       INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
     }
-    if (!isArrayStoreInstr(opcode)){
+    if (!isArrayStoreInstr(opcode)) {
       super.visitInsn(opcode)
     }
   }
@@ -94,6 +99,15 @@ final class MethodTransformer(
       }
     }
     super.visitVarInsn(opcode, varIndex)
+    if (isVarLoadInstr(opcode) && !methodTable.isInitMethod) { // do not log variable loads in <init>, it is useless and crashes the program
+      methodTable.localVars.get(varIndex).foreach { localVar =>
+        val typeDescr = topmostTypeFor(localVar.descriptor)
+        DUP(typeDescr)
+        LDC(localVar.name)
+        SWAP(TD.String, typeDescr)
+        INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
+      }
+    }
   }
 
   override def visitIincInsn(varIndex: Int, increment: Int): Unit = {
@@ -105,28 +119,58 @@ final class MethodTransformer(
     }
   }
 
-  override def visitFieldInsn(opcode: Int, ownerClass: String, name: String, descriptor: String): Unit = {
+  override def visitFieldInsn(opcode: Int, ownerClass: String, fieldName: String, descriptor: String): Unit = {
 
-    lazy val unpreciseTypeDescr: TypeDescriptor = topmostTypeFor(TypeDescriptor.parse(descriptor).get)
+    val preciseTypeDescr = TypeDescriptor.parse(descriptor).get
+    val unpreciseTypeDescr: TypeDescriptor = topmostTypeFor(preciseTypeDescr)
 
-    if (opcode == Opcodes.PUTSTATIC){
-      DUP(unpreciseTypeDescr)
-      LDC(ownerClass)
-      SWAP(TD.String, unpreciseTypeDescr)
-      LDC(name)
-      SWAP(TD.String, unpreciseTypeDescr)
-      INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
-    } else if (opcode == Opcodes.PUTFIELD){
-      DUP2(unpreciseTypeDescr, TD.Object)
-      LDC(name)
-      SWAP(TD.String, unpreciseTypeDescr)
-      INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
+    def callToSuper(): Unit = {
+      super.visitFieldInsn(opcode, ownerClass, fieldName, descriptor)
     }
-    super.visitFieldInsn(opcode, ownerClass, name, descriptor)
+
+    opcode match {
+      case Opcodes.PUTSTATIC => {
+        DUP(unpreciseTypeDescr)
+        LDC(ownerClass)
+        SWAP(TD.String, unpreciseTypeDescr)
+        LDC(fieldName)
+        SWAP(TD.String, unpreciseTypeDescr)
+        INVOKE_STATIC(jumboTracer, StaticFieldSet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+        callToSuper()
+      }
+      case Opcodes.PUTFIELD => {
+        DUP2(unpreciseTypeDescr, TD.Object)
+        LDC(fieldName)
+        SWAP(TD.String, unpreciseTypeDescr)
+        INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
+        callToSuper()
+      }
+      case Opcodes.GETSTATIC => {
+        callToSuper()
+        DUP(unpreciseTypeDescr)
+        LDC(ownerClass)
+        SWAP(TD.String, unpreciseTypeDescr)
+        LDC(fieldName)
+        SWAP(TD.String, unpreciseTypeDescr)
+        INVOKE_STATIC(jumboTracer, StaticFieldGet.methodName, Seq(TD.String, TD.String, unpreciseTypeDescr) ==> TD.Void)
+      }
+      case Opcodes.GETFIELD => {
+        // Stack: o = owner | s = field name (string) | v = field value
+        // Initially: [o
+        DUP(TD.Object) // [oo
+        DUP(TD.Object) // [ooo
+        GETFIELD(ownerClass, fieldName, preciseTypeDescr) // [voo
+        SWAP(unpreciseTypeDescr, TD.Object) // [ovo
+        LDC(fieldName) // [sovo
+        INVOKE_STATIC(jumboTracer, InstanceFieldGet.methodName, Seq(unpreciseTypeDescr, TD.Object, TD.String) ==> TD.Void) // [o
+        callToSuper() // [v
+      }
+      case _ => assert(false, s"unexpected opcode: $opcode")
+    }
   }
 
   override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {
-    if (isMainMethod){
+    if (isMainMethod) {
       LABEL(tryCatchLabels._2)
       LDC("Program terminating with an exception")
       INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
@@ -165,6 +209,27 @@ final class MethodTransformer(
 
   private def isArrayStoreInstr(opcode: Int): Boolean = {
     Opcodes.IASTORE <= opcode && opcode <= Opcodes.SASTORE
+  }
+
+  private def isVarLoadInstr(opcode: Int): Boolean = {
+    Opcodes.ILOAD <= opcode && opcode <= Opcodes.ALOAD
+  }
+
+  private def isArrayLoadInstr(opcode: Int): Boolean = {
+    Opcodes.IALOAD <= opcode && opcode <= Opcodes.SALOAD
+  }
+
+  private def arrayLoadInstrTypeDescr(opcode: Int): TypeDescriptor = {
+    require(isArrayLoadInstr(opcode))
+    opcode match
+      case Opcodes.IALOAD => TD.Int
+      case Opcodes.LALOAD => TD.Long
+      case Opcodes.FALOAD => TD.Float
+      case Opcodes.DALOAD => TD.Double
+      case Opcodes.AALOAD => TD.Object
+      case Opcodes.BALOAD => TD.Byte
+      case Opcodes.CALOAD => TD.Char
+      case Opcodes.SALOAD => TD.Short
   }
 
 }
