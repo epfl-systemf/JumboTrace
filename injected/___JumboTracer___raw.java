@@ -25,7 +25,7 @@ static void variableGet(String varId, _type value){                             
 
 #define INSTRUMENTED_ARRAY_STORE(_elemType)                                                                               \
 static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                                          \
-    handlingSuspended(() -> currTrace.add(new ArrayElemSet(safeToString(array), idx, convertToString(value))));           \
+    handlingSuspended(() -> currTrace.add(new ArrayElemSet(objectId(array), idx, convertToString(value))));               \
     array[idx] = value;                                                                                                   \
 }
 
@@ -33,7 +33,7 @@ static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){
 static void arrayLoad(_elemType[] array, int idx){                                                       \
     handlingSuspended(() -> {                                                                            \
         var value = array[idx];                                                                          \
-        currTrace.add(new ArrayElemGet(safeToString(array), idx, convertToString(value)));               \
+        currTrace.add(new ArrayElemGet(objectId(array), idx, convertToString(value)));                   \
     });                                                                                                  \
 }
 
@@ -402,8 +402,7 @@ public final class ___JumboTracer___ {
     }
 
     private record Termination(String msg) implements TraceElement {
-        @Override
-        public String toJson(int indent) {
+        @Override public String toJson(int indent) {
             return jsonObject("Termination", indent + 1, fld("msg", msg));
         }
     }
@@ -497,28 +496,28 @@ public final class ___JumboTracer___ {
 
     private static String convertToString(Object o){
         if (o instanceof Object[] array){
-            var sj = new StringJoiner(",", "[", "] (" + safeToString(o) + ")");
+            var sj = new StringJoiner(",", objectId(o) + "[", "]");
             for (var e: array){
                 sj.add(convertToString(e));
             }
             return sj.toString();
         } else if (o instanceof Iterable<?> iterable){
-            var sj = new StringJoiner(",", "[", "]@" + safeToString(o));
+            var sj = new StringJoiner(",", objectId(o) + "[", "]");
             for (var e: iterable){
                 sj.add(convertToString(e));
             }
             return sj.toString();
         } else {
-            return safeToString(o);
+            try {
+                return Objects.toString(o);
+            } catch (Throwable e){
+                return null;
+            }
         }
     }
 
-    private static String safeToString(Object o){
-        try {
-            return Objects.toString(o);
-        } catch (Throwable e){
-            return null;
-        }
+    private static String objectId(Object o){
+        return o.getClass().getName() + "@" + System.identityHashCode(o);
     }
 
 }
