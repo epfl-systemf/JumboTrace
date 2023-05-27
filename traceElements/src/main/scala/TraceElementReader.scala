@@ -3,6 +3,7 @@ package traceElements
 import play.api.libs.json.{Json, JsonConfiguration, JsonNaming, Reads}
 import NonRecursiveReaders._
 import MethodCalledReader._
+import PositionReader._
 
 import play.api.libs.json.JsonConfiguration.Aux
 

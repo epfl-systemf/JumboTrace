@@ -2,6 +2,7 @@ package traceElements
 
 import NonRecursiveReaders._
 import TraceElementReader._
+import PositionReader._
 
 import play.api.libs.json.{Json, Reads}
 

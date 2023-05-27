@@ -30,24 +30,23 @@ object DebugCmdlineFrontend {
   private def display(traceElement: TraceElement, indent: Int)(using ps: PrintStream): Unit = {
 
     def println(str: String): Unit = ps.println(" " * (indent * 2) ++ str)
+    def printlnPositioned(str: String, position: Position): Unit = println(s"$str ($position)")
 
     traceElement match
-      case LineVisited(className, lineNum) =>
-        println(s"LINE $className:$lineNum")
-      case VarSet(varId, value) =>
-        println(s"SET $varId = $value")
-      case ArrayElemSet(arrayId, idx, value) =>
-        println(s"SET $arrayId[$idx] = $value")
-      case StaticFieldSet(owner, fieldName, value) =>
-        println(s"SET $owner.$fieldName = $value")
-      case InstanceFieldSet(owner, fieldName, value) =>
-        println(s"SET $owner.$fieldName = $value")
-      case Return(methodName, value) =>
-        println(s"RETURN $value FROM $methodName")
-      case ReturnVoid(methodName) =>
-        println(s"RETURN void FROM $methodName")
-      case MethodCalled(ownerClass, methodName, args, isStatic, subEvents) =>
-        println(s"CALL $ownerClass :: $methodName (${args.mkString(",")})")
+      case VarSet(varId, value, pos) =>
+        printlnPositioned(s"SET $varId = $value", pos)
+      case ArrayElemSet(arrayId, idx, value, pos) =>
+        printlnPositioned(s"SET $arrayId[$idx] = $value", pos)
+      case StaticFieldSet(owner, fieldName, value, pos) =>
+        printlnPositioned(s"SET $owner.$fieldName = $value", pos)
+      case InstanceFieldSet(owner, fieldName, value, pos) =>
+        printlnPositioned(s"SET $owner.$fieldName = $value", pos)
+      case Return(methodName, value, pos) =>
+        printlnPositioned(s"RETURN $value FROM $methodName", pos)
+      case ReturnVoid(methodName, pos) =>
+        printlnPositioned(s"RETURN void FROM $methodName", pos)
+      case MethodCalled(ownerClass, methodName, args, isStatic, pos, subEvents) =>
+        printlnPositioned(s"CALL $ownerClass :: $methodName (${args.mkString(",")})", pos)
         displayAll(subEvents, indent + 1)
       case Initialization(dateTime) =>
         println(s"INITIALIZATION: ${formatTime(dateTime)}")
