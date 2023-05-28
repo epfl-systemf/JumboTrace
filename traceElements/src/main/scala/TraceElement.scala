@@ -10,53 +10,53 @@ final case class LineVisited(
 
 final case class VarSet(
                          varId: String,
-                         value: String
+                         value: Value
                        ) extends TraceElement
                        
 final case class VarGet(
                        varId: String,
-                       value: String
+                       value: Value
                        ) extends TraceElement
 
 final case class ArrayElemSet(
-                               arrayId: String,
+                               array: Value,
                                idx: Int,
-                               value: String
+                               value: Value
                              ) extends TraceElement
 
 final case class ArrayElemGet(
-                               arrayId: String,
+                               array: Value,
                                idx: Int,
-                               value: String
+                               value: Value
                              ) extends TraceElement
 
 final case class StaticFieldSet(
                                  owner: String,
                                  fieldName: String,
-                                 value: String
+                                 value: Value
                                ) extends TraceElement
 
 final case class StaticFieldGet(
                                  owner: String,
                                  fieldName: String,
-                                 value: String
+                                 value: Value
                                ) extends TraceElement
 
 final case class InstanceFieldSet(
-                                   owner: String,
+                                   owner: Value,
                                    fieldName: String,
-                                   value: String
+                                   value: Value
                                  ) extends TraceElement
 
 final case class InstanceFieldGet(
-                                   owner: String,
+                                   owner: Value,
                                    fieldName: String,
-                                   value: String
+                                   value: Value
                                  ) extends TraceElement
 
 final case class Return(
                          methodName: String,
-                         value: String
+                         value: Value
                        ) extends TraceElement
 
 final case class ReturnVoid(
@@ -66,7 +66,7 @@ final case class ReturnVoid(
 final case class MethodCalled(
                                ownerClass: String,
                                methodName: String,
-                               args: Seq[String],
+                               args: Seq[Value],
                                isStatic: Boolean,
                                subEvents: Seq[TraceElement]
                              ) extends TraceElement

@@ -2,6 +2,8 @@ package traceElements
 
 import play.api.libs.json.{Json, Reads}
 
+import ValueReader._
+
 private[traceElements] object NonRecursiveReaders {
   implicit val varSetReader: Reads[VarSet] = Json.reads[VarSet]
   implicit val varGetRader: Reads[VarGet] = Json.reads[VarGet]

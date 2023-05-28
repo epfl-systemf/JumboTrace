@@ -4,9 +4,14 @@ import com.github.javaparser.JavaParser
 import com.github.javaparser.ast.Node
 import com.github.javaparser.ast.body.{ClassOrInterfaceDeclaration, EnumDeclaration, VariableDeclarator}
 import com.github.javaparser.ast.expr.{AssignExpr, NameExpr}
-import traceElements.{ArrayElemGet, ArrayElemSet, Initialization, InstanceFieldGet, InstanceFieldSet, JsonParser, LineVisited, MethodCalled, Return, ReturnVoid, StaticFieldGet, StaticFieldSet, Termination, TraceElement, VarGet, VarSet}
+import j2html.{Config, TagCreator}
+import j2html.TagCreator.*
+import j2html.attributes.Attr
+import j2html.tags.specialized.DivTag
+import j2html.tags.{ContainerTag, DomContent, Tag}
+import traceElements.*
 
-import java.io.File
+import java.io.{File, FileWriter, PrintWriter}
 import java.util
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
@@ -63,11 +68,71 @@ object JavaHtmlFrontend {
     }.toMap
 
     val linesConverter = new LinesConverter(indices, srcFiles.toMap)
-    traverseTrace(trace, 0)(using linesConverter)
 
+    Using(new PrintWriter("./jumbotracer-transformed/trace/trace.html")) { writer =>
+      writer.println(buildHtml(trace))
+    }
   }
 
-  def traverseTrace(trace: Seq[TraceElement], indentLevel: Int)(using linesConverter: LinesConverter): Unit = {
+  private def buildHtml(traceElements: Seq[TraceElement]): String = {
+
+    def buildRecursively(traceElement: TraceElement): DomContent = {
+      traceElement match
+        case LineVisited(className, lineNumber, subEvents) =>
+          details(
+            summary(s"VISIT line $lineNumber in class $className"),
+            buildAllRecursively(subEvents)
+              .withStyle("padding-left: 10px;")
+          )
+        case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
+          details(
+            summary(s"CALL $ownerClass::$methodName(${args.mkString(",")})"),
+            buildAllRecursively(subEvents)
+              .withStyle("padding-left: 25px;")
+          )
+        case VarSet(varId, value) =>
+          div(s"$varId := $value")
+        case VarGet(varId, value) =>
+          div(s"$varId == $value")
+        case ArrayElemSet(arrayId, idx, value) =>
+          div(s"$arrayId[$idx] := $value")
+        case ArrayElemGet(arrayId, idx, value) =>
+          div(s"$arrayId[$idx] == $value")
+        case StaticFieldSet(owner, fieldName, value) =>
+          div(s"$owner.$fieldName := $value")
+        case StaticFieldGet(owner, fieldName, value) =>
+          div(s"$owner.$fieldName == $value")
+        case InstanceFieldSet(owner, fieldName, value) =>
+          div(s"$owner.$fieldName := $value")
+        case InstanceFieldGet(owner, fieldName, value) =>
+          div(s"$owner.$fieldName == $value")
+        case Return(methodName, value) =>
+          div(s"RETURN $value FROM $methodName")
+        case ReturnVoid(methodName) =>
+          div(s"RETURN void FROM $methodName")
+        case Initialization(dateTime) =>
+          div(s"INITIALIZATION AT ${formatTime(dateTime)}")
+        case Termination(msg) =>
+          div(s"TERMINATION: $msg")
+    }
+
+    def buildAllRecursively(traceElements: Seq[TraceElement]): DivTag = {
+      div(traceElements.map(buildRecursively): _*)
+    }
+
+    "<!DOCTYPE html>" ++ "\n" ++
+      html(
+        header(
+          title("JumboTrace")
+        ),
+        body(
+          buildAllRecursively(traceElements)
+        )
+      ).withStyle("font-family: Consolas;")
+        .renderFormatted()
+  }
+
+  private def traverseTrace(trace: Seq[TraceElement], indentLevel: Int)(using linesConverter: LinesConverter): Unit = {
 
     def display(str: String): Unit = {
       println((" " * indentLevel) ++ str)

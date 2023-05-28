@@ -36,27 +36,27 @@ object DebugCmdlineFrontend {
         println(s"VISIT line $lineNumber in class $className")
         displayAll(subEvents, indent + 1)
       case VarSet(varId, value) =>
-        println(s"SET $varId = $value")
+        println(s"SET $varId = ${value.value}")
       case VarGet(varId, value) =>
-        println(s"GET $varId = $value")
-      case ArrayElemSet(arrayId, idx, value) =>
-        println(s"SET $arrayId[$idx] = $value")
-      case ArrayElemGet(arrayId, idx, value) =>
-        println(s"GET $arrayId[$idx] = $value")
+        println(s"GET $varId = ${value.value}")
+      case ArrayElemSet(array, idx, value) =>
+        println(s"SET ${array.shortDescr}[$idx] = ${value.value}")
+      case ArrayElemGet(array, idx, value) =>
+        println(s"GET ${array.shortDescr}[$idx] = ${value.value}")
       case StaticFieldSet(owner, fieldName, value) =>
-        println(s"SET $owner.$fieldName = $value")
+        println(s"SET $owner.$fieldName = ${value.value}")
       case StaticFieldGet(owner, fieldName, value) =>
-        println(s"GET $owner.$fieldName = $value")
+        println(s"GET $owner.$fieldName = ${value.value}")
       case InstanceFieldSet(owner, fieldName, value) =>
-        println(s"SET $owner.$fieldName = $value")
+        println(s"SET ${owner.shortDescr}.$fieldName = ${value.value}")
       case InstanceFieldGet(owner, fieldName, value) =>
-        println(s"GET $owner.$fieldName = $value")
+        println(s"GET ${owner.shortDescr}.$fieldName = ${value.value}")
       case Return(methodName, value) =>
-        println(s"RETURN $value FROM $methodName")
+        println(s"RETURN ${value.value} FROM $methodName")
       case ReturnVoid(methodName) =>
         println(s"RETURN void FROM $methodName")
       case MethodCalled(ownerClass, methodName, args, isStatic, subEvents) =>
-        println(s"CALL $ownerClass :: $methodName (${args.mkString(",")})")
+        println(s"CALL $ownerClass :: $methodName (${args.map(_.value).mkString(",")})")
         displayAll(subEvents, indent + 2)
       case Initialization(dateTime) =>
         println(s"INITIALIZATION: ${formatTime(dateTime)}")

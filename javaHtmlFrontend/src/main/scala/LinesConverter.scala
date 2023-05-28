@@ -40,6 +40,4 @@ object LinesConverter {
   type CodeLine = String
   type VarId = String
 
-  private type Value = String
-
 }

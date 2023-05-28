@@ -15,17 +15,17 @@ import java.time.LocalDateTime;
 
 #define VARIABLE_SET(_type)                                                                        \
 static void variableSet(String varId, _type value){                                                \
-    handlingSuspended(() -> currTrace.add(new VarSet(varId, convertToString(value))));             \
+    handlingSuspended(() -> currTrace.add(new VarSet(varId, makeValue(value))));                   \
 }
 
 #define VARIABLE_GET(_type)                                                                        \
 static void variableGet(String varId, _type value){                                                \
-    handlingSuspended(() -> currTrace.add(new VarGet(varId, convertToString(value))));             \
+    handlingSuspended(() -> currTrace.add(new VarGet(varId, makeValue(value))));                   \
 }
 
 #define INSTRUMENTED_ARRAY_STORE(_elemType)                                                                               \
 static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                                          \
-    handlingSuspended(() -> currTrace.add(new ArrayElemSet(objectId(array), idx, convertToString(value))));               \
+    handlingSuspended(() -> currTrace.add(new ArrayElemSet(makeValue(array), idx, makeValue(value))));                    \
     array[idx] = value;                                                                                                   \
 }
 
@@ -33,34 +33,34 @@ static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){
 static void arrayLoad(_elemType[] array, int idx){                                                       \
     handlingSuspended(() -> {                                                                            \
         var value = array[idx];                                                                          \
-        currTrace.add(new ArrayElemGet(objectId(array), idx, convertToString(value)));                   \
+        currTrace.add(new ArrayElemGet(makeValue(array), idx, makeValue(value)));                        \
     });                                                                                                  \
 }
 
 #define STATIC_FIELD_SET(_type)                                                                                          \
 static void staticFieldSet(String fieldOwner, String fieldName, _type value){                                            \
-    handlingSuspended(() -> currTrace.add(new StaticFieldSet(fieldOwner, fieldName, convertToString(value))));           \
+    handlingSuspended(() -> currTrace.add(new StaticFieldSet(fieldOwner, fieldName, makeValue(value))));                 \
 }
 
 #define STATIC_FIELD_GET(_type)                                                                                          \
 static void staticFieldGet(String fieldOwner, String fieldName, _type value){                                            \
-    handlingSuspended(() -> currTrace.add(new StaticFieldGet(fieldOwner, fieldName, convertToString(value))));           \
+    handlingSuspended(() -> currTrace.add(new StaticFieldGet(fieldOwner, fieldName, makeValue(value))));                 \
 }
 
 #define INSTANCE_FIELD_SET(_type)                                                                                                           \
 static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                                             \
-    handlingSuspended(() -> currTrace.add(new InstanceFieldSet(convertToString(fieldOwner), fieldName, convertToString(value))));           \
+    handlingSuspended(() -> currTrace.add(new InstanceFieldSet(makeValue(fieldOwner), fieldName, makeValue(value))));                       \
 }
 
 #define INSTANCE_FIELD_GET(_type)                                                                                                           \
 static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){                                                             \
-    handlingSuspended(() -> currTrace.add(new InstanceFieldGet(convertToString(fieldOwner), fieldName, convertToString(value))));           \
+    handlingSuspended(() -> currTrace.add(new InstanceFieldGet(makeValue(fieldOwner), fieldName, makeValue(value))));                       \
 }
 
 #define RETURNED(_tpe)                                                                    \
 static void returned(String methodName, _tpe value){                                      \
     handlingSuspended(() -> {                                                             \
-        currTrace.add(new Return(methodName, convertToString(value)));                    \
+        currTrace.add(new Return(methodName, makeValue(value)));                          \
         traceStack.removeLast();                                                          \
         traceStack.removeLast();                                                          \
         currTrace = traceStack.peekLast();                                                \
@@ -69,7 +69,7 @@ static void returned(String methodName, _tpe value){                            
 
 #define SAVE_ARG(_tpe)                                                                    \
 static void saveArgument(_tpe value){                                                     \
-    handlingSuspended(() -> currentArgs.add(convertToString(value)));                     \
+    handlingSuspended(() -> currentArgs.add(makeValue(value)));                           \
 }
 
 // JVM root types: boolean char byte short int float long double Object
@@ -84,7 +84,7 @@ public final class ___JumboTracer___ {
 
     private static final Deque<List<TraceElement>> traceStack;
     private static List<TraceElement> currTrace;
-    private static List<String> currentArgs;
+    private static List<Value> currentArgs;
 
     static {
         traceStack = new LinkedList<>();
@@ -275,6 +275,30 @@ public final class ___JumboTracer___ {
         String toJson(int indent);
     }
 
+    private interface Value extends JsonWritable {
+        String tpe();
+        String value();
+    }
+
+    private record PrimitiveValue(String tpe, String value) implements Value {
+        @Override public String toJson(int indent) {
+            return jsonObject("PrimitiveValue", indent + 1,
+                    fld("tpe", tpe),
+                    fld("value", value)
+            );
+        }
+    }
+
+    private record ReferenceValue(String tpe, int hashcode, String value) implements Value {
+        @Override public String toJson(int indent) {
+            return jsonObject("ReferenceValue", indent + 1,
+                    fld("tpe", tpe),
+                    fld("hashcode", hashcode),
+                    fld("value", value)
+            );
+        }
+    }
+
     private interface TraceElement extends JsonWritable { }
 
     private record LineVisited(String className, int lineNumber, List<TraceElement> subEvents) implements TraceElement {
@@ -287,7 +311,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record VarSet(String varId, String value) implements TraceElement {
+    private record VarSet(String varId, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarSet", indent + 1,
                     fld("varId", varId),
@@ -296,7 +320,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record VarGet(String varId, String value) implements TraceElement {
+    private record VarGet(String varId, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarGet", indent + 1,
                     fld("varId", varId),
@@ -305,27 +329,27 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record ArrayElemSet(String arrayId, int idx, String value) implements TraceElement {
+    private record ArrayElemSet(Value array, int idx, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemSet", indent + 1,
-                    fld("arrayId", arrayId),
+                    fld("array", array),
                     fld("idx", idx),
                     fld("value", value)
             );
         }
     }
 
-    private record ArrayElemGet(String arrayId, int idx, String value) implements TraceElement {
+    private record ArrayElemGet(Value array, int idx, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemGet", indent + 1,
-                    fld("arrayId", arrayId),
+                    fld("array", array),
                     fld("idx", idx),
                     fld("value", value)
             );
         }
     }
 
-    private record StaticFieldSet(String owner, String fieldName, String value) implements TraceElement {
+    private record StaticFieldSet(String owner, String fieldName, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldSet", indent + 1,
                     fld("owner", owner),
@@ -335,7 +359,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record StaticFieldGet(String owner, String fieldName, String value) implements TraceElement {
+    private record StaticFieldGet(String owner, String fieldName, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldGet", indent + 1,
                     fld("owner", owner),
@@ -345,7 +369,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record InstanceFieldSet(String owner, String fieldName, String value) implements TraceElement {
+    private record InstanceFieldSet(Value owner, String fieldName, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldSet", indent + 1,
                     fld("owner", owner),
@@ -355,7 +379,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record InstanceFieldGet(String owner, String fieldName, String value) implements TraceElement {
+    private record InstanceFieldGet(Value owner, String fieldName, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldGet", indent + 1,
                     fld("owner", owner),
@@ -365,7 +389,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record Return(String methodName, String value) implements TraceElement {
+    private record Return(String methodName, Value value) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("Return", indent + 1,
                     fld("methodName", methodName),
@@ -382,7 +406,7 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record MethodCalled(String ownerClass, String methodName, List<String> args,
+    private record MethodCalled(String ownerClass, String methodName, List<Value> args,
                                 boolean isStatic, List<TraceElement> subEvents) implements TraceElement {
         @Override public String toJson(int indent){
             return jsonObject("MethodCalled", indent + 1,
@@ -415,6 +439,12 @@ public final class ___JumboTracer___ {
         }
     }
 
+    private record JsonValueField(String key, Value value) implements JsonField {
+        @Override public String jsonValue(int indent) {
+            return value.toJson(indent);
+        }
+    }
+
     private record JsonStringField(String key, String value) implements JsonField {
         @Override public String jsonValue(int indent) {
             return value == null
@@ -435,13 +465,9 @@ public final class ___JumboTracer___ {
         }
     }
 
-    private record JsonArgsListField(String key, List<String> traceElementList) implements JsonField {
+    private record JsonArgsListField(String key, List<Value> args) implements JsonField {
         @Override public String jsonValue(int indent) {
-            var sj = new StringJoiner(",", "[", "]");
-            for (var elem: traceElementList){
-                sj.add("\"" + elem + "\"");
-            }
-            return sj.toString();
+            return jsonList(indent, args);
         }
     }
 
@@ -455,6 +481,10 @@ public final class ___JumboTracer___ {
         return new JsonStringField(key, value);
     }
 
+    private static JsonValueField fld(String key, Value value){
+        return new JsonValueField(key, value);
+    }
+
     private static JsonIntegerField fld(String key, int value){
         return new JsonIntegerField(key, value);
     }
@@ -463,7 +493,7 @@ public final class ___JumboTracer___ {
         return new JsonBooleanField(key, value);
     }
 
-    private static JsonArgsListField fld(String key, List<String> value){
+    private static JsonArgsListField fld(String key, List<Value> value){
         return new JsonArgsListField(key, value);
     }
 
@@ -494,30 +524,50 @@ public final class ___JumboTracer___ {
         return joiner.toString();
     }
 
-    private static String convertToString(Object o){
-        if (o instanceof Object[] array){
-            var sj = new StringJoiner(",", objectId(o) + "[", "]");
+    private static Value makeValue(Object o){
+        if (o instanceof Integer i){
+            return new PrimitiveValue("int", Integer.toString(i));
+        } else if (o instanceof Long l){
+            return new PrimitiveValue("long", Long.toString(l));
+        } else if (o instanceof Double d){
+            return new PrimitiveValue("double", Double.toString(d));
+        } else if (o instanceof Float f){
+            return new PrimitiveValue("float", Float.toString(f));
+        } else if (o instanceof Boolean b){
+            return new PrimitiveValue("boolean", Boolean.toString(b));
+        } else if (o instanceof Byte b){
+            return new PrimitiveValue("byte", Byte.toString(b));
+        } else if (o instanceof Character c){
+            return new PrimitiveValue("char", Character.toString(c));
+        } else if (o instanceof Short s){
+            return new PrimitiveValue("short", Short.toString(s));
+        } else if (o instanceof Object[] array){
+            var sj = new StringJoiner(",", "[", "]");
             for (var e: array){
-                sj.add(convertToString(e));
+                sj.add(makeValue(e).value());
             }
-            return sj.toString();
+            return new ReferenceValue(o.getClass().getName(), System.identityHashCode(o), sj.toString());
         } else if (o instanceof Iterable<?> iterable){
-            var sj = new StringJoiner(",", objectId(o) + "[", "]");
+            var sj = new StringJoiner(",", "[", "]");
             for (var e: iterable){
-                sj.add(convertToString(e));
+                sj.add(makeValue(e).value());
             }
-            return sj.toString();
+            return new ReferenceValue(o.getClass().getName(), System.identityHashCode(o), sj.toString());
         } else {
             try {
-                return Objects.toString(o);
+                return new ReferenceValue(o.getClass().getName(), System.identityHashCode(o), Objects.toString(o));
             } catch (Throwable e){
-                return null;
+                return new ReferenceValue("Null", -1, "null");
             }
         }
     }
 
-    private static String objectId(Object o){
-        return o.getClass().getName() + "@" + System.identityHashCode(o);
+    private static String toStringOrNull(Object o){
+        if (o == null){
+            return "??";
+        } else {
+            return Objects.toString(o);
+        }
     }
 
 }
