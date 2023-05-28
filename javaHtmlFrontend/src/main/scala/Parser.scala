@@ -3,7 +3,7 @@ package javaHtmlFrontend
 import com.github.javaparser.ParserConfiguration.LanguageLevel
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.body.{ClassOrInterfaceDeclaration, EnumDeclaration, VariableDeclarator}
-import com.github.javaparser.ast.expr.NameExpr
+import com.github.javaparser.ast.expr.{AssignExpr, NameExpr}
 import com.github.javaparser.ast.nodeTypes.NodeWithSimpleName
 import com.github.javaparser.{JavaParser, ParserConfiguration, Position, Problem}
 
@@ -37,7 +37,10 @@ object Parser {
       for (fileName, code, parseRes) <- parsedFiles do {
         val cu = parseRes.getResult.get()
         class2FileB.addAll(
-          cu.findAll(classOf[ClassOrInterfaceDeclaration]).asScala.map(fileName -> _.getName.asString())
+          (
+            cu.findAll(classOf[ClassOrInterfaceDeclaration]).asScala ++
+              cu.findAll(classOf[EnumDeclaration]).asScala
+            ).map(_.getName.asString() -> fileName)
         )
         val codeLines = Source.fromString(code).getLines().toSeq
         pluggableLinesB.addOne(fileName, sourceToPluggableLines(codeLines, cu))
@@ -61,7 +64,7 @@ object Parser {
           }
         }
     sourceLines.zipWithIndex.map { (srcLine, lineIdx) =>
-      PluggableCodeLine(srcLine, endsByNames.getOrElse(lineIdx+1, Seq.empty))
+      PluggableCodeLine(srcLine, endsByNames.getOrElse(lineIdx + 1, Seq.empty))
     }
   }
 

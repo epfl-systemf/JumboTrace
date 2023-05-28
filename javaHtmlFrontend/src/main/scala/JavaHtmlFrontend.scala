@@ -9,6 +9,7 @@ import j2html.TagCreator.*
 import j2html.attributes.Attr
 import j2html.tags.specialized.DivTag
 import j2html.tags.{ContainerTag, DomContent, Tag}
+import javaHtmlFrontend.Parser.ParsingSuccess
 import traceElements.*
 
 import java.io.{File, FileWriter, PrintWriter}
@@ -19,7 +20,9 @@ import scala.util.{Failure, Success, Try, Using}
 
 object JavaHtmlFrontend {
 
-  private type CodeLine = String
+  private val plugLengthLimit = 7
+
+  private type DisplayableTraceElement = LineVisited | MethodCalled | Initialization | Termination
 
   def main(args: Array[String]): Unit = {
 
@@ -45,7 +48,7 @@ object JavaHtmlFrontend {
     val srcFiles = {
       srcFilesNames.map { filename =>
         filename ->
-          Using(Source.fromFile(filename))(_.getLines().toSeq)
+          Using(Source.fromFile(filename))(_.getLines().mkString("\n"))
             .recover { err =>
               System.err.println(s"An error occured: could not read at least 1 source file: ${err.getMessage}")
               exit(-1)
@@ -53,63 +56,48 @@ object JavaHtmlFrontend {
       }
     }
 
-    val indices = srcFiles.flatMap { (filename, lines) =>
-      ClassIndex.buildIndices(filename, lines.mkString("\n")) match
-        case Left(problems) =>
-          System.err.println("Error(s) occured:")
-          problems.foreach {
-            prob => System.err.println(prob.getMessage)
-          }
-          exit(-1)
-        case Right(idcs) =>
-          idcs.map { classIndex =>
-            classIndex.className -> classIndex
-          }
-    }.toMap
-
-    val linesConverter = new LinesConverter(indices, srcFiles.toMap)
-
-    Using(new PrintWriter("./jumbotracer-transformed/trace/trace.html")) { writer =>
-      writer.println(buildHtml(trace))
-    }
+    Parser.parse(srcFiles) match
+      case Parser.ParsingFailure(problems) => {
+        System.err.println("Error(s) occured:")
+        for prob <- problems do {
+          System.err.println(prob.getMessage)
+        }
+        exit(-1)
+      }
+      case ParsingSuccess(class2File, pluggableLines) => {
+        Using(new PrintWriter("./jumbotracer-transformed/trace/trace.html")) { writer =>
+          writer.println(buildHtml(trace, class2File, pluggableLines))
+        }
+      }
   }
 
-  private def buildHtml(traceElements: Seq[TraceElement]): String = {
+  private def buildHtml(
+                         traceElements: Seq[TraceElement],
+                         class2Files: Map[ClassName, FileName],
+                         pluggableLines: Map[FileName, Seq[PluggableCodeLine]]
+                       ): String = {
 
-    def buildRecursively(traceElement: TraceElement): DomContent = {
+    def buildRecursively(traceElement: DisplayableTraceElement): DomContent = {
       traceElement match
         case LineVisited(className, lineNumber, subEvents) =>
-          details(
-            summary(s"VISIT line $lineNumber in class $className"),
+          div(
+            div(
+              (for {
+                filename <- class2Files.get(className)
+                plugLinesSeq <- pluggableLines.get(filename)
+                plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
+              } yield {
+                plugLine.plugged(readValues(subEvents), plugLengthLimit) ++ s"   ($filename:$lineNumber)"
+              }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
+            ),
             buildAllRecursively(subEvents)
-              .withStyle("padding-left: 10px;")
           )
         case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
           details(
-            summary(s"CALL $ownerClass::$methodName(${args.mkString(",")})"),
+            summary(s"CALL $ownerClass::$methodName(${args.map(_.value).mkString(",")})"),
             buildAllRecursively(subEvents)
               .withStyle("padding-left: 25px;")
           )
-        case VarSet(varId, value) =>
-          div(s"$varId := $value")
-        case VarGet(varId, value) =>
-          div(s"$varId == $value")
-        case ArrayElemSet(arrayId, idx, value) =>
-          div(s"$arrayId[$idx] := $value")
-        case ArrayElemGet(arrayId, idx, value) =>
-          div(s"$arrayId[$idx] == $value")
-        case StaticFieldSet(owner, fieldName, value) =>
-          div(s"$owner.$fieldName := $value")
-        case StaticFieldGet(owner, fieldName, value) =>
-          div(s"$owner.$fieldName == $value")
-        case InstanceFieldSet(owner, fieldName, value) =>
-          div(s"$owner.$fieldName := $value")
-        case InstanceFieldGet(owner, fieldName, value) =>
-          div(s"$owner.$fieldName == $value")
-        case Return(methodName, value) =>
-          div(s"RETURN $value FROM $methodName")
-        case ReturnVoid(methodName) =>
-          div(s"RETURN void FROM $methodName")
         case Initialization(dateTime) =>
           div(s"INITIALIZATION AT ${formatTime(dateTime)}")
         case Termination(msg) =>
@@ -117,7 +105,11 @@ object JavaHtmlFrontend {
     }
 
     def buildAllRecursively(traceElements: Seq[TraceElement]): DivTag = {
-      div(traceElements.map(buildRecursively): _*)
+      val displayableElems = traceElements.flatMap {
+        case dte: DisplayableTraceElement => Some(dte)
+        case _ => None
+      }
+      div(displayableElems.map(buildRecursively): _*)
     }
 
     "<!DOCTYPE html>" ++ "\n" ++
@@ -132,31 +124,21 @@ object JavaHtmlFrontend {
         .renderFormatted()
   }
 
-  private def traverseTrace(trace: Seq[TraceElement], indentLevel: Int)(using linesConverter: LinesConverter): Unit = {
-
-    def display(str: String): Unit = {
-      println((" " * indentLevel) ++ str)
-    }
-
-    def subDisplay(str: String): Unit = display(" " ++ str)
-
-    trace.foreach {
-      case lineVisited@LineVisited(className, lineNumber, subEvents) =>
-        display(linesConverter.convert(lineVisited) ++ s" ($className:$lineNumber)")
-        traverseTrace(subEvents, indentLevel + 1)
-      case Return(methodName, value) =>
-        subDisplay(s"return $value from $methodName")
-      case ReturnVoid(methodName) =>
-        subDisplay(s"return void from $methodName")
-      case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
-        subDisplay(s"call: $ownerClass::$methodName(${args.mkString(",")})")
-        traverseTrace(subEvents, indentLevel + 2)
-      case Initialization(dateTime) =>
-        display(s"Initialization: ${formatTime(dateTime)}")
-      case Termination(msg) =>
-        display(s"Termination: $msg")
-      case _ => ()
-    }
+  private def readValues(subEvents: Seq[TraceElement]): Map[Identifier, Value] = {
+    subEvents.flatMap {
+      case VarGet(varId, value) => Some(varId -> value)
+      case ArrayElemGet(arrayId, idx, value) => Some(s"$arrayId[$idx]" -> value)
+      case StaticFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
+      case InstanceFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
+      case _ => None
+    }.groupBy(_._1)
+      .map { (varId: Identifier, pairs: Seq[(Identifier, Value)]) =>
+        varId -> pairs.map(_._2).toSet
+      }.filter(_._2.size == 1) // exclude the variables for which multiple accesses yielded distinct values
+      .map { (varId: Identifier, singletonVal: Set[Value]) =>
+        varId -> singletonVal.head
+      }
+      .toMap
   }
 
   private def formatTime(dateTime: String): String = {
