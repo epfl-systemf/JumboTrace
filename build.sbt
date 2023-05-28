@@ -6,6 +6,7 @@ ThisBuild / scalacOptions += "-deprecation"
 val asmVersion = "9.5"
 val javaParserVersion = "3.25.3"
 val playVersion = "2.9.4"
+val j2htmlVersion = "1.6.0"
 
 lazy val instrumenter = project
   .settings(
@@ -28,9 +29,12 @@ lazy val debugCmdlineFrontend = project
     idePackagePrefix := Some("debugCmdlineFrontend")
   ).dependsOn(traceElements)
 
-lazy val javaCmdlineFrontend = project
+lazy val javaHtmlFrontend = project
   .settings(
-    name := "javaCmdlineFrontend",
-    idePackagePrefix := Some("javacmdfrontend"),
-    libraryDependencies += "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
+    name := "javaHtmlFrontend",
+    idePackagePrefix := Some("javaHtmlFrontend"),
+    libraryDependencies ++= Seq(
+      "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
+      "com.j2html" % "j2html" % j2htmlVersion
+    )
   ).dependsOn(traceElements)
