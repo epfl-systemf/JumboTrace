@@ -9,13 +9,14 @@ import com.github.javaparser.ast.body.{ClassOrInterfaceDeclaration, EnumDeclarat
 import com.github.javaparser.ast.expr.{AssignExpr, NameExpr}
 import j2html.TagCreator.*
 import j2html.attributes.Attr
-import j2html.tags.specialized.DivTag
+import j2html.tags.specialized.{DivTag, ScriptTag}
 import j2html.tags.{ContainerTag, DomContent, Tag}
 import j2html.{Config, TagCreator}
 import traceElements.*
 
 import java.io.{File, FileWriter, PrintWriter}
 import java.util
+import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
@@ -26,6 +27,37 @@ object JavaHtmlFrontend {
   private val pluggedValueLengthLimit = 8
   private val codeLineMinWidth = 80
   private val preSpacing = "margin-top: 5px;"
+
+  private val lineVisitedDetailsPrefix = "line-visited-details"
+  private val lineVisitedSummaryPrefix = "line-visited-summary"
+  private val methodCallDetailsPrefix = "method-call-details"
+  private val methodCallSummaryPrefix = "method-call-summary"
+
+  private val setDetailsStateScript = {
+    s"""
+       |function expandAll(){
+       |    document.body.querySelectorAll("details")
+       |      .forEach((e) => {
+       |         if (e.id.startsWith(\"$methodCallDetailsPrefix\")){
+       |            e.setAttribute("open", "true");
+       |         }
+       |      });
+       |}
+       |
+       |function collapseAll(){
+       |    document.body.querySelectorAll("details")
+       |      .forEach((e) => e.removeAttribute("open"));
+       |}
+       |
+       |function highlight(nodeId, color){
+       |    document.getElementById(nodeId).style.backgroundColor = color;
+       |}
+       |
+       |function removeHighlighting(nodeId){
+       |    document.getElementById(nodeId).style.backgroundColor = "";
+       |}
+       |""".stripMargin
+  }
 
   private type DisplayableTraceElement = LineVisited | MethodCalled | Initialization | Termination
 
@@ -84,12 +116,17 @@ object JavaHtmlFrontend {
 
     var lastVisitedLine: (ClassName, LineNumber) = ("", -1)
 
+    val idsGenerator = new AtomicInteger(0)
+
     def buildRecursively(traceElement: DisplayableTraceElement, indentLevel: Int): DomContent = {
       traceElement match
         case LineVisited(className, lineNumber, subEvents) => {
           val addSpace = (className, lineNumber - 1) != lastVisitedLine
           lastVisitedLine = (className, lineNumber)
           var hideFlag = false
+          val currIdIdx = idsGenerator.incrementAndGet()
+          val summaryId = lineVisitedSummaryPrefix + currIdIdx
+          val detailsId = lineVisitedDetailsPrefix + currIdIdx
           div(
             details(
               summary(
@@ -103,23 +140,32 @@ object JavaHtmlFrontend {
                     plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
                     s" ($filename:$lineNumber)"
                 }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
-              ).withStyle("display: block;"),
+              ).withStyle("display: block;")
+                .withId(summaryId),
               readWrites(traceElement, indentLevel + 1).withStyle("color: blue;")
             ).withStyle(
               (if addSpace then preSpacing else "") ++
                 (if hideFlag then "display:none;" else "")
-            ),
+            ).withId(detailsId)
+              .attr("onmouseenter", s"highlight(\"$detailsId\", \"lightcyan\")")
+              .attr("onmouseleave", s"removeHighlighting(\"$detailsId\")"),
             buildAllRecursively(subEvents, indentLevel + 1)
           )
         }
         case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
+          val idIdx = idsGenerator.incrementAndGet()
+          val summaryId = methodCallSummaryPrefix + idIdx
+          val detailsId = methodCallDetailsPrefix + idIdx
           details(
             summary(
               b(("\u00A0" * indentLevel) ++
                 s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValueShort).mkString(",")})")
-            ).withStyle("display: block;"),
+            ).withStyle("display: block;")
+              .withId(summaryId),
             buildAllRecursively(subEvents, indentLevel + 3)
-          )
+          ).withId(detailsId)
+            .attr("onmouseenter", s"highlight(\"$summaryId\", \"moccasin\")")
+            .attr("onmouseleave", s"removeHighlighting(\"$summaryId\")")
         case Initialization(dateTime) =>
           div(s"INITIALIZATION AT ${formatTime(dateTime)}")
         case Termination(msg) =>
@@ -141,8 +187,16 @@ object JavaHtmlFrontend {
           title("JumboTrace")
         ),
         body(
+          div("Click on a line to expand").withStyle("font-family: Arial;"),
+          br(),
+          div(
+            button("Expand all").attr("onClick", "expandAll()"),
+            button("Collapse all").attr("onClick", "collapseAll()"),
+          ),
+          br(),
           buildAllRecursively(traceElements, 0)
-        )
+        ),
+        script(setDetailsStateScript)
       ).withStyle("font-family: Consolas;")
         .renderFormatted()
   }
@@ -154,16 +208,18 @@ object JavaHtmlFrontend {
       (reads.keys ++ writes.keys).toSeq
         .flatMap { key =>
           def rd = refinedValueComplete(reads.apply(key))
+
           def wr = refinedValueComplete(writes.apply(key))
-          if (reads.contains(key) && writes.contains(key)){
+
+          if (reads.contains(key) && writes.contains(key)) {
             Some(s"> $key: $rd -> $wr")
-          } else if (reads.contains(key)){
+          } else if (reads.contains(key)) {
             Some(s"> $key: $rd")
-          } else if (writes.contains(key)){
+          } else if (writes.contains(key)) {
             Some(s"> $key := $wr")
           } else None
         }
-    )
+      )
     div(descr.map(d => div(i(("\u00A0" * indentLevel) ++ d))): _*)
   }
 
