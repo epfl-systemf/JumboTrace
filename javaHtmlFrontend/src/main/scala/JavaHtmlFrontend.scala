@@ -156,11 +156,11 @@ object JavaHtmlFrontend {
           def rd = refinedValueComplete(reads.apply(key))
           def wr = refinedValueComplete(writes.apply(key))
           if (reads.contains(key) && writes.contains(key)){
-            Some(s"$key: $rd -> $wr")
+            Some(s"> $key: $rd -> $wr")
           } else if (reads.contains(key)){
-            Some(s"$key: $rd")
+            Some(s"> $key: $rd")
           } else if (writes.contains(key)){
-            Some(s"$key := $wr")
+            Some(s"> $key := $wr")
           } else None
         }
     )
@@ -170,9 +170,9 @@ object JavaHtmlFrontend {
   private def readValues(subEvents: Seq[TraceElement]): Map[Identifier, Value] = {
     subEvents.flatMap {
       case VarGet(varId, value) => Some(varId -> value)
-      case ArrayElemGet(arrayId, idx, value) => Some(s"$arrayId[$idx]" -> value)
+      case ArrayElemGet(array, idx, value) => Some(s"${array.shortDescr}[$idx]" -> value)
       case StaticFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
-      case InstanceFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
+      case InstanceFieldGet(owner, fieldName, value) => Some(s"${owner.shortDescr}.$fieldName" -> value)
       case _ => None
     }.groupBy(_._1)
       .map { (varId: Identifier, pairs: Seq[(Identifier, Value)]) =>
@@ -218,9 +218,9 @@ object JavaHtmlFrontend {
       case LineVisited(_, _, subEvents) =>
         subEvents.flatMap(orderedWrites)
       case VarSet(varId, value) => Seq(varId -> value)
-      case ArrayElemSet(array, idx, value) => Seq(s"$array[$idx]" -> value)
+      case ArrayElemSet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
       case StaticFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
-      case InstanceFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+      case InstanceFieldSet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
       case _ => Seq.empty
   }
 
