@@ -3,7 +3,7 @@ package javaHtmlFrontend
 import com.github.javaparser.ParserConfiguration.LanguageLevel
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.ast.body.{ClassOrInterfaceDeclaration, EnumDeclaration, VariableDeclarator}
-import com.github.javaparser.ast.expr.{AssignExpr, NameExpr}
+import com.github.javaparser.ast.expr.{AssignExpr, FieldAccessExpr, NameExpr}
 import com.github.javaparser.ast.nodeTypes.NodeWithSimpleName
 import com.github.javaparser.{JavaParser, ParserConfiguration, Position, Problem}
 
@@ -55,12 +55,21 @@ object Parser {
 
   private def sourceToPluggableLines(sourceLines: Seq[Code], cu: CompilationUnit): Seq[PluggableCodeLine] = {
     val endsByNames: Map[Int, Seq[(Identifier, ColIdx)]] =
-      (cu.findAll(classOf[NameExpr]).asScala ++ cu.findAll(classOf[VariableDeclarator]).asScala).toSeq
+      (cu.findAll(classOf[NameExpr]).asScala ++
+        cu.findAll(classOf[VariableDeclarator]).asScala ++
+        cu.findAll(classOf[FieldAccessExpr]).asScala
+        ).toSeq
         .filter(_.getEnd.isPresent)
         .groupBy(_.getEnd.get().line)
-        .map { (lineIdx, nameExprs) =>
-          lineIdx -> nameExprs.map { nameExpr =>
-            nameExpr.getName().asString() -> nameExpr.getEnd().get().column
+        .map { (lineIdx, exprs) =>
+          lineIdx -> exprs.map {
+            case accessExpr: (NameExpr | FieldAccessExpr) =>
+              accessExpr.getName.asString() -> accessExpr.getEnd.get().column
+            case varDecl: VariableDeclarator => {
+              val varName = varDecl.getName.asString()
+              val varNameEnd = varDecl.getBegin.get().column + varName.length - 1
+              varName -> varNameEnd
+            }
           }
         }
     sourceLines.zipWithIndex.map { (srcLine, lineIdx) =>

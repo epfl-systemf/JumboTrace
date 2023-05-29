@@ -12,6 +12,8 @@ import j2html.tags.{ContainerTag, DomContent, Tag}
 import javaHtmlFrontend.Parser.ParsingSuccess
 import traceElements.*
 
+import DisplayRefiner.{refinedValue, refineMethodName}
+
 import java.io.{File, FileWriter, PrintWriter}
 import java.util
 import scala.io.Source
@@ -20,7 +22,9 @@ import scala.util.{Failure, Success, Try, Using}
 
 object JavaHtmlFrontend {
 
-  private val plugLengthLimit = 7
+  private val pluggedValueLengthLimit = 8
+  private val codeLineMinWidth = 80
+  private val preSpacing = "margin-top: 5px;"
 
   private type DisplayableTraceElement = LineVisited | MethodCalled | Initialization | Termination
 
@@ -77,9 +81,14 @@ object JavaHtmlFrontend {
                          pluggableLines: Map[FileName, Seq[PluggableCodeLine]]
                        ): String = {
 
-    def buildRecursively(traceElement: DisplayableTraceElement): DomContent = {
+    var lastVisitedLine: (ClassName, LineNumber) = ("", -1)
+
+    def buildRecursively(traceElement: DisplayableTraceElement, indentLevel: Int): DomContent = {
       traceElement match
-        case LineVisited(className, lineNumber, subEvents) =>
+        case LineVisited(className, lineNumber, subEvents) => {
+          val addSpace = (className, lineNumber - 1) != lastVisitedLine
+          lastVisitedLine = (className, lineNumber)
+          var hideFlag = false
           div(
             div(
               (for {
@@ -87,29 +96,39 @@ object JavaHtmlFrontend {
                 plugLinesSeq <- pluggableLines.get(filename)
                 plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
               } yield {
-                plugLine.plugged(readValues(subEvents), plugLengthLimit) ++ s"   ($filename:$lineNumber)"
+                hideFlag = plugLine.mustHide
+                (("\u00A0" * indentLevel) ++
+                  plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
+                  s" ($filename:$lineNumber)"
               }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
+            ).withStyle(
+              (if addSpace then preSpacing else "") ++
+                (if hideFlag then "display:none;" else "")
             ),
-            buildAllRecursively(subEvents)
+            buildAllRecursively(subEvents, indentLevel + 1)
           )
+        }
         case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
           details(
-            summary(s"CALL $ownerClass::$methodName(${args.map(_.value).mkString(",")})"),
-            buildAllRecursively(subEvents)
-              .withStyle("padding-left: 25px;")
+            summary(
+              b(("\u00A0" * indentLevel) ++
+                s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValue).mkString(",")})")
+            ).withStyle("display: block;"),
+            buildAllRecursively(subEvents, indentLevel + 3)
           )
         case Initialization(dateTime) =>
           div(s"INITIALIZATION AT ${formatTime(dateTime)}")
         case Termination(msg) =>
           div(s"TERMINATION: $msg")
+            .withStyle(preSpacing)
     }
 
-    def buildAllRecursively(traceElements: Seq[TraceElement]): DivTag = {
+    def buildAllRecursively(traceElements: Seq[TraceElement], indentLevel: Int): DivTag = {
       val displayableElems = traceElements.flatMap {
         case dte: DisplayableTraceElement => Some(dte)
         case _ => None
       }
-      div(displayableElems.map(buildRecursively): _*)
+      div(displayableElems.map(buildRecursively(_, indentLevel)): _*)
     }
 
     "<!DOCTYPE html>" ++ "\n" ++
@@ -118,7 +137,7 @@ object JavaHtmlFrontend {
           title("JumboTrace")
         ),
         body(
-          buildAllRecursively(traceElements)
+          buildAllRecursively(traceElements, 0)
         )
       ).withStyle("font-family: Consolas;")
         .renderFormatted()
