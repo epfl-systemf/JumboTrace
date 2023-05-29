@@ -1,21 +1,22 @@
 package javaHtmlFrontend
 
+import DisplayRefiner.{refineMethodName, refinedValueComplete, refinedValueShort}
+import Parser.ParsingSuccess
+
 import com.github.javaparser.JavaParser
 import com.github.javaparser.ast.Node
 import com.github.javaparser.ast.body.{ClassOrInterfaceDeclaration, EnumDeclaration, VariableDeclarator}
 import com.github.javaparser.ast.expr.{AssignExpr, NameExpr}
-import j2html.{Config, TagCreator}
 import j2html.TagCreator.*
 import j2html.attributes.Attr
 import j2html.tags.specialized.DivTag
 import j2html.tags.{ContainerTag, DomContent, Tag}
-import javaHtmlFrontend.Parser.ParsingSuccess
+import j2html.{Config, TagCreator}
 import traceElements.*
-
-import DisplayRefiner.{refinedValue, refineMethodName}
 
 import java.io.{File, FileWriter, PrintWriter}
 import java.util
+import scala.collection.mutable
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try, Using}
@@ -90,17 +91,20 @@ object JavaHtmlFrontend {
           lastVisitedLine = (className, lineNumber)
           var hideFlag = false
           div(
-            div(
-              (for {
-                filename <- class2Files.get(className)
-                plugLinesSeq <- pluggableLines.get(filename)
-                plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
-              } yield {
-                hideFlag = plugLine.mustHide
-                (("\u00A0" * indentLevel) ++
-                  plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
-                  s" ($filename:$lineNumber)"
-              }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
+            details(
+              summary(
+                (for {
+                  filename <- class2Files.get(className)
+                  plugLinesSeq <- pluggableLines.get(filename)
+                  plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
+                } yield {
+                  hideFlag = plugLine.mustHide
+                  (("\u00A0" * indentLevel) ++
+                    plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
+                    s" ($filename:$lineNumber)"
+                }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
+              ).withStyle("display: block;"),
+              readWrites(traceElement, indentLevel + 1).withStyle("color: blue;")
             ).withStyle(
               (if addSpace then preSpacing else "") ++
                 (if hideFlag then "display:none;" else "")
@@ -112,7 +116,7 @@ object JavaHtmlFrontend {
           details(
             summary(
               b(("\u00A0" * indentLevel) ++
-                s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValue).mkString(",")})")
+                s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValueShort).mkString(",")})")
             ).withStyle("display: block;"),
             buildAllRecursively(subEvents, indentLevel + 3)
           )
@@ -143,6 +147,26 @@ object JavaHtmlFrontend {
         .renderFormatted()
   }
 
+  private def readWrites(traceElement: TraceElement, indentLevel: Int): DivTag = {
+    val reads = firstReads(traceElement)
+    val writes = lastWrites(traceElement)
+    val descr = (
+      (reads.keys ++ writes.keys).toSeq
+        .flatMap { key =>
+          def rd = refinedValueComplete(reads.apply(key))
+          def wr = refinedValueComplete(writes.apply(key))
+          if (reads.contains(key) && writes.contains(key)){
+            Some(s"$key: $rd -> $wr")
+          } else if (reads.contains(key)){
+            Some(s"$key: $rd")
+          } else if (writes.contains(key)){
+            Some(s"$key := $wr")
+          } else None
+        }
+    )
+    div(descr.map(d => div(i(("\u00A0" * indentLevel) ++ d))): _*)
+  }
+
   private def readValues(subEvents: Seq[TraceElement]): Map[Identifier, Value] = {
     subEvents.flatMap {
       case VarGet(varId, value) => Some(varId -> value)
@@ -158,6 +182,46 @@ object JavaHtmlFrontend {
         varId -> singletonVal.head
       }
       .toMap
+  }
+
+  private def firstReads(traceElement: TraceElement): Map[String, Value] = {
+    val reads = mutable.Map.empty[String, Value]
+    for (queryDescr, value) <- orderedReads(traceElement) do {
+      if (!reads.contains(queryDescr)) {
+        reads(queryDescr) = value
+      }
+    }
+    reads.toMap
+  }
+
+  private def lastWrites(traceElement: TraceElement): Map[String, Value] = {
+    val writes = mutable.Map.empty[String, Value]
+    for (wrDescr, value) <- orderedWrites(traceElement) do {
+      writes(wrDescr) = value
+    }
+    writes.toMap
+  }
+
+  private def orderedReads(traceElement: TraceElement): Seq[(String, Value)] = {
+    traceElement match
+      case LineVisited(_, _, subEvents) =>
+        subEvents.flatMap(orderedReads)
+      case VarGet(varId, value) => Seq(varId -> value)
+      case ArrayElemGet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
+      case StaticFieldGet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+      case InstanceFieldGet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
+      case _ => Seq.empty
+  }
+
+  private def orderedWrites(traceElement: TraceElement): Seq[(String, Value)] = {
+    traceElement match
+      case LineVisited(_, _, subEvents) =>
+        subEvents.flatMap(orderedWrites)
+      case VarSet(varId, value) => Seq(varId -> value)
+      case ArrayElemSet(array, idx, value) => Seq(s"$array[$idx]" -> value)
+      case StaticFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+      case InstanceFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+      case _ => Seq.empty
   }
 
   private def formatTime(dateTime: String): String = {

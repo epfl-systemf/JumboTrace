@@ -11,11 +11,18 @@ object DisplayRefiner {
     ).getOrElse(methodName, methodName)
   }
 
-  def refinedValue(value: Value): String = {
+  def refinedValueShort(value: Value): String = {
     value match
       case PrimitiveValue(_, value) => value
       case ReferenceValue(tpe, hashcode, value) if tpe.contains("$$Lambda$") => "lambda#" + hashcode
       case ReferenceValue(_, _, value) => value
+  }
+
+  def refinedValueComplete(value: Value): String = {
+    value match
+      case PrimitiveValue(tpe, value) => s"$value ($tpe)"
+      case ReferenceValue(tpe, hashcode, value) if tpe.contains("$$Lambda$") => "lambda#" + hashcode
+      case ReferenceValue(tpe, hashcode, value) => s"#$hashcode: $value ($tpe)"
   }
 
 }

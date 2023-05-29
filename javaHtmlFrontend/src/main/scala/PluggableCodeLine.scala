@@ -10,7 +10,7 @@ final case class PluggableCodeLine private(code: Code, colDecreasingVarsEnds: Se
     val line = new StringBuffer(code)
     for (id, colIdx) <- colDecreasingVarsEnds if 0 <= colIdx && colIdx < line.length() do {
       values.get(id)
-        .map(DisplayRefiner.refinedValue)
+        .map(DisplayRefiner.refinedValueShort)
         .filter(_.length <= lengthLimit)
         .foreach { refinedVal =>
           line.insert(colIdx, s":$refinedVal")

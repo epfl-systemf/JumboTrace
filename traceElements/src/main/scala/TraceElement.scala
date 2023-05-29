@@ -19,13 +19,13 @@ final case class VarGet(
                        ) extends TraceElement
 
 final case class ArrayElemSet(
-                               array: Value,
+                               array: ReferenceValue,
                                idx: Int,
                                value: Value
                              ) extends TraceElement
 
 final case class ArrayElemGet(
-                               array: Value,
+                               array: ReferenceValue,
                                idx: Int,
                                value: Value
                              ) extends TraceElement
@@ -43,13 +43,13 @@ final case class StaticFieldGet(
                                ) extends TraceElement
 
 final case class InstanceFieldSet(
-                                   owner: Value,
+                                   owner: ReferenceValue,
                                    fieldName: String,
                                    value: Value
                                  ) extends TraceElement
 
 final case class InstanceFieldGet(
-                                   owner: Value,
+                                   owner: ReferenceValue,
                                    fieldName: String,
                                    value: Value
                                  ) extends TraceElement
