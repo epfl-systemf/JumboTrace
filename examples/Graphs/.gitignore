@@ -30,4 +30,5 @@ bin/
 ### Mac OS ###
 .DS_Store
 
-/trace
+trace/
+*.class
