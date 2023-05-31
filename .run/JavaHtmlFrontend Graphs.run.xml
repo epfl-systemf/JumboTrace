@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="JavaHtmlFrontend Graphs" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="javaHtmlFrontend.JavaHtmlFrontend" />
+    <module name="javaHtmlFrontend" />
+    <option name="PROGRAM_PARAMETERS" value="./jumbotracer-transformed/trace/trace.json Main.java DirectedGraph.java" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples/Graphs" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
