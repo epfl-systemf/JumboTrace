@@ -28,6 +28,9 @@ object JavaHtmlFrontend {
   private val codeLineMinWidth = 80
   private val preSpacing = "margin-top: 5px;"
 
+  private val methodCallIndent = 3
+  private val lineVisitedIndent = 1
+
   private val lineVisitedDetailsPrefix = "line-visited-details"
   private val lineVisitedSummaryPrefix = "line-visited-summary"
   private val methodCallDetailsPrefix = "method-call-details"
@@ -59,7 +62,7 @@ object JavaHtmlFrontend {
        |""".stripMargin
   }
 
-  private type DisplayableTraceElement = LineVisited | MethodCalled | Initialization | Termination
+  private type DisplayableTraceElement = LineVisited | MethodCalled | Return | ReturnVoid | Initialization | Termination
 
   def main(args: Array[String]): Unit = {
 
@@ -118,7 +121,7 @@ object JavaHtmlFrontend {
 
     val idsGenerator = new AtomicInteger(0)
 
-    def buildRecursively(traceElement: DisplayableTraceElement, indentLevel: Int): DomContent = {
+    def buildRecursively(traceElement: DisplayableTraceElement, currIndentLevel: Int, lastCallIndentLevel: Int): DomContent = {
       traceElement match
         case LineVisited(className, lineNumber, subEvents) => {
           val addSpace = (className, lineNumber - 1) != lastVisitedLine
@@ -136,20 +139,20 @@ object JavaHtmlFrontend {
                   plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
                 } yield {
                   hideFlag = plugLine.mustHide
-                  (("\u00A0" * indentLevel) ++
+                  (("\u00A0" * currIndentLevel) ++
                     plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
                     s" ($filename:$lineNumber)"
                 }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
               ).withStyle("display: block;")
                 .withId(summaryId),
-              readWrites(traceElement, indentLevel + 1).withStyle("color: blue;")
+              readWrites(traceElement, currIndentLevel + lineVisitedIndent).withStyle("color: blue;")
             ).withStyle(
               (if addSpace then preSpacing else "") ++
                 (if hideFlag then "display:none;" else "")
             ).withId(detailsId)
               .attr("onmouseenter", s"highlight(\"$detailsId\", \"lightcyan\")")
               .attr("onmouseleave", s"removeHighlighting(\"$detailsId\")"),
-            buildAllRecursively(subEvents, indentLevel + 1)
+            buildAllRecursively(subEvents, currIndentLevel + lineVisitedIndent, lastCallIndentLevel)
           )
         }
         case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
@@ -158,14 +161,18 @@ object JavaHtmlFrontend {
           val detailsId = methodCallDetailsPrefix + idIdx
           details(
             summary(
-              b(("\u00A0" * indentLevel) ++
+              b(("\u00A0" * currIndentLevel) ++
                 s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValueShort).mkString(",")})")
             ).withStyle("display: block;")
               .withId(summaryId),
-            buildAllRecursively(subEvents, indentLevel + 3)
+            buildAllRecursively(subEvents, currIndentLevel + methodCallIndent, currIndentLevel)
           ).withId(detailsId)
             .attr("onmouseenter", s"highlight(\"$summaryId\", \"moccasin\")")
             .attr("onmouseleave", s"removeHighlighting(\"$summaryId\")")
+        case Return(methodName, value) =>
+          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS ${refinedValueShort(value)}"))
+        case ReturnVoid(methodName) =>
+          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS void"))
         case Initialization(dateTime) =>
           div(s"INITIALIZATION AT ${formatTime(dateTime)}")
         case Termination(msg) =>
@@ -173,12 +180,12 @@ object JavaHtmlFrontend {
             .withStyle(preSpacing)
     }
 
-    def buildAllRecursively(traceElements: Seq[TraceElement], indentLevel: Int): DivTag = {
+    def buildAllRecursively(traceElements: Seq[TraceElement], indentLevel: Int, lastCallIndentLevel: Int): DivTag = {
       val displayableElems = traceElements.flatMap {
         case dte: DisplayableTraceElement => Some(dte)
         case _ => None
       }
-      div(displayableElems.map(buildRecursively(_, indentLevel)): _*)
+      div(displayableElems.map(buildRecursively(_, indentLevel, lastCallIndentLevel)): _*)
     }
 
     "<!DOCTYPE html>" ++ "\n" ++
@@ -194,7 +201,7 @@ object JavaHtmlFrontend {
             button("Collapse all").attr("onClick", "collapseAll()"),
           ),
           br(),
-          buildAllRecursively(traceElements, 0)
+          buildAllRecursively(traceElements, 0, 0)
         ),
         script(setDetailsStateScript)
       ).withStyle("font-family: Consolas;")
