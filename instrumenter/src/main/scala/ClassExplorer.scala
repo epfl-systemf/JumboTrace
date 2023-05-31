@@ -10,7 +10,7 @@ final class ClassExplorer(classTableB: ClassTable.Builder, logger: String => Uni
   override def visitMethod(access: Int, name: String, descriptor: String, signature: String, exceptions: Array[String]): MethodVisitor = {
     val isStatic = (access & Opcodes.ACC_STATIC) != 0
     val isMainMethod = isStatic && classTableB.isMainClass && name == "main" && descriptor == mainMethodDescriptorStr
-    val methodDescriptor = MethodDescriptor.parse(descriptor).get
+    val methodDescriptor = MethodDescriptor.parse(descriptor)
     logger(s"Exploring ${classTableB.className}::$name")
     val methodTableB = new MethodTable.Builder(classTableB.className, MethodName(name), methodDescriptor, isStatic = isStatic, isMainMethod = isMainMethod)
     classTableB.addMethodTable(methodTableB)

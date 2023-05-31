@@ -61,7 +61,7 @@ object MethodTable {
     }
 
     def visitVarInfoInstr(varName: String, descriptorStr: String, scopeStart: Label, scopeEnd: Label, idx: Int): Unit = {
-      val descriptor = TypeDescriptor.parse(descriptorStr).get
+      val descriptor = TypeDescriptor.parse(descriptorStr)
       val scope = Scope(labels.apply(scopeStart), labels.apply(scopeEnd))
       localVars(idx) = LocalVariable(varName, descriptor, scope, idx)
     }

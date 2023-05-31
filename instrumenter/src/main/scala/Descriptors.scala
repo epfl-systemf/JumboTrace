@@ -1,5 +1,6 @@
 package instrumenter
 
+import instrumenter.TypeDescriptor.Boolean
 import org.objectweb.asm.Type
 
 import scala.collection.mutable.ListBuffer
@@ -34,24 +35,24 @@ enum TypeDescriptor(str: String, asmType: Option[Type]) {
 
 object TypeDescriptor {
 
-  def parse(str: String): Option[TypeDescriptor] = {
+  def parse(str: String): TypeDescriptor = {
     str match
-      case "Z" => Some(Boolean)
-      case "C" => Some(Char)
-      case "B" => Some(Byte)
-      case "S" => Some(Short)
-      case "I" => Some(Int)
-      case "F" => Some(Float)
-      case "J" => Some(Long)
-      case "D" => Some(Double)
-      case "V" => Some(Void)
+      case "Z" => Boolean
+      case "C" => Char
+      case "B" => Byte
+      case "S" => Short
+      case "I" => Int
+      case "F" => Float
+      case "J" => Long
+      case "D" => Double
+      case "V" => Void
       case arrayDescr if arrayDescr.nonEmpty && arrayDescr.startsWith("[") =>
-        parse(arrayDescr.tail).map(Array.apply)
+        Array(parse(arrayDescr.tail))
       case classDescr if classDescr.length >= 3 && classDescr.startsWith("L") && classDescr.endsWith(";") => {
         val parts = classDescr.slice(1, classDescr.length - 1).split('/').toSeq
-        Some(Class(parts.init, parts.last))
+        Class(parts.init, parts.last)
       }
-      case _ => None
+      case _ => assert(false, s"could not parse type descriptor: $str")
   }
 
   def isDoubleWordType(td: TypeDescriptor): Boolean = {
@@ -73,39 +74,53 @@ final case class MethodDescriptor(args: Seq[TypeDescriptor], ret: TypeDescriptor
 object MethodDescriptor {
   private val uniqueCharArgDesciptors = Set('Z', 'C', 'B', 'S', 'I', 'F', 'J', 'D')
 
+  import instrumenter.TypeDescriptor as TD
+
   extension(args: Seq[TypeDescriptor]) def ==>(ret: TypeDescriptor): MethodDescriptor = {
     MethodDescriptor(args, ret)
   }
 
-  def parse(str: String): Option[MethodDescriptor] = {  // TODO tests
-    if (str.startsWith("(") && str.count(_ == '(') == 1 && str.count(_ == ')') == 1) {
-      val Array(argsStr, retStr) = str.tail.split(')')
-      val argsDescriptors = ListBuffer.empty[TypeDescriptor]
-      var argsStrIter = argsStr.iterator
-      var isArray = false
-      while (argsStrIter.hasNext){
-        val curr = argsStrIter.next()
-        if (uniqueCharArgDesciptors.contains(curr) && isArray){
-          argsDescriptors.addOne(TypeDescriptor.Array(TypeDescriptor.parse(curr.toString).get))
-          isArray = false
-        } else if (uniqueCharArgDesciptors.contains(curr)){
-          argsDescriptors.addOne(TypeDescriptor.parse(curr.toString).get)
-        } else if (curr == '['){
-          isArray = true
-        } else if (curr == 'L'){
-          val (className, rem) = argsStrIter.span(_ != ';')
-          if (rem.isEmpty){
-            return None
-          }
-          argsDescriptors.addOne(TypeDescriptor.parse(s"L$className;").get)
-          argsStrIter = rem.iterator
-          argsStrIter.next() // drop ';'
-        } else {
-          return None
+  def parse(str: String): MethodDescriptor = {
+    require((str.startsWith("(") && str.count(_ == '(') == 1 && str.count(_ == ')') == 1), s"could not parse method descriptor: $str")
+
+    // To be called after detecting a L
+    def consumeClass(charsIter: Iterator[Char]): (TypeDescriptor, Iterator[Char]) = {
+      val (objTDIter, rem) =  charsIter.span(_ != ';')
+      assert(rem.hasNext, s"expected ';', could not parse $str")
+      rem.next() // drop ';'
+      (TypeDescriptor.parse("L" ++ objTDIter.mkString ++ ";"), rem)
+    }
+
+    def consumeArg(charsIter: Iterator[Char]): (TypeDescriptor, Iterator[Char]) = {
+      require(charsIter.nonEmpty)
+      charsIter.next() match {
+        case 'Z' => (TD.Boolean, charsIter)
+        case 'C' => (TD.Char, charsIter)
+        case 'B' => (TD.Byte, charsIter)
+        case 'S' => (TD.Short, charsIter)
+        case 'I' => (TD.Int, charsIter)
+        case 'F' => (TD.Float, charsIter)
+        case 'J' => (TD.Long, charsIter)
+        case 'D' => (TD.Double, charsIter)
+        case 'V' => assert(false, s"unexpected V (void?) in arguments type list ; parse argument was $str")
+        case 'L' => consumeClass(charsIter)
+        case '[' => {
+          val (sub, rem) = consumeArg(charsIter)
+          (TD.Array(sub), rem)
         }
+        case _ => assert(false, s"could not parse method descriptor: $str")
       }
-      TypeDescriptor.parse(retStr).map(MethodDescriptor(argsDescriptors.toSeq, _))
-    } else None
+    }
+
+    val Array(args, ret) = str.tail.split(')')
+    val argsBuffer = ListBuffer.empty[TypeDescriptor]
+    var argsCharsIter = args.iterator
+    while (argsCharsIter.hasNext) {
+      val (parsedArg, rem) = consumeArg(argsCharsIter)
+      argsBuffer.addOne(parsedArg)
+      argsCharsIter = rem
+    }
+    argsBuffer.toSeq ==> TD.parse(ret)
   }
 
 }

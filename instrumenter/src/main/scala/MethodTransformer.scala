@@ -121,7 +121,7 @@ final class MethodTransformer(
 
   override def visitFieldInsn(opcode: Int, ownerClass: String, fieldName: String, descriptor: String): Unit = {
 
-    val preciseTypeDescr = TypeDescriptor.parse(descriptor).get
+    val preciseTypeDescr = TypeDescriptor.parse(descriptor)
     val unpreciseTypeDescr: TypeDescriptor = topmostTypeFor(preciseTypeDescr)
 
     def callToSuper(): Unit = {

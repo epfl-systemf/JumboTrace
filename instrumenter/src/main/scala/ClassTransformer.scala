@@ -14,7 +14,7 @@ final class ClassTransformer(
     logger(s"Transforming ${classTable.className}::$name")
     new MethodTransformer(
       super.visitMethod(access, name, descriptor, signature, exceptions),
-      classTable.getMethodTable(MethodName(name), MethodDescriptor.parse(descriptor).get).get
+      classTable.getMethodTable(MethodName(name), MethodDescriptor.parse(descriptor)).get
     )
   }
 

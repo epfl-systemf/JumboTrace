@@ -12,7 +12,10 @@ lazy val instrumenter = project
   .settings(
     name := "instrumenter",
     idePackagePrefix := Some("instrumenter"),
-    libraryDependencies += "org.ow2.asm" % "asm" % asmVersion
+    libraryDependencies ++= Seq(
+      "org.ow2.asm" % "asm" % asmVersion,
+      "com.github.sbt" % "junit-interface" % "0.13.3" % "test"
+    )
   )
 
 lazy val traceElements = project
