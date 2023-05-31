@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Instrument Counters" type="Application" factoryName="Application">
-    <option name="MAIN_CLASS_NAME" value="instrumenter.Main" />
+    <option name="MAIN_CLASS_NAME" value="instrumenter.Instrumenter" />
     <module name="instrumenter" />
     <option name="PROGRAM_PARAMETERS" value="Main" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/examples/Counters" />

@@ -6,7 +6,7 @@ import java.io.{FileReader, FileWriter}
 import java.nio.file.{Files, Paths}
 import scala.util.Using
 
-object Main {
+object Instrumenter {
 
   private val logArg = "-log"
 
