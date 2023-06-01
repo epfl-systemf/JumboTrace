@@ -66,10 +66,15 @@ object JavaCommander {
       case COMPILE_CMD :: Nil => compile()
       case ADD_ADDITIONAL_CODE_CMD :: Nil => addAdditionalCode()
       case ALL_CMD :: mainClassName :: Nil => {
+        println(" > Compiling...")
         compile()
+        println(" > Instrumenting...")
         Instrumenter.performInstrumentation(_ => (), ClassName(mainClassName))
+        println(" > Copying additional code...")
         addAdditionalCode()
+        println(" > Running the program...")
         runJava(mainClassName, classPathOpt = Some(Config.config.transformedClassesDirName))
+        println(" > Generating HTML...")
         JavaHtmlFrontend.generateHtml(
           jsonTraceFilePath = jsonTraceFilePath,
           srcFilesNames = allFileNamesInDirWithExtension("java"),
