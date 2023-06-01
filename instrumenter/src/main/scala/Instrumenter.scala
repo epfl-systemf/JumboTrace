@@ -23,10 +23,20 @@ object Instrumenter {
 
     val mainClass = ClassName(args(0))
 
-    for (className <- allClassesInCurrDir()) do {
+    performInstrumentation(logger, mainClass)
+  }
+
+  def performInstrumentation(logger: String => Unit, mainClass: ClassName): Unit = {
+    
+    val classes = allClassesInCurrDir()
+    if (!classes.contains(mainClass)){
+      logger(s"Main class $mainClass not found")
+    }
+    
+    for (className <- classes) do {
 
       val inputPath = Paths.get(".").resolve(s"$className.class")
-      val outputPath = Paths.get(".").resolve(Config.current.transformedClassesDirName).resolve(s"$className.class")
+      val outputPath = Paths.get(".").resolve(Config.config.transformedClassesDirName).resolve(s"$className.class")
 
       val inputBytes = Files.readAllBytes(inputPath)
 

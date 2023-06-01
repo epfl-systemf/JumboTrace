@@ -8,7 +8,7 @@ final class ClassTransformer(
                               underlying: ClassVisitor,
                               classTable: ClassTable,
                               logger: String => Unit
-                            ) extends ClassVisitor(Config.current.asmVersion, underlying) {
+                            ) extends ClassVisitor(Config.config.asmVersion, underlying) {
 
   override def visitMethod(access: Int, name: String, descriptor: String, signature: String, exceptions: Array[String]): MethodVisitor = {
     logger(s"Transforming ${classTable.className}::$name")

@@ -3,7 +3,7 @@ package instrumenter
 import org.objectweb.asm.{ClassVisitor, MethodVisitor, Opcodes}
 import instrumenter.TypeDescriptor as TD
 
-final class ClassExplorer(classTableB: ClassTable.Builder, logger: String => Unit) extends ClassVisitor(Config.current.asmVersion) {
+final class ClassExplorer(classTableB: ClassTable.Builder, logger: String => Unit) extends ClassVisitor(Config.config.asmVersion) {
 
   private val mainMethodDescriptorStr = MethodDescriptor(Seq(TD.Array(TD.String)), TD.Void).toString
 

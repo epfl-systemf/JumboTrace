@@ -76,8 +76,13 @@ object JavaHtmlFrontend {
     val traceFileName = args.head
     val srcFilesNames = args.tail.toSeq
 
+    generateHtml(traceFileName, srcFilesNames, "./jumbotracer-transformed/trace/trace.html")
+  }
+
+  def generateHtml(jsonTraceFilePath: String, srcFilesNames: Seq[String], outputFilePath: String): Unit = {
+
     val trace = {
-      Using(Source.fromFile(traceFileName))(_.getLines().mkString("\n"))
+      Using(Source.fromFile(jsonTraceFilePath))(_.getLines().mkString("\n"))
         .map(JsonParser.parse)
         .recover { err =>
           System.err.println(s"An error occured: could not read trace ; ${err.getMessage}")
@@ -105,9 +110,9 @@ object JavaHtmlFrontend {
         exit(-1)
       }
       case ParsingSuccess(class2File, pluggableLines) => {
-        Using(new PrintWriter("./jumbotracer-transformed/trace/trace.html")) { writer =>
+        Using(new PrintWriter(outputFilePath)) { writer =>
           writer.println(buildHtml(trace, class2File, pluggableLines))
-        }
+        }.get
       }
   }
 

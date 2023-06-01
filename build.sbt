@@ -7,6 +7,7 @@ val asmVersion = "9.5"
 val javaParserVersion = "3.25.3"
 val playVersion = "2.9.4"
 val j2htmlVersion = "1.6.0"
+val junitInterfaceVersion = "0.13.3"
 
 lazy val instrumenter = project
   .settings(
@@ -14,7 +15,7 @@ lazy val instrumenter = project
     idePackagePrefix := Some("instrumenter"),
     libraryDependencies ++= Seq(
       "org.ow2.asm" % "asm" % asmVersion,
-      "com.github.sbt" % "junit-interface" % "0.13.3" % "test"
+      "com.github.sbt" % "junit-interface" % junitInterfaceVersion % "test"
     )
   )
 
@@ -41,3 +42,13 @@ lazy val javaHtmlFrontend = project
       "com.j2html" % "j2html" % j2htmlVersion
     )
   ).dependsOn(traceElements)
+
+lazy val commander = project
+  .settings(
+    name := "commander",
+    idePackagePrefix := Some("commander"),
+    assembly / assemblyMergeStrategy := {
+      case PathList("META-INF", _*) => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
+  ).dependsOn(instrumenter, traceElements, debugCmdlineFrontend, javaHtmlFrontend)
