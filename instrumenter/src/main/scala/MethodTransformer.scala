@@ -12,7 +12,7 @@ import instrumenter.TypeDescriptor as TD
 final class MethodTransformer(
                                underlying: MethodVisitor,
                                methodTable: MethodTable
-                             ) extends MethodVisitor(Config.current.asmVersion, underlying) {
+                             ) extends MethodVisitor(Config.config.asmVersion, underlying) {
 
   private val ansiYellow = "\u001B[33m"
   private val ansiRed = "\u001B[31m"
@@ -111,6 +111,11 @@ final class MethodTransformer(
   }
 
   override def visitIincInsn(varIndex: Int, increment: Int): Unit = {
+    methodTable.localVars.get(varIndex).foreach { localVar =>
+      LDC(localVar.name)
+      LOAD(TD.Int, varIndex)
+      INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
+    }
     super.visitIincInsn(varIndex, increment)
     methodTable.localVars.get(varIndex).foreach { localVar =>
       LDC(localVar.name)
