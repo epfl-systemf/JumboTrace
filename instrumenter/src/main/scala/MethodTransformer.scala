@@ -80,7 +80,6 @@ final class MethodTransformer(
       PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
       LDC("Program terminating normally")
       INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
-      INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
     }
     if (!isArrayStoreInstr(opcode)) {
@@ -180,7 +179,6 @@ final class MethodTransformer(
       LDC("Program terminating with an exception")
       INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
       PRINTLN(s"$ansiYellow JumboTracer: $ansiRed[ERROR]$ansiYellow: program terminating with an exception$ansiReset")
-      INVOKE_STATIC(jumboTracer, display, Seq.empty ==> TD.Void) // TODO remove (just for debugging)
       INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
       ATHROW
     }
