@@ -8,6 +8,9 @@ import traceElements.*
 
 import java.io.PrintStream
 
+/**
+ * Simple frontend to display a trace in a readable way in the console or a file
+ */
 object DebugCmdlineFrontend {
 
   def main(args: Array[String]): Unit = {

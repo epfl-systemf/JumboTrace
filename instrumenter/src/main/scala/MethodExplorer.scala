@@ -2,6 +2,9 @@ package instrumenter
 
 import org.objectweb.asm.{Label, MethodVisitor}
 
+/**
+ * Traverses a method to build a [[MethodTable]]
+ */
 final class MethodExplorer(tableB: MethodTable.Builder) extends MethodVisitor(Config.config.asmVersion) {
 
   override def visitLabel(label: Label): Unit = {

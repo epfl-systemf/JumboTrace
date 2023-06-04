@@ -11,13 +11,11 @@ import scala.io.Source
 import scala.util.Using
 
 /**
- * Very simple command line program for running all the features of the debugger
+ * Very simple command line program for running most of the features of the tracer
  *
  * Quick and dirty, designed mainly for the presentation of the project
  *
  * Command-line parsing is very rudimentary (based on pattern match)
- *
- * Meant to be run in from a directory containing the Java source files
  */
 object JavaCommander {
 
@@ -25,6 +23,7 @@ object JavaCommander {
   private val htmlTraceFilePath = "./trace/trace.html"
   private val additionalCodeDir = "injected"
 
+  // Commands
   private val INSTRUMENT_CMD = "instrument"
   private val DISPLAY_CMD = "display"
   private val GEN_HTML_CMD = "html"
@@ -35,10 +34,16 @@ object JavaCommander {
   private val HELP_CMD = "help"
   private val ALL_CMD = "all"
 
+  // Options
   private val LOG_OPTION = "-log"
   private val CLASSPATH_OPTION = "-cp"
 
   def main(args: Array[String]): Unit = {
+    
+    /* 
+     * WARNING: some of the methods called from here were themselves main methods before refactoring, 
+     * and may call System.exit instead of throwing exceptions
+     */
 
     args.toList match {
       case Nil => {

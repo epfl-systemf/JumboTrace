@@ -2,6 +2,9 @@ package instrumenter
 
 import instrumenter.TypeDescriptor as TD
 
+/**
+ * Names of the methods of the _\_\_Jumbotracer_\_\_ class
+ */
 object Injection {
 
   val jumboTracer: ClassName = ClassName("___JumboTracer___")

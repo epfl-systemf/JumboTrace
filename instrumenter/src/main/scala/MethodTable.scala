@@ -8,6 +8,15 @@ import org.objectweb.asm.{Label, Opcodes}
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable
 
+/**
+ * @param ownerClass name of the class the method belongs to
+ * @param methodName name of the method
+ * @param methodDescr JVM descriptor of the method arguments types and return type
+ * @param localVars all the local variables appearing in the method body, incl. its parameters
+ * @param tryCatches the try-catch blocks appearing in the method
+ * @param isStatic flag for static methods
+ * @param isMainMethod flag for main methods
+ */
 final class MethodTable(
                          val ownerClass: ClassName,
                          val methodName: MethodName,
@@ -23,6 +32,7 @@ final class MethodTable(
   def arguments: Seq[LocalVariable] = {
     val argsCnt = methodDescr.args.size + (if isStatic then 0 else 1)
     val rawArgs = localVars.values.take(argsCnt).toSeq
+    // if init method, referring to the head of rawArgs seems to cause issues because it is the this ptr, which is not yet initialized
     if methodName == initMethodName then rawArgs.tail else rawArgs
   }
 
@@ -76,6 +86,9 @@ object MethodTable {
 
   }
 
+  /**
+   * Scope of a local
+   */
   final case class Scope(startLine: Int, lastLine: Int){
     override def toString: String = s"[$startLine;$lastLine]"
   }

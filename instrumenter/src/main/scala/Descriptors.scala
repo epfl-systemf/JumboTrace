@@ -5,6 +5,9 @@ import org.objectweb.asm.Type
 
 import scala.collection.mutable.ListBuffer
 
+/**
+ * Representation of JVM internal type descriptors (see [[https://asm.ow2.io/asm4-guide.pdf]], section 2.1.3)
+ */
 enum TypeDescriptor(str: String, asmType: Option[Type]) {
   case Boolean extends TypeDescriptor("Z", Some(Type.BOOLEAN_TYPE))
   case Char extends TypeDescriptor("C", Some(Type.CHAR_TYPE))
@@ -67,6 +70,9 @@ object TypeDescriptor {
 
 }
 
+/**
+ * Representation of JVM internal method descriptors (see [[https://asm.ow2.io/asm4-guide.pdf]], section 2.1.4)
+ */
 final case class MethodDescriptor(args: Seq[TypeDescriptor], ret: TypeDescriptor) {
   override def toString: String = args.mkString("(", "", ")") ++ ret.toString
 }
@@ -80,10 +86,12 @@ object MethodDescriptor {
     MethodDescriptor(args, ret)
   }
 
+  // LL1 parsing of a method descriptor
   def parse(str: String): MethodDescriptor = {
     require((str.startsWith("(") && str.count(_ == '(') == 1 && str.count(_ == ')') == 1), s"could not parse method descriptor: $str")
-
+    
     // To be called after detecting a L
+    // Returns (type descriptor, next iterator to be used)
     def consumeClass(charsIter: Iterator[Char]): (TypeDescriptor, Iterator[Char]) = {
       val (objTDIter, rem) =  charsIter.span(_ != ';')
       assert(rem.hasNext, s"expected ';', could not parse $str")
@@ -91,6 +99,7 @@ object MethodDescriptor {
       (TypeDescriptor.parse("L" ++ objTDIter.mkString ++ ";"), rem)
     }
 
+    // Returns (type descriptor, next iterator to be used)
     def consumeArg(charsIter: Iterator[Char]): (TypeDescriptor, Iterator[Char]) = {
       require(charsIter.nonEmpty)
       charsIter.next() match {

@@ -81,6 +81,7 @@ object JavaHtmlFrontend {
 
   def generateHtml(jsonTraceFilePath: String, srcFilesNames: Seq[String], outputFilePath: String): Unit = {
 
+    // Load the trace from the trace file
     val trace = {
       Using(Source.fromFile(jsonTraceFilePath))(_.getLines().mkString("\n"))
         .map(JsonParser.parse)
@@ -90,6 +91,7 @@ object JavaHtmlFrontend {
         }.get
     }
 
+    // Load the source files
     val srcFiles = {
       srcFilesNames.map { filename =>
         filename ->
@@ -101,6 +103,7 @@ object JavaHtmlFrontend {
       }
     }
 
+    // Try to parse the files and combine them with the trace to build the HTML page
     Parser.parse(srcFiles) match
       case Parser.ParsingFailure(problems) => {
         System.err.println("Error(s) occured:")
@@ -131,7 +134,7 @@ object JavaHtmlFrontend {
         case LineVisited(className, lineNumber, subEvents) => {
           val addSpace = (className, lineNumber - 1) != lastVisitedLine
           lastVisitedLine = (className, lineNumber)
-          var hideFlag = false
+          var hideFlag = false  // set to true when the node being built should be hidden (easier than not building it)
           val currIdIdx = idsGenerator.incrementAndGet()
           val summaryId = lineVisitedSummaryPrefix + currIdIdx
           val detailsId = lineVisitedDetailsPrefix + currIdIdx
@@ -213,6 +216,9 @@ object JavaHtmlFrontend {
         .renderFormatted()
   }
 
+  /**
+   * The information pane below a visited line, containing info about variables read and updated
+   */
   private def readWrites(traceElement: TraceElement, indentLevel: Int): DivTag = {
     val reads = firstReads(traceElement)
     val writes = lastWrites(traceElement)
@@ -235,6 +241,12 @@ object JavaHtmlFrontend {
     div(descr.map(d => div(i(("\u00A0" * indentLevel) ++ d))): _*)
   }
 
+  /**
+   * Retrieve the values that can be safely displayed next to variables in a the code line
+   * 
+   * (safely meaning that there is no risk of confusion because all the reads of the value
+   * gave the same result)
+   */
   private def readValues(subEvents: Seq[TraceElement]): Map[Identifier, Value] = {
     subEvents.flatMap {
       case VarGet(varId, value) => Some(varId -> value)
@@ -252,6 +264,9 @@ object JavaHtmlFrontend {
       .toMap
   }
 
+  /**
+   * For each value read in that `TraceElement`, its value the first time the line reads it
+   */
   private def firstReads(traceElement: TraceElement): Map[String, Value] = {
     val reads = mutable.Map.empty[String, Value]
     for (queryDescr, value) <- orderedReads(traceElement) do {
@@ -262,6 +277,9 @@ object JavaHtmlFrontend {
     reads.toMap
   }
 
+  /**
+   * For each value written in that `TraceElement`, the last value the line wrote to it
+   */
   private def lastWrites(traceElement: TraceElement): Map[String, Value] = {
     val writes = mutable.Map.empty[String, Value]
     for (wrDescr, value) <- orderedWrites(traceElement) do {
@@ -270,6 +288,9 @@ object JavaHtmlFrontend {
     writes.toMap
   }
 
+  /**
+   * All the reads performed during this `TraceElement`, in chronological order
+   */
   private def orderedReads(traceElement: TraceElement): Seq[(String, Value)] = {
     traceElement match
       case LineVisited(_, _, subEvents) =>
@@ -281,6 +302,9 @@ object JavaHtmlFrontend {
       case _ => Seq.empty
   }
 
+  /**
+   * All the writes performed during this `TraceElement`, in chronological order
+   */
   private def orderedWrites(traceElement: TraceElement): Seq[(String, Value)] = {
     traceElement match
       case LineVisited(_, _, subEvents) =>

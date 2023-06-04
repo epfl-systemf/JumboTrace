@@ -8,6 +8,9 @@ sealed trait Value {
   
 }
 
+/**
+ * One of: boolean, byte, char, double, float, int, long, short
+ */
 final case class PrimitiveValue(override val tpe: String, override val value: String) extends Value {
   override def shortDescr: String = value
 }

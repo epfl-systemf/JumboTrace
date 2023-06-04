@@ -9,6 +9,9 @@ import instrumenter.MethodDescriptor.==>
 import instrumenter.MethodTable.LocalVariable
 import instrumenter.TypeDescriptor as TD
 
+/**
+ * Traverses a method and performs the injection of events-saving instructions
+ */
 final class MethodTransformer(
                                underlying: MethodVisitor,
                                methodTable: MethodTable
@@ -26,9 +29,11 @@ final class MethodTransformer(
 
   override def visitCode(): Unit = {
     if (isMainMethod) {
+      // We want to write the trace file when the program crashes
       TRY_CATCH(tryCatchLabels._1, tryCatchLabels._2, tryCatchLabels._2, "java/lang/Throwable")
       LABEL(tryCatchLabels._1)
     }
+    // Save arguments 1 by 1, then call terminateMethodCall
     for (argVar <- methodTable.arguments) do {
       val typeDescr = topmostTypeFor(argVar.descriptor)
       LOAD(typeDescr, argVar.idx)
@@ -109,7 +114,7 @@ final class MethodTransformer(
     }
   }
 
-  override def visitIincInsn(varIndex: Int, increment: Int): Unit = {
+  override def visitIincInsn(varIndex: Int, increment: Int): Unit = {   // IINC is i++
     methodTable.localVars.get(varIndex).foreach { localVar =>
       LDC(localVar.name)
       LOAD(TD.Int, varIndex)
@@ -196,6 +201,9 @@ final class MethodTransformer(
     INVOKE_STATIC(jumboTracer, InstrumentedArrayStore.methodName, Seq(TD.Array(elemType), TD.Int, elemType) ==> TD.Void)
   }
 
+  /**
+   * Topmost type in the hierarchy, without considering boxing
+   */
   private def topmostTypeFor(td: TypeDescriptor): TypeDescriptor = {
     td match
       case _: (TD.Array | TD.Class) => TD.Object

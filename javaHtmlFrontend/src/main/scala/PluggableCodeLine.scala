@@ -4,8 +4,14 @@ import traceElements.Value
 
 import scala.io.AnsiColor
 
+/**
+ * A code line, with the variables whose value can be inlined  (along with their end column)
+ */
 final case class PluggableCodeLine private(code: Code, colDecreasingVarsEnds: Seq[(Identifier, ColIdx)]) {
 
+  /**
+   * This line, with the provided values plugged
+   */
   def plugged(values: Map[Identifier, Value], lengthLimit: Int): String = {
     val line = new StringBuffer(code)
     for (id, colIdx) <- colDecreasingVarsEnds if 0 <= colIdx && colIdx < line.length() do {

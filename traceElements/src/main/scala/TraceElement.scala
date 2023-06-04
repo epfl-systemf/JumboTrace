@@ -1,5 +1,8 @@
 package traceElements
 
+/**
+ * An element of a trace. Represents an event that happened in the program during its execution
+ */
 sealed trait TraceElement
 
 final case class LineVisited(

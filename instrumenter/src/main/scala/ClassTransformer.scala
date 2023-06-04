@@ -4,6 +4,9 @@ import org.objectweb.asm.{ClassVisitor, MethodVisitor}
 import instrumenter.TypeDescriptor as TD
 import instrumenter.MethodDescriptor.*
 
+/**
+ * Traverses a class and injects [[MethodTransformer]]s to perform transformations
+ */
 final class ClassTransformer(
                               underlying: ClassVisitor,
                               classTable: ClassTable,
