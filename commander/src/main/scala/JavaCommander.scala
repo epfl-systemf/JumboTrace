@@ -86,7 +86,7 @@ object JavaCommander {
           outputFilePath = htmlTraceFilePath
         )
       }
-      case HELP_CMD :: mainClassName :: Nil => displayHelp()
+      case HELP_CMD :: Nil => displayHelp()
       case _ =>
         System.err.println("unrecognized command or arguments")
     }
