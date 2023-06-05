@@ -54,7 +54,7 @@ to write the recorded events to a JSON file.
 ### TraceElements
 
 The [traceElements](./traceElements) module, written in Scala 2 (because of issues with the JSON library), contains the
-[`TraceElement`](./traceElements/TraceElement.scala) algebraic data type, which represents the events saved by the tracer.
+[`TraceElement`](./traceElements/src/main/scala/TraceElement.scala) algebraic data type, which represents the events saved by the tracer.
 It also contains a parser that handles the JSON file written by the `___JumboTracer___` class.
 
 
