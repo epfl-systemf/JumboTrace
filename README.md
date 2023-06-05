@@ -21,6 +21,29 @@ of the program may be modified by the calls to `toString` performed by the instr
 - The program should not contain a class named `___JumboTracer___`.
 
 
+## How to use the jar
+
+Release: https://github.com/epfl-systemf/JumboTrace/releases/latest (jar obtained using sbt assembly)
+
+1. Download `JumboTrace.jar` and place it in your project directory (the directory containing the `.java` source files)
+2. Download and unzip `injected.zip`. The resulting `injected` directory should be placed in the project directory, next to the jar and the source files
+
+    The directory structure should be as follows:
+    ```
+    file1.java
+    file2.java
+    ...
+    JumboTrace.jar
+    injected/
+        \_ ___JumboTracer___$ArrayElemGet.class
+        \_ ___JumboTracer___$ArrayElemSet.class
+        ...
+    ```
+    In particular, be careful that the `injected` directory is unzipped and contains the class files, and not another `injected` directory that would itself contain the class files.
+    
+3. Run the tracer: `java -jar JumboTrace.jar all <main class name>`, e.g. `java -jar JumboTrace.jar all Main`. The generated trace files in both JSON and HTML should be in the `trace` directory. Run `java -jar JumboTrace.jar help x` for a list of the available commands (note that due to a bug `help` takes an argument, which is ignored, hence the `x` here).
+
+
 ## Setup
 
 In order to be able to run all the functionalities of this repository, you need:
@@ -77,7 +100,6 @@ Executable: [JavaHtmlFrontend](./javaHtmlFrontend/src/main/scala/JavaHtmlFronten
 ### Commander
 
 The [Commander](./commander) module, written in Scala 3, is a very simple command-line program to run the other modules.
-Run it with the `help` command to see which commands it supports.
 
 Executable: [JavaCommander](./commander/src/main/scala/JavaCommander.scala)
 
