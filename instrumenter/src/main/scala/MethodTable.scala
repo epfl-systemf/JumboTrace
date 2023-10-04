@@ -43,12 +43,6 @@ final class MethodTable(
     if methodName == initMethodName then rawArgs.tail else rawArgs
   }
 
-  /**
-   * @param variableIdx          the index of the variable slot
-   * @param alreadyVisitedLabels the labels already encountered (not modified, it is mutable only for
-   *                             compatibility with MethodTransformer and performance purposes)
-   * @return the matching local, if any
-   */
   def findLocalVar(variableIdx: Int, lastVisitedLabelIdx: Int): Option[LocalVariable] = {
     // the variable we want is the first (in program order) that has not yet gone out of scope
     localVars
