@@ -3,6 +3,8 @@
 A tracer for Java, to record the evolution of the state of a Java program during its execution and use it to build a trace
 (sequence of events and lines executed in the program).
 
+<b>Work in progress, the readme may not be up to date</b>
+
 
 ## Warning/disclaimer
 
@@ -15,7 +17,7 @@ absence of bugs.
 - All the class files provided as input to the instrumenter must be compiler with the debug flag (`javac -g`). Otherwise
 the instrumeter will not find enough information in the program to work properly).
 - The program for which we want to generate a trace should never exit by calling `System.exit`, otherwise the instructions
-that write the JSON trace will not be executed.
+that write the JSON trace will not be executed. WILL BE FIXED (hopefully...)
 - The `toString` method of the objects manipulated by the program should not have side effects. If they do, the behaviour
 of the program may be modified by the calls to `toString` performed by the instrumented bytecode.
 - The program should not contain a class named `___JumboTracer___`.
@@ -23,7 +25,8 @@ of the program may be modified by the calls to `toString` performed by the instr
 
 ## How to use the jar
 
-Release: https://github.com/epfl-systemf/JumboTrace/releases/latest (jar obtained using sbt assembly)
+Release: https://github.com/epfl-systemf/JumboTrace/releases/latest (jar obtained using sbt assembly, more precisely
+`commander/assembly` in sbt)
 
 1. Download `JumboTrace.jar` and place it in your project directory (the directory containing the `.java` source files)
 2. Download and unzip `injected.zip`. The resulting `injected` directory should be placed in the project directory, next to the jar and the source files
