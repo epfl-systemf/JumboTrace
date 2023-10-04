@@ -118,9 +118,10 @@ object AsmDsl {
     mv.visitTryCatchBlock(start, end, handler, typeInternalName)
   }
 
-  def LABEL(label: Label)(using mv: MethodVisitor): Unit = {
-    mv.visitLabel(label)
-  }
+  // may be better to never use this, if labels are identified by their order
+//  def LABEL(label: Label)(using mv: MethodVisitor): Unit = {
+//    mv.visitLabel(label)
+//  }
 
   def GOTO(label: Label)(using mv: MethodVisitor): Unit = {
     mv.visitJumpInsn(Opcodes.GOTO, label)

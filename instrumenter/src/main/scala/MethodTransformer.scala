@@ -8,6 +8,7 @@ import Injection.EventMethod.*
 import instrumenter.MethodDescriptor.==>
 import instrumenter.MethodTable.LocalVariable
 import instrumenter.TypeDescriptor as TD
+import scala.collection.mutable
 
 /**
  * Traverses a method and performs the injection of events-saving instructions
@@ -25,16 +26,11 @@ final class MethodTransformer(
 
   private given MethodVisitor = underlying
 
-  private lazy val tryCatchLabels = (new Label(), new Label())
+  private var lastVisitedLabelIdx = -1
 
   override def visitCode(): Unit = {
-    if (isMainMethod) {
-      // We want to write the trace file when the program crashes
-      TRY_CATCH(tryCatchLabels._1, tryCatchLabels._2, tryCatchLabels._2, "java/lang/Throwable")
-      LABEL(tryCatchLabels._1)
-    }
     // Save arguments 1 by 1, then call terminateMethodCall
-    for (argVar <- methodTable.arguments) do {
+    for (argVar <- methodTable.parameters) do {
       val typeDescr = topmostTypeFor(argVar.descriptor)
       LOAD(typeDescr, argVar.idx)
       INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(typeDescr) ==> TD.Void)
@@ -81,12 +77,6 @@ final class MethodTransformer(
       DUP2(TD.Int, TD.Array(unpreciseTypeDescr))
       INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(unpreciseTypeDescr), TD.Int) ==> TD.Void)
     }
-    if (isMainMethod && isRetInstr) {
-      PRINTLN(ansiYellow + "JumboTracer: program terminating normally" + ansiReset)
-      LDC("Program terminating normally")
-      INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
-      INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
-    }
     if (!isArrayStoreInstr(opcode)) {
       super.visitInsn(opcode)
     }
@@ -94,34 +84,37 @@ final class MethodTransformer(
 
   override def visitVarInsn(opcode: Int, varIndex: Int): Unit = {
     if (isVarStoreInstr(opcode)) {
-      methodTable.localVars.get(varIndex).foreach { localVar =>
-        val typeDescr = topmostTypeFor(localVar.descriptor)
-        DUP(typeDescr)
-        LDC(localVar.name)
-        SWAP(TD.String, typeDescr)
-        INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
-      }
+      methodTable.findLocalVar(varIndex, lastVisitedLabelIdx)
+        .foreach { localVar =>
+          val typeDescr = topmostTypeFor(localVar.descriptor)
+          DUP(typeDescr)
+          LDC(localVar.name)
+          SWAP(TD.String, typeDescr)
+          INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
+        }
     }
     super.visitVarInsn(opcode, varIndex)
     if (isVarLoadInstr(opcode) && !methodTable.isInitMethod) { // do not log variable loads in <init>, it is useless and crashes the program
-      methodTable.localVars.get(varIndex).foreach { localVar =>
-        val typeDescr = topmostTypeFor(localVar.descriptor)
-        DUP(typeDescr)
-        LDC(localVar.name)
-        SWAP(TD.String, typeDescr)
-        INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
-      }
+      methodTable.findLocalVar(varIndex, lastVisitedLabelIdx)
+        .foreach { localVar =>
+          val typeDescr = topmostTypeFor(localVar.descriptor)
+          DUP(typeDescr)
+          LDC(localVar.name)
+          SWAP(TD.String, typeDescr)
+          INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, typeDescr) ==> TD.Void)
+        }
     }
   }
 
-  override def visitIincInsn(varIndex: Int, increment: Int): Unit = {   // IINC is i++
-    methodTable.localVars.get(varIndex).foreach { localVar =>
-      LDC(localVar.name)
-      LOAD(TD.Int, varIndex)
-      INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
-    }
+  override def visitIincInsn(varIndex: Int, increment: Int): Unit = { // IINC is i++
+    methodTable.findLocalVar(varIndex, lastVisitedLabelIdx)
+      .foreach { localVar =>
+        LDC(localVar.name)
+        LOAD(TD.Int, varIndex)
+        INVOKE_STATIC(jumboTracer, VariableGet.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
+      }
     super.visitIincInsn(varIndex, increment)
-    methodTable.localVars.get(varIndex).foreach { localVar =>
+    methodTable.findLocalVar(varIndex, lastVisitedLabelIdx).foreach { localVar =>
       LDC(localVar.name)
       LOAD(TD.Int, varIndex)
       INVOKE_STATIC(jumboTracer, VariableSet.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
@@ -178,23 +171,16 @@ final class MethodTransformer(
     }
   }
 
-  override def visitMaxs(maxStack: Int, maxLocals: Int): Unit = {
-    if (isMainMethod) {
-      LABEL(tryCatchLabels._2)
-      LDC("Program terminating with an exception")
-      INVOKE_STATIC(jumboTracer, SaveTermination.methodName, Seq(TD.String) ==> TD.Void)
-      PRINTLN(s"$ansiYellow JumboTracer: $ansiRed[ERROR]$ansiYellow: program terminating with an exception$ansiReset")
-      INVOKE_STATIC(jumboTracer, writeJsonTrace, Seq.empty ==> TD.Void)
-      ATHROW
-    }
-    super.visitMaxs(maxStack, maxLocals)
-  }
-
   override def visitLineNumber(line: Int, start: Label): Unit = {
     LDC(ownerClass.name)
     LDC(line)
     INVOKE_STATIC(jumboTracer, LineVisited.methodName, Seq(TD.String, TD.Int) ==> TD.Void)
     super.visitLineNumber(line, start)
+  }
+
+  override def visitLabel(label: Label): Unit = {
+    super.visitLabel(label)
+    lastVisitedLabelIdx += 1
   }
 
   private def callToInstrumentedArrayStore(elemType: TypeDescriptor): Unit = {

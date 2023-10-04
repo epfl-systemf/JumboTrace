@@ -27,8 +27,5 @@ object Injection {
     
     val methodName: MethodName = MethodName(methodNameStr)
   }
-  
-  val display: MethodName = MethodName("display")
-  val writeJsonTrace: MethodName = MethodName("writeJsonTrace")
 
 }

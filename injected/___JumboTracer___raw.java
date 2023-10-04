@@ -93,6 +93,11 @@ public final class ___JumboTracer___ {
         currentArgs = new ArrayList<>();
         var time = LocalDateTime.now();
         currTrace.add(new Initialization(time.toString()));
+        Runtime.getRuntime().addShutdownHook(new Thread(){
+            public void run(){
+                writeJsonTrace();
+            }
+        });
     }
 
     // -----------------------------------------------------------------------------------------
