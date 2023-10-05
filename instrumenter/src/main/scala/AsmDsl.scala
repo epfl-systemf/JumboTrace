@@ -117,11 +117,10 @@ object AsmDsl {
   def TRY_CATCH(start: Label, end: Label, handler: Label, typeInternalName: String)(using mv: MethodVisitor): Unit = {
     mv.visitTryCatchBlock(start, end, handler, typeInternalName)
   }
-
-  // may be better to never use this, if labels are identified by their order
-//  def LABEL(label: Label)(using mv: MethodVisitor): Unit = {
-//    mv.visitLabel(label)
-//  }
+  
+  def LABEL(label: Label)(using mv: MethodVisitor): Unit = {
+    mv.visitLabel(label)
+  }
 
   def GOTO(label: Label)(using mv: MethodVisitor): Unit = {
     mv.visitJumpInsn(Opcodes.GOTO, label)
@@ -136,9 +135,21 @@ object AsmDsl {
     val opcode = td.getOpcode(Opcodes.ILOAD, Opcodes.ALOAD)
     mv.visitVarInsn(opcode, varIdx)
   }
+
+  def IFEQ(jumpTarget: Label)(using mv: MethodVisitor): Unit = {
+    mv.visitJumpInsn(Opcodes.IFEQ, jumpTarget)
+  }
   
   def ATHROW(using mv: MethodVisitor): Unit = {
     mv.visitInsn(Opcodes.ATHROW)
+  }
+
+  def INSTANCEOF(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    mv.visitTypeInsn(Opcodes.INSTANCEOF, td.toString)
+  }
+
+  def CHECKCAST(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
+    mv.visitTypeInsn(Opcodes.CHECKCAST, td.toString)
   }
 
   def PRINTLN(str: String)(using mv: MethodVisitor): Unit = {

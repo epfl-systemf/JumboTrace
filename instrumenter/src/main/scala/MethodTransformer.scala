@@ -67,12 +67,47 @@ final class MethodTransformer(
     } else if (opcode == Opcodes.AASTORE) {
       callToInstrumentedArrayStore(TD.Object)
     } else if (opcode == Opcodes.BASTORE) {
+      val elseBrLabel = new Label()
+      val endifLabel = new Label()
+      // [b int ref
+      mv.visitInsn(Opcodes.DUP_X2)
+      // [b int ref b
+      mv.visitInsn(Opcodes.POP)
+      // [int ref b
+      mv.visitInsn(Opcodes.DUP_X2)
+      // [int ref b int
+      mv.visitInsn(Opcodes.POP)
+      // [ref b int
+      DUP(TD.Object)
+      // [ref ref b int
+      INSTANCEOF(TD.Array(TD.Byte))
+      // [bool ref b int
+      IFEQ(elseBrLabel)
+      // [ref b int
+      CHECKCAST(TD.Array(TD.Byte))
+      // [cref b int
+      mv.visitInsn(Opcodes.DUP_X2)
+      // [cref b int cref
+      mv.visitInsn(Opcodes.POP)
+      // [b int cref
       callToInstrumentedArrayStore(TD.Byte)
+      GOTO(endifLabel)
+      LABEL(elseBrLabel)
+      // [ref b int
+      CHECKCAST(TD.Array(TD.Boolean))
+      // [cref b int
+      mv.visitInsn(Opcodes.DUP_X2)
+      // [cref b int cref
+      mv.visitInsn(Opcodes.POP)
+      // [b int cref
+      callToInstrumentedArrayStore(TD.Boolean)
+      LABEL(endifLabel)
     } else if (opcode == Opcodes.CASTORE) {
       callToInstrumentedArrayStore(TD.Char)
     } else if (opcode == Opcodes.SASTORE) {
       callToInstrumentedArrayStore(TD.Short)
     } else if (isArrayLoadInstr(opcode)) {
+      // FIXME handle the problem with arrays of bytes vs booleans
       val unpreciseTypeDescr = arrayLoadInstrTypeDescr(opcode)
       DUP2(TD.Int, TD.Array(unpreciseTypeDescr))
       INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(unpreciseTypeDescr), TD.Int) ==> TD.Void)
