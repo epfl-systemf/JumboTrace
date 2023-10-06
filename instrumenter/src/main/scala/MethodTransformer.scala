@@ -22,11 +22,21 @@ final class MethodTransformer(
   private val ansiRed = "\u001B[31m"
   private val ansiReset = "\u001B[0m"
 
+  private val initMethodName = MethodName("<init>")
+
   import methodTable.{ownerClass, methodName, isMainMethod, methodDescr, tryCatches}
 
   private given MethodVisitor = underlying
 
   private var lastVisitedLabelIdx = -1
+  private var alreadySeenObjectInit = false
+
+  private def canAccessClassField: Boolean = methodName != initMethodName || alreadySeenObjectInit
+
+  override def visitMethodInsn(opcode: Int, owner: String, name: String, descriptor: String, isInterface: Boolean): Unit = {
+    super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
+    alreadySeenObjectInit ||= (name == initMethodName.name)
+  }
 
   override def visitCode(): Unit = {
     // Save arguments 1 by 1, then call terminateMethodCall
@@ -67,47 +77,58 @@ final class MethodTransformer(
     } else if (opcode == Opcodes.AASTORE) {
       callToInstrumentedArrayStore(TD.Object)
     } else if (opcode == Opcodes.BASTORE) {
+      // BASTORE can be applied to both bytes and booleans
+      // so we test the type of the array, cast it and call the appropriate method
       val elseBrLabel = new Label()
       val endifLabel = new Label()
-      // [b int ref
+      // bring array to the top of the stack
       mv.visitInsn(Opcodes.DUP_X2)
-      // [b int ref b
       mv.visitInsn(Opcodes.POP)
-      // [int ref b
       mv.visitInsn(Opcodes.DUP_X2)
-      // [int ref b int
       mv.visitInsn(Opcodes.POP)
-      // [ref b int
       DUP(TD.Object)
-      // [ref ref b int
       INSTANCEOF(TD.Array(TD.Byte))
-      // [bool ref b int
       IFEQ(elseBrLabel)
-      // [ref b int
       CHECKCAST(TD.Array(TD.Byte))
-      // [cref b int
+      // bring back array to its initial position
       mv.visitInsn(Opcodes.DUP_X2)
-      // [cref b int cref
       mv.visitInsn(Opcodes.POP)
-      // [b int cref
       callToInstrumentedArrayStore(TD.Byte)
       GOTO(endifLabel)
       LABEL(elseBrLabel)
-      // [ref b int
       CHECKCAST(TD.Array(TD.Boolean))
-      // [cref b int
+      // bring back array to its initial position
       mv.visitInsn(Opcodes.DUP_X2)
-      // [cref b int cref
       mv.visitInsn(Opcodes.POP)
-      // [b int cref
       callToInstrumentedArrayStore(TD.Boolean)
       LABEL(endifLabel)
     } else if (opcode == Opcodes.CASTORE) {
       callToInstrumentedArrayStore(TD.Char)
     } else if (opcode == Opcodes.SASTORE) {
       callToInstrumentedArrayStore(TD.Short)
-    } else if (isArrayLoadInstr(opcode)) {
-      // FIXME handle the problem with arrays of bytes vs booleans
+    } else if (opcode == Opcodes.BALOAD) {
+      // BALOAD can be applied to both bytes and booleans
+      // so we test the type of the array, cast it and call the appropriate method
+      val elseLabel = new Label()
+      val endLabel = new Label()
+      DUP2(TD.Int, TD.Object)
+      // bring array to the top of the stack
+      mv.visitInsn(Opcodes.SWAP)
+      DUP(TD.Object)
+      INSTANCEOF(TD.Array(TD.Byte))
+      IFEQ(elseLabel)
+      CHECKCAST(TD.Array(TD.Byte))
+      // bring back array to its initial position
+      mv.visitInsn(Opcodes.SWAP)
+      INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(TD.Byte), TD.Int) ==> TD.Void)
+      GOTO(endLabel)
+      LABEL(elseLabel)
+      CHECKCAST(TD.Array(TD.Boolean))
+      // bring back array to its initial position
+      mv.visitInsn(Opcodes.SWAP)
+      INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(TD.Boolean), TD.Int) ==> TD.Void)
+      LABEL(endLabel)
+    } else if (isArrayLoadInstr(opcode)) {  // except the special case of BALOAD, which is handled above
       val unpreciseTypeDescr = arrayLoadInstrTypeDescr(opcode)
       DUP2(TD.Int, TD.Array(unpreciseTypeDescr))
       INVOKE_STATIC(jumboTracer, ArrayLoad.methodName, Seq(TD.Array(unpreciseTypeDescr), TD.Int) ==> TD.Void)
@@ -130,6 +151,7 @@ final class MethodTransformer(
     }
     super.visitVarInsn(opcode, varIndex)
     if (isVarLoadInstr(opcode) && !methodTable.isInitMethod) { // do not log variable loads in <init>, it is useless and crashes the program
+      // FIXME check whether the exclusion of <init> is necessary
       methodTable.findLocalVar(varIndex, lastVisitedLabelIdx)
         .foreach { localVar =>
           val typeDescr = topmostTypeFor(localVar.descriptor)
@@ -176,10 +198,12 @@ final class MethodTransformer(
         callToSuper()
       }
       case Opcodes.PUTFIELD => {
-        DUP2(unpreciseTypeDescr, TD.Object)
-        LDC(fieldName)
-        SWAP(TD.String, unpreciseTypeDescr)
-        INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
+        if (canAccessClassField){
+          DUP2(unpreciseTypeDescr, TD.Object)
+          LDC(fieldName)
+          SWAP(TD.String, unpreciseTypeDescr)
+          INVOKE_STATIC(jumboTracer, InstanceFieldSet.methodName, Seq(TD.Object, TD.String, unpreciseTypeDescr) ==> TD.Void)
+        }
         callToSuper()
       }
       case Opcodes.GETSTATIC => {
@@ -194,12 +218,14 @@ final class MethodTransformer(
       case Opcodes.GETFIELD => {
         // Stack: o = owner | s = field name (string) | v = field value
         // Initially: [o
-        DUP(TD.Object) // [oo
-        DUP(TD.Object) // [ooo
-        GETFIELD(ownerClass, fieldName, preciseTypeDescr) // [voo
-        SWAP(unpreciseTypeDescr, TD.Object) // [ovo
-        LDC(fieldName) // [sovo
-        INVOKE_STATIC(jumboTracer, InstanceFieldGet.methodName, Seq(unpreciseTypeDescr, TD.Object, TD.String) ==> TD.Void) // [o
+        if (canAccessClassField){
+          DUP(TD.Object) // [oo
+          DUP(TD.Object) // [ooo
+          GETFIELD(ownerClass, fieldName, preciseTypeDescr) // [voo
+          SWAP(unpreciseTypeDescr, TD.Object) // [ovo
+          LDC(fieldName) // [sovo
+          INVOKE_STATIC(jumboTracer, InstanceFieldGet.methodName, Seq(unpreciseTypeDescr, TD.Object, TD.String) ==> TD.Void) // [o
+        }
         callToSuper() // [v
       }
       case _ => assert(false, s"unexpected opcode: $opcode")
