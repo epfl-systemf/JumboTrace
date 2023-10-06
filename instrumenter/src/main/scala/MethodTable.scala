@@ -7,6 +7,7 @@ import org.objectweb.asm.{Label, Opcodes}
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable
+import scala.collection.immutable.SortedMap
 
 /**
  * @param ownerClass   name of the class the method belongs to
@@ -21,7 +22,7 @@ final class MethodTable(
                          val ownerClass: ClassName,
                          val methodName: MethodName,
                          val methodDescr: MethodDescriptor,
-                         val localVars: mutable.SortedMap[Int, List[LocalVariable]],
+                         val localVars: SortedMap[Int, List[LocalVariable]],
                          val tryCatches: Seq[TryCatch],
                          val isStatic: Boolean,
                          val isMainMethod: Boolean
@@ -87,7 +88,7 @@ object MethodTable {
     }
 
     def built: MethodTable = {
-      new MethodTable(ownerClass, methodName, methodDescr, mutable.SortedMap.from(localVars), tryCatches.toSeq, isStatic = isStatic, isMainMethod = isMainMethod)
+      new MethodTable(ownerClass, methodName, methodDescr, SortedMap.from(localVars), tryCatches.toSeq, isStatic = isStatic, isMainMethod = isMainMethod)
     }
 
   }
