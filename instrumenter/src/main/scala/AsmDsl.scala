@@ -144,12 +144,20 @@ object AsmDsl {
     mv.visitInsn(Opcodes.ATHROW)
   }
 
-  def INSTANCEOF(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    mv.visitTypeInsn(Opcodes.INSTANCEOF, td.toString)
+  def INSTANCEOF(td: (TypeDescriptor.Class | TypeDescriptor.Array))(using mv: MethodVisitor): Unit = {
+    mv.visitTypeInsn(Opcodes.INSTANCEOF, typeStrForTypeInstruction(td))
   }
 
-  def CHECKCAST(td: TypeDescriptor)(using mv: MethodVisitor): Unit = {
-    mv.visitTypeInsn(Opcodes.CHECKCAST, td.toString)
+  def CHECKCAST(td: (TypeDescriptor.Class | TypeDescriptor.Array))(using mv: MethodVisitor): Unit = {
+    mv.visitTypeInsn(Opcodes.CHECKCAST, typeStrForTypeInstruction(td))
+  }
+  
+  private def typeStrForTypeInstruction(td: (TypeDescriptor.Class | TypeDescriptor.Array)): String = {
+    td match
+      case TypeDescriptor.Class(prefixes, className) =>
+        prefixes.mkString("/") ++ "/" ++ className
+      case _: TypeDescriptor.Array =>
+        td.toString
   }
 
   def PRINTLN(str: String)(using mv: MethodVisitor): Unit = {

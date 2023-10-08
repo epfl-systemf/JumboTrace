@@ -15,6 +15,7 @@ import java.util.StringJoiner;
 import java.util.Objects;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.Collections;
 import java.time.LocalDateTime;
 import java.lang.reflect.Array;
 
@@ -82,9 +83,19 @@ static void returned(String methodName, _tpe value){                            
     });                                                                                   \
 }
 
+
+// Assumption: at the point when saveArgument is called, all the arguments are on the stack,
+// ready to be taken by the method. Thus the value will not be mutated until terminateMethodCall
+// is called, so we can save the reference to value without the need for saving its state
+// (as we do at other places using makeValue)
 #define SAVE_ARG(_tpe)                                                                    \
 static void saveArgument(_tpe value){                                                     \
-    handlingSuspended(() -> currentArgs.add(makeValue(value)));                           \
+    handlingSuspended(() -> currentArgs.add(value));                                      \
+}
+
+#define REPUSH_ARG(_tpe)                              \
+static _tpe repushArgument_##_tpe(int argIdx){        \
+    return (_tpe)currentArgs.get(argIdx);             \
 }
 
 // JVM root types: boolean char byte short int float long double Object
@@ -102,10 +113,10 @@ public final class ___JumboTracer___ {
     private static final String ANSI_RESET = "\u001B[0m";
 
     private static int currentTraceFileIdx = 1;
-    private static TraceElement[] trace;
+    private static final TraceElement[] trace;
     private static int nextTraceElemIdx = 0;
     private static int currNestingLevel = 0;
-    private static List<Value> currentArgs;
+    private static final List<Object> currentArgs;
 
     private static PrintStream defaultOut;
     private static PrintStream defaultErr;
@@ -266,12 +277,34 @@ public final class ___JumboTracer___ {
     SAVE_ARG(long)
     SAVE_ARG(double)
     SAVE_ARG(Object)
+        
+    static void reverseArgsList(){
+        Collections.reverse(currentArgs);
+    }
+
+    REPUSH_ARG(boolean)
+    REPUSH_ARG(char)
+    REPUSH_ARG(byte)
+    REPUSH_ARG(short)
+    REPUSH_ARG(int)
+    REPUSH_ARG(float)
+    REPUSH_ARG(long)
+    REPUSH_ARG(double)
+    REPUSH_ARG(Object)
 
     static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
         handlingSuspended(() -> {
-            addTraceElement(new MethodCalled(ownerClass, methodName, currentArgs, isStatic, currNestingLevel));
-            currNestingLevel += 2;
+            var currentArgsValues = new ArrayList<Value>();
+            for (var arg: currentArgs){
+                currentArgsValues.add(makeValue(arg));
+            }
+            addTraceElement(new MethodCalled(ownerClass, methodName, currentArgsValues, isStatic, currNestingLevel));
+            currentArgs.clear();
         });
+    }
+    
+    static void incrementNestingLevel(){
+        currNestingLevel += 2;
     }
 
     static void saveTermination(String msg){

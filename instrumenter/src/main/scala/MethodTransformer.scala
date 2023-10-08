@@ -33,25 +33,52 @@ final class MethodTransformer(
 
   private def canAccessClassField: Boolean = methodName != initMethodName || alreadySeenObjectInit
 
-  override def visitMethodInsn(opcode: Int, owner: String, name: String, descriptor: String, isInterface: Boolean): Unit = {
-    super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
-    alreadySeenObjectInit ||= (name == initMethodName.name)
-  }
-
   override def visitCode(): Unit = {
-    // Save arguments 1 by 1, then call terminateMethodCall
-    for (argVar <- methodTable.parameters) do {
-      val typeDescr = topmostTypeFor(argVar.descriptor)
-      LOAD(typeDescr, argVar.idx)
-      INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(typeDescr) ==> TD.Void)
-    }
-    LDC(ownerClass.name)
-    LDC(methodName.name)
-    LDC(methodTable.isStatic)
-    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)
+    INVOKE_STATIC(jumboTracer, IncrementNestingLevel.methodName, Seq.empty ==> TD.Void)
     super.visitCode()
   }
 
+  override def visitMethodInsn(opcode: Int, ownerClass: String, methodName: String, descriptor: String, isInterface: Boolean): Unit = {
+    val isStatic = (opcode == Opcodes.INVOKESTATIC)
+    generateSaveAndRepushArgs(ownerClass, methodName, descriptor, isStatic)
+    super.visitMethodInsn(opcode, ownerClass, methodName, descriptor, isInterface)
+    alreadySeenObjectInit ||= (methodName == initMethodName.name)
+  }
+
+  override def visitMethodInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
+    // TODO check if this is safe
+    throw new UnsupportedOperationException("unexpected call to deprecated version of visitMethodInsn")
+  }
+
+  override def visitInvokeDynamicInsn(methodName: String, descriptor: String, bootstrapMethodHandle: Handle, bootstrapMethodArguments: Any*): Unit = {
+    // TODO see if we can find something better than "<unknown>"
+    // TODO check than isStatic should always be false
+    generateSaveAndRepushArgs("<unkwnown>", methodName, descriptor, isStatic = false)
+    super.visitInvokeDynamicInsn(methodName, descriptor, bootstrapMethodHandle, bootstrapMethodArguments: _*)
+    alreadySeenObjectInit ||= (methodName == initMethodName.name)
+  }
+
+  private def generateSaveAndRepushArgs(ownerClass: String, methodName: String, descriptor: String, isStatic: Boolean): Unit = {
+    val methodDescr = MethodDescriptor.parse(descriptor)
+    for (td <- methodDescr.args.reverse) {
+      INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(topmostTypeFor(td)) ==> TD.Void)
+    }
+    INVOKE_STATIC(jumboTracer, ReverseArgsList.methodName, Seq.empty ==> TD.Void)
+    for ((td, i) <- methodDescr.args.zipWithIndex) {
+      val topmostTd = topmostTypeFor(td)
+      LDC(i)
+      INVOKE_STATIC(jumboTracer, RepushArgument(topmostTd).methodName, Seq(TD.Int) ==> topmostTd)
+      td match {
+        case td: (TD.Array | TD.Class) =>
+          CHECKCAST(td)
+        case _ => ()
+      }
+    }
+    LDC(ownerClass)
+    LDC(methodName)
+    LDC(isStatic)
+    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)
+  }
 
   override def visitInsn(opcode: Int): Unit = {
     val isRetInstr = isReturnInstr(opcode)
