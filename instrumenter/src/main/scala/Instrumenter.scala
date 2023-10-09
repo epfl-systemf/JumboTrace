@@ -33,6 +33,7 @@ object Instrumenter {
       logger(s"Main class $mainClass not found")
     }
     
+    val classesSet = classes.toSet
     for (className <- classes) do {
 
       val inputPath = Paths.get(".").resolve(s"$className.class")
@@ -50,7 +51,7 @@ object Instrumenter {
       val transformationReader = new ClassReader(inputBytes)
       val transformationWriter = new ClassWriter(transformationReader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS)
 
-      transformationReader.accept(new ClassTransformer(transformationWriter, classTable, logger), ClassReader.EXPAND_FRAMES)
+      transformationReader.accept(new ClassTransformer(transformationWriter, classTable, logger, classesSet), ClassReader.EXPAND_FRAMES)
 
       val outFile = outputPath.toFile
       outFile.getParentFile.mkdirs()

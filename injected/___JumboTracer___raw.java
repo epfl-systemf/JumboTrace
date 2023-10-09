@@ -3,13 +3,14 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Deque;
 import java.util.Map;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Arrays;
 import java.util.StringJoiner;
 import java.util.Objects;
@@ -22,17 +23,17 @@ import java.lang.reflect.Array;
 // C-like macros. Use cpp -P to expand before compiling
 
 #define VARIABLE_SET(_type)                                                                           \
-static void variableSet(String varId, _type value){                                                   \
+public static void variableSet(String varId, _type value){                                            \
     handlingSuspended(() -> addTraceElement(new VarSet(varId, makeValue(value), currNestingLevel)));  \
 }
 
 #define VARIABLE_GET(_type)                                                                           \
-static void variableGet(String varId, _type value){                                                   \
+public static void variableGet(String varId, _type value){                                            \
     handlingSuspended(() -> addTraceElement(new VarGet(varId, makeValue(value), currNestingLevel)));  \
 }
 
 #define INSTRUMENTED_ARRAY_STORE(_elemType)                                                              \
-static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                         \
+public static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                  \
     handlingSuspended(() -> {                                                                            \
         addTraceElement(new ArrayElemSet(makeValue(array), idx, makeValue(value), currNestingLevel));    \
     });                                                                                                  \
@@ -40,7 +41,7 @@ static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){
 }
 
 #define ARRAY_LOAD(_elemType)                                                                            \
-static void arrayLoad(_elemType[] array, int idx){                                                       \
+public static void arrayLoad(_elemType[] array, int idx){                                                \
     handlingSuspended(() -> {                                                                            \
         var value = array[idx];                                                                          \
         addTraceElement(new ArrayElemGet(makeValue(array), idx, makeValue(value), currNestingLevel));    \
@@ -48,35 +49,35 @@ static void arrayLoad(_elemType[] array, int idx){                              
 }
 
 #define STATIC_FIELD_SET(_type)                                                                           \
-static void staticFieldSet(String fieldOwner, String fieldName, _type value){                             \
+public static void staticFieldSet(String fieldOwner, String fieldName, _type value){                      \
     handlingSuspended(() -> {                                                                             \
-        addTraceElement(new StaticFieldSet(fieldOwner, fieldName, makeValue(value), currNestingLevel));       \
+        addTraceElement(new StaticFieldSet(fieldOwner, fieldName, makeValue(value), currNestingLevel));   \
     });                                                                                                   \
 }
 
 #define STATIC_FIELD_GET(_type)                                                                           \
-static void staticFieldGet(String fieldOwner, String fieldName, _type value){                             \
+public static void staticFieldGet(String fieldOwner, String fieldName, _type value){                      \
     handlingSuspended(() -> {                                                                             \
         addTraceElement(new StaticFieldGet(fieldOwner, fieldName, makeValue(value), currNestingLevel));   \
     });                                                                                                   \
 }
 
 #define INSTANCE_FIELD_SET(_type)                                                                                     \
-static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                       \
+public static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                \
     handlingSuspended(() -> {                                                                                         \
         addTraceElement(new InstanceFieldSet(makeValue(fieldOwner), fieldName, makeValue(value), currNestingLevel));  \
     });                                                                                                               \
 }
 
 #define INSTANCE_FIELD_GET(_type)                                                                                     \
-static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){                                       \
+public static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){                                \
     handlingSuspended(() -> {                                                                                         \
         addTraceElement(new InstanceFieldGet(makeValue(fieldOwner), fieldName, makeValue(value), currNestingLevel));  \
     });                                                                                                               \
 }
 
 #define RETURNED(_tpe)                                                                    \
-static void returned(String methodName, _tpe value){                                      \
+public static void returned(String methodName, _tpe value){                               \
     handlingSuspended(() -> {                                                             \
         addTraceElement(new Return(methodName, makeValue(value), currNestingLevel));      \
         currNestingLevel -= 2;                                                            \
@@ -89,13 +90,13 @@ static void returned(String methodName, _tpe value){                            
 // is called, so we can save the reference to value without the need for saving its state
 // (as we do at other places using makeValue)
 #define SAVE_ARG(_tpe)                                                                    \
-static void saveArgument(_tpe value){                                                     \
+public static void saveArgument(_tpe value){                                              \
     handlingSuspended(() -> currentArgs.add(value));                                      \
 }
 
-#define REPUSH_ARG(_tpe)                              \
-static _tpe repushArgument_##_tpe(int argIdx){        \
-    return (_tpe)currentArgs.get(argIdx);             \
+#define PUSHBACK_ARG(_tpe)                                   \
+public static _tpe pushbackArgument_##_tpe(int argIdx){      \
+    return (_tpe)currentArgs.get(argIdx);                    \
 }
 
 // JVM root types: boolean char byte short int float long double Object
@@ -113,13 +114,16 @@ public final class ___JumboTracer___ {
     private static final String ANSI_RESET = "\u001B[0m";
 
     private static int currentTraceFileIdx = 1;
-    private static final TraceElement[] trace;
+    private static final TraceElement[] trace = new TraceElement[EVENTS_PER_FILE_THRES];
     private static int nextTraceElemIdx = 0;
     private static int currNestingLevel = 0;
-    private static final List<Object> currentArgs;
+    private static final List<Object> currentArgs = new ArrayList<>();
+    private static boolean callAlreadyLoggedFlag = false;
 
     private static PrintStream defaultOut;
     private static PrintStream defaultErr;
+
+    private static final Set<String> instrumentedClasses = new HashSet<>();
 
     static {
         defaultOut = System.out;
@@ -130,8 +134,6 @@ public final class ___JumboTracer___ {
         System.setErr(new LoggingPrintStream(defaultErr, s -> {
             addTraceElement(new SystemErrPrinted(s, currNestingLevel));
         }));
-        trace = new TraceElement[EVENTS_PER_FILE_THRES];
-        currentArgs = new ArrayList<>();
         var time = LocalDateTime.now();
         addTraceElement(new Initialization(time.toString(), currNestingLevel));
         Runtime.getRuntime().addShutdownHook(new Thread(){
@@ -149,14 +151,32 @@ public final class ___JumboTracer___ {
         trace[nextTraceElemIdx++] = event;
     }
 
+    public static void recordInstrumentedClass(String className){
+        instrumentedClasses.add(className);
+    }
+
+    public static boolean isInstrumentedClass(String className){
+        return instrumentedClasses.contains(className);
+    }
+
+    public static void setCallAlreadyLoggedFlagIfClassIsInstrumented(String className){
+        callAlreadyLoggedFlag |= isInstrumentedClass(className);
+    }
+
+    public static boolean getAndResetCallAlreadyLoggedFlag(){
+        var prev = callAlreadyLoggedFlag;
+        callAlreadyLoggedFlag = false;
+        return prev;
+    }
+
     // -----------------------------------------------------------------------------------------
 
     private static boolean loggingSuspended = false;
 
-    static void suspendLogging(){ loggingSuspended = true; }
-    static void resumeLogging(){ loggingSuspended = false; }
+    public static void suspendLogging(){ loggingSuspended = true; }
+    public static void resumeLogging(){ loggingSuspended = false; }
 
-    static void handlingSuspended(Runnable action){
+    public static void handlingSuspended(Runnable action){
         if (!loggingSuspended){
             suspendLogging();
             action.run();
@@ -166,7 +186,7 @@ public final class ___JumboTracer___ {
 
     // -----------------------------------------------------------------------------------------
 
-    static void lineVisited(String className, int lineNum) {
+    public static void lineVisited(String className, int lineNum) {
         handlingSuspended(() -> {
             addTraceElement(new LineVisited(className, lineNum, currNestingLevel-1));
         });
@@ -261,7 +281,7 @@ public final class ___JumboTracer___ {
     RETURNED(long)
     RETURNED(double)
     RETURNED(Object)
-    static void returnedVoid(String methodName){
+    public static void returnedVoid(String methodName){
         handlingSuspended(() -> {
             addTraceElement(new ReturnVoid(methodName, currNestingLevel));
             currNestingLevel -= 2;
@@ -277,22 +297,26 @@ public final class ___JumboTracer___ {
     SAVE_ARG(long)
     SAVE_ARG(double)
     SAVE_ARG(Object)
-        
-    static void reverseArgsList(){
+
+    public static void reverseArgsList(){
         Collections.reverse(currentArgs);
     }
 
-    REPUSH_ARG(boolean)
-    REPUSH_ARG(char)
-    REPUSH_ARG(byte)
-    REPUSH_ARG(short)
-    REPUSH_ARG(int)
-    REPUSH_ARG(float)
-    REPUSH_ARG(long)
-    REPUSH_ARG(double)
-    REPUSH_ARG(Object)
+    PUSHBACK_ARG(boolean)
+    PUSHBACK_ARG(char)
+    PUSHBACK_ARG(byte)
+    PUSHBACK_ARG(short)
+    PUSHBACK_ARG(int)
+    PUSHBACK_ARG(float)
+    PUSHBACK_ARG(long)
+    PUSHBACK_ARG(double)
+    PUSHBACK_ARG(Object)
 
-    static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
+    public static String classNameOf(Object o){
+        return o.getClass().getName();
+    }
+
+    public static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
         handlingSuspended(() -> {
             var currentArgsValues = new ArrayList<Value>();
             for (var arg: currentArgs){
@@ -302,18 +326,14 @@ public final class ___JumboTracer___ {
             currentArgs.clear();
         });
     }
-    
-    static void incrementNestingLevel(){
-        currNestingLevel += 2;
-    }
 
-    static void saveTermination(String msg){
-        addTraceElement(new Termination(msg, currNestingLevel));
+    public static void incrementNestingLevel(){
+        currNestingLevel += 2;
     }
 
     // -----------------------------------------------------------------------------------------
 
-    static String toJson() {
+    public static String toJson() {
         var joiner = new StringJoiner(",\n", "[\n", "\n]");
         for (int i = 0; i < nextTraceElemIdx; i++) {
             var elem = trace[i];
@@ -322,14 +342,14 @@ public final class ___JumboTracer___ {
         return joiner.toString();
     }
 
-    static void display() {
+    public static void display() {
         defaultOut.println(ANSI_CYAN);
         defaultOut.println("JSON display");
         defaultOut.println(toJson());
         defaultOut.println(ANSI_RESET);
     }
 
-    static void writeJsonTrace(){
+    public static void writeJsonTrace(){
         var filePath = jsonFilePath(currentTraceFileIdx);
         var file = new File(filePath);
         file.getParentFile().mkdirs();

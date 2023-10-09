@@ -139,6 +139,10 @@ object AsmDsl {
   def IFEQ(jumpTarget: Label)(using mv: MethodVisitor): Unit = {
     mv.visitJumpInsn(Opcodes.IFEQ, jumpTarget)
   }
+
+  def IFNE(jumpTarget: Label)(using mv: MethodVisitor): Unit = {
+    mv.visitJumpInsn(Opcodes.IFNE, jumpTarget)
+  }
   
   def ATHROW(using mv: MethodVisitor): Unit = {
     mv.visitInsn(Opcodes.ATHROW)
@@ -155,7 +159,7 @@ object AsmDsl {
   private def typeStrForTypeInstruction(td: (TypeDescriptor.Class | TypeDescriptor.Array)): String = {
     td match
       case TypeDescriptor.Class(prefixes, className) =>
-        prefixes.mkString("/") ++ "/" ++ className
+        if prefixes.isEmpty then className else prefixes.mkString("/") ++ "/" ++ className
       case _: TypeDescriptor.Array =>
         td.toString
   }
