@@ -35,16 +35,6 @@ final class MethodTransformer(
   private def canAccessClassField: Boolean = methodName != initMethodName || alreadySeenObjectInit
 
   override def visitCode(): Unit = {
-    if (isMainMethod) {
-      // at startup
-      for (className <- instrumentedClasses) do {
-        LDC(className.name)
-        INVOKE_STATIC(jumboTracer, RecordInstrumentedClass.methodName, Seq(TD.String) ==> TD.Void)
-      }
-    }
-    val skipLabel = new Label()
-    INVOKE_STATIC(jumboTracer, GetAndResetCallAlreadyLoggedFlag.methodName, Seq.empty ==> TD.Boolean)
-    IFNE(skipLabel)
     for (argVar <- methodTable.parameters) do {
       val td = topmostTypeFor(argVar.descriptor)
       LOAD(td, argVar.idx)
@@ -54,15 +44,15 @@ final class MethodTransformer(
     LDC(methodName.name)
     LDC(methodTable.isStatic)
     INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)
-    LABEL(skipLabel)
     INVOKE_STATIC(jumboTracer, IncrementNestingLevel.methodName, Seq.empty ==> TD.Void)
     super.visitCode()
   }
 
   override def visitMethodInsn(opcode: Int, ownerClass: String, methodName: String, descriptor: String, isInterface: Boolean): Unit = {
+    // save call from caller iff the callee is not instrumented (o.w. it will save the call itself)
     if (!instrumentedClasses.contains(ClassName(ownerClass))) {
       val isStatic = (opcode == Opcodes.INVOKESTATIC)
-      generateSaveAndPushbackArgs(Some(ownerClass), methodName, descriptor, isStatic, pushOwnerClassName = false)
+      generateSaveAndPushbackArgs(ownerClass, methodName, descriptor, isStatic)
     }
     super.visitMethodInsn(opcode, ownerClass, methodName, descriptor, isInterface)
     alreadySeenObjectInit ||= (methodName == initMethodName.name)
@@ -73,41 +63,19 @@ final class MethodTransformer(
     throw new UnsupportedOperationException("unexpected call to deprecated version of visitMethodInsn")
   }
 
-  override def visitInvokeDynamicInsn(methodName: String, descriptor: String, bootstrapMethodHandle: Handle, bootstrapMethodArguments: Any*): Unit = {
-    // TODO see if we can find something better than "<unknown, maybe lambda>"
-    // TODO check than isStatic should always be false
-    // FIXME this doesn't work, apparently there is not always a receiver
-    generateSaveAndPushbackArgs(None, methodName, descriptor, isStatic = false, pushOwnerClassName = true)
-    INVOKE_STATIC(jumboTracer, SetCallAlreadyLoggedFlagIfClassIsInstrumented.methodName, Seq(TD.String) ==> TD.Void)
-    super.visitInvokeDynamicInsn(methodName, descriptor, bootstrapMethodHandle, bootstrapMethodArguments: _*)
-    alreadySeenObjectInit ||= (methodName == initMethodName.name)
-  }
+  // TODO see if it is safe to ignore invokedynamic
 
   private def generateSaveAndPushbackArgs(
-                                           ownerClassOpt: Option[String],
+                                           ownerClass: String,
                                            methodName: String,
                                            descriptor: String,
-                                           isStatic: Boolean,
-                                           pushOwnerClassName: Boolean
+                                           isStatic: Boolean
                                          ): Unit = {
-    require(!isStatic || ownerClassOpt.isDefined)
-    // TODO simplify this if we don't use it in invokedynamic
-    /*
-    * if owner class is known statically (i.e. ownerClassOpt.isDefined), then only push the name of the owner class when needed
-    * if it is not known statically (i.e. ownerClassOpt.isEmpty), then once we popped all the arguments from the stack
-    * and saved them in the arguments list, we have the receiver on the top of the stack. So duplicate it, transform
-    * the copy into the name of its class (by calling ___JumboTracer___.classNameOf) and use swaps to keep this name
-    * on the top of the stack as we push the arguments back to the stack
-    */
     val methodDescr = MethodDescriptor.parse(descriptor)
     for (td <- methodDescr.args.reverse) {
       INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(topmostTypeFor(td)) ==> TD.Void)
     }
     INVOKE_STATIC(jumboTracer, ReverseArgsList.methodName, Seq.empty ==> TD.Void)
-    if (ownerClassOpt.isEmpty) {
-      DUP(TD.Object)
-      INVOKE_STATIC(jumboTracer, ClassNameOf.methodName, Seq(TD.Object) ==> TD.Void)
-    }
     for ((td, i) <- methodDescr.args.zipWithIndex) do {
       val topmostTd = topmostTypeFor(td)
       LDC(i)
@@ -117,18 +85,8 @@ final class MethodTransformer(
           CHECKCAST(td)
         case _ => ()
       }
-      if (ownerClassOpt.isEmpty) {
-        SWAP(td, TD.String)
-      }
     }
-    if (ownerClassOpt.isDefined) {
-      LDC(ownerClassOpt.get)
-    }
-    // at that point the stack should be:  [ ownerClassName arg<n> arg<n-1> arg<n-2> ... arg0 (receiver)
-    if (pushOwnerClassName) {
-      // so that the name is on the stack after the bytecode written by this function terminates
-      DUP(TD.String)
-    }
+    LDC(ownerClass)
     LDC(methodName)
     LDC(isStatic)
     INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)

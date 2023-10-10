@@ -22,15 +22,10 @@ object Injection {
     case SaveArgument extends EventMethod("saveArgument")
     case ReverseArgsList extends EventMethod("reverseArgsList")
     case PushbackArg(tpe: TypeDescriptor) extends EventMethod("pushbackArgument_" + javaRootTypeName(tpe))
-    case ClassNameOf extends EventMethod("classNameOf")
     case TerminateMethodCall extends EventMethod("terminateMethodCall")
     case IncrementNestingLevel extends EventMethod("incrementNestingLevel")
     case InstrumentedArrayStore extends EventMethod("instrumentedArrayStore")
     case ArrayLoad extends EventMethod("arrayLoad")
-    case RecordInstrumentedClass extends EventMethod("recordInstrumentedClass")
-    case IsInstrumentedClass extends EventMethod("isInstrumentedClass")
-    case SetCallAlreadyLoggedFlagIfClassIsInstrumented extends EventMethod("setCallAlreadyLoggedFlagIfClassIsInstrumented")
-    case GetAndResetCallAlreadyLoggedFlag extends EventMethod("getAndResetCallAlreadyLoggedFlag")
     
     val methodName: MethodName = MethodName(methodNameStr)
   }

@@ -118,12 +118,9 @@ public final class ___JumboTracer___ {
     private static int nextTraceElemIdx = 0;
     private static int currNestingLevel = 0;
     private static final List<Object> currentArgs = new ArrayList<>();
-    private static boolean callAlreadyLoggedFlag = false;
 
     private static PrintStream defaultOut;
     private static PrintStream defaultErr;
-
-    private static final Set<String> instrumentedClasses = new HashSet<>();
 
     static {
         defaultOut = System.out;
@@ -149,24 +146,6 @@ public final class ___JumboTracer___ {
             nextTraceElemIdx = 0;
         }
         trace[nextTraceElemIdx++] = event;
-    }
-
-    public static void recordInstrumentedClass(String className){
-        instrumentedClasses.add(className);
-    }
-
-    public static boolean isInstrumentedClass(String className){
-        return instrumentedClasses.contains(className);
-    }
-
-    public static void setCallAlreadyLoggedFlagIfClassIsInstrumented(String className){
-        callAlreadyLoggedFlag |= isInstrumentedClass(className);
-    }
-
-    public static boolean getAndResetCallAlreadyLoggedFlag(){
-        var prev = callAlreadyLoggedFlag;
-        callAlreadyLoggedFlag = false;
-        return prev;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -311,10 +290,6 @@ public final class ___JumboTracer___ {
     PUSHBACK_ARG(long)
     PUSHBACK_ARG(double)
     PUSHBACK_ARG(Object)
-
-    public static String classNameOf(Object o){
-        return o.getClass().getName();
-    }
 
     public static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
         handlingSuspended(() -> {
