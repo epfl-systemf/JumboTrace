@@ -130,62 +130,63 @@ object JavaHtmlFrontend {
     val idsGenerator = new AtomicInteger(0)
 
     def buildRecursively(traceElement: DisplayableTraceElement, currIndentLevel: Int, lastCallIndentLevel: Int): DomContent = {
-      traceElement match
-        case LineVisited(className, lineNumber, subEvents) => {
-          val addSpace = (className, lineNumber - 1) != lastVisitedLine
-          lastVisitedLine = (className, lineNumber)
-          var hideFlag = false  // set to true when the node being built should be hidden (easier than not building it)
-          val currIdIdx = idsGenerator.incrementAndGet()
-          val summaryId = lineVisitedSummaryPrefix + currIdIdx
-          val detailsId = lineVisitedDetailsPrefix + currIdIdx
-          div(
-            details(
-              summary(
-                (for {
-                  filename <- class2Files.get(className)
-                  plugLinesSeq <- pluggableLines.get(filename)
-                  plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
-                } yield {
-                  hideFlag = plugLine.mustHide
-                  (("\u00A0" * currIndentLevel) ++
-                    plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
-                    s" ($filename:$lineNumber)"
-                }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
-              ).withStyle("display: block;")
-                .withId(summaryId),
-              readWrites(traceElement, currIndentLevel + lineVisitedIndent).withStyle("color: blue;")
-            ).withStyle(
-              (if addSpace then preSpacing else "") ++
-                (if hideFlag then "display:none;" else "")
-            ).withId(detailsId)
-              .attr("onmouseenter", s"highlight(\"$detailsId\", \"lightcyan\")")
-              .attr("onmouseleave", s"removeHighlighting(\"$detailsId\")"),
-            buildAllRecursively(subEvents, currIndentLevel + lineVisitedIndent, lastCallIndentLevel)
-          )
-        }
-        case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
-          val idIdx = idsGenerator.incrementAndGet()
-          val summaryId = methodCallSummaryPrefix + idIdx
-          val detailsId = methodCallDetailsPrefix + idIdx
-          details(
-            summary(
-              b(("\u00A0" * currIndentLevel) ++
-                s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValueShort).mkString(",")})")
-            ).withStyle("display: block;")
-              .withId(summaryId),
-            buildAllRecursively(subEvents, currIndentLevel + methodCallIndent, currIndentLevel)
-          ).withId(detailsId)
-            .attr("onmouseenter", s"highlight(\"$summaryId\", \"moccasin\")")
-            .attr("onmouseleave", s"removeHighlighting(\"$summaryId\")")
-        case Return(methodName, value) =>
-          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS ${refinedValueShort(value)}"))
-        case ReturnVoid(methodName) =>
-          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS void"))
-        case Initialization(dateTime) =>
-          div(s"INITIALIZATION AT ${formatTime(dateTime)}")
-        case Termination(msg) =>
-          div(s"TERMINATION: $msg")
-            .withStyle(preSpacing)
+      ???   // FIXME once we are a bit more sure of the format of the traces
+//      traceElement match
+//        case LineVisited(className, lineNumber, subEvents) => {
+//          val addSpace = (className, lineNumber - 1) != lastVisitedLine
+//          lastVisitedLine = (className, lineNumber)
+//          var hideFlag = false  // set to true when the node being built should be hidden (easier than not building it)
+//          val currIdIdx = idsGenerator.incrementAndGet()
+//          val summaryId = lineVisitedSummaryPrefix + currIdIdx
+//          val detailsId = lineVisitedDetailsPrefix + currIdIdx
+//          div(
+//            details(
+//              summary(
+//                (for {
+//                  filename <- class2Files.get(className)
+//                  plugLinesSeq <- pluggableLines.get(filename)
+//                  plugLine <- plugLinesSeq.lift.apply(lineNumber - 1)
+//                } yield {
+//                  hideFlag = plugLine.mustHide
+//                  (("\u00A0" * currIndentLevel) ++
+//                    plugLine.plugged(readValues(subEvents), pluggedValueLengthLimit).trim ++ " ").padTo(codeLineMinWidth, '.') ++
+//                    s" ($filename:$lineNumber)"
+//                }).getOrElse(s"Visit line $lineNumber in class $className (missing in provided source files)")
+//              ).withStyle("display: block;")
+//                .withId(summaryId),
+//              readWrites(traceElement, currIndentLevel + lineVisitedIndent).withStyle("color: blue;")
+//            ).withStyle(
+//              (if addSpace then preSpacing else "") ++
+//                (if hideFlag then "display:none;" else "")
+//            ).withId(detailsId)
+//              .attr("onmouseenter", s"highlight(\"$detailsId\", \"lightcyan\")")
+//              .attr("onmouseleave", s"removeHighlighting(\"$detailsId\")"),
+//            buildAllRecursively(subEvents, currIndentLevel + lineVisitedIndent, lastCallIndentLevel)
+//          )
+//        }
+//        case MethodCalled(ownerClass, methodName, args, _, subEvents) =>
+//          val idIdx = idsGenerator.incrementAndGet()
+//          val summaryId = methodCallSummaryPrefix + idIdx
+//          val detailsId = methodCallDetailsPrefix + idIdx
+//          details(
+//            summary(
+//              b(("\u00A0" * currIndentLevel) ++
+//                s"CALL $ownerClass::${refineMethodName(methodName)}(${args.map(refinedValueShort).mkString(",")})")
+//            ).withStyle("display: block;")
+//              .withId(summaryId),
+//            buildAllRecursively(subEvents, currIndentLevel + methodCallIndent, currIndentLevel)
+//          ).withId(detailsId)
+//            .attr("onmouseenter", s"highlight(\"$summaryId\", \"moccasin\")")
+//            .attr("onmouseleave", s"removeHighlighting(\"$summaryId\")")
+//        case Return(methodName, value) =>
+//          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS ${refinedValueShort(value)}"))
+//        case ReturnVoid(methodName) =>
+//          div(b(("\u00A0" * lastCallIndentLevel) ++ s"$methodName RETURNS void"))
+//        case Initialization(dateTime) =>
+//          div(s"INITIALIZATION AT ${formatTime(dateTime)}")
+//        case Termination(msg) =>
+//          div(s"TERMINATION: $msg")
+//            .withStyle(preSpacing)
     }
 
     def buildAllRecursively(traceElements: Seq[TraceElement], indentLevel: Int, lastCallIndentLevel: Int): DivTag = {
@@ -248,20 +249,21 @@ object JavaHtmlFrontend {
    * gave the same result)
    */
   private def readValues(subEvents: Seq[TraceElement]): Map[Identifier, Value] = {
-    subEvents.flatMap {
-      case VarGet(varId, value) => Some(varId -> value)
-      case ArrayElemGet(array, idx, value) => Some(s"${array.shortDescr}[$idx]" -> value)
-      case StaticFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
-      case InstanceFieldGet(owner, fieldName, value) => Some(s"${owner.shortDescr}.$fieldName" -> value)
-      case _ => None
-    }.groupBy(_._1)
-      .map { (varId: Identifier, pairs: Seq[(Identifier, Value)]) =>
-        varId -> pairs.map(_._2).toSet
-      }.filter(_._2.size == 1) // exclude the variables for which multiple accesses yielded distinct values
-      .map { (varId: Identifier, singletonVal: Set[Value]) =>
-        varId -> singletonVal.head
-      }
-      .toMap
+    ???   // FIXME once we are a bit more sure of the format of the traces
+//    subEvents.flatMap {
+//      case VarGet(varId, value) => Some(varId -> value)
+//      case ArrayElemGet(array, idx, value) => Some(s"${array.shortDescr}[$idx]" -> value)
+//      case StaticFieldGet(owner, fieldName, value) => Some(s"$owner.$fieldName" -> value)
+//      case InstanceFieldGet(owner, fieldName, value) => Some(s"${owner.shortDescr}.$fieldName" -> value)
+//      case _ => None
+//    }.groupBy(_._1)
+//      .map { (varId: Identifier, pairs: Seq[(Identifier, Value)]) =>
+//        varId -> pairs.map(_._2).toSet
+//      }.filter(_._2.size == 1) // exclude the variables for which multiple accesses yielded distinct values
+//      .map { (varId: Identifier, singletonVal: Set[Value]) =>
+//        varId -> singletonVal.head
+//      }
+//      .toMap
   }
 
   /**
@@ -292,28 +294,30 @@ object JavaHtmlFrontend {
    * All the reads performed during this `TraceElement`, in chronological order
    */
   private def orderedReads(traceElement: TraceElement): Seq[(String, Value)] = {
-    traceElement match
-      case LineVisited(_, _, subEvents) =>
-        subEvents.flatMap(orderedReads)
-      case VarGet(varId, value) => Seq(varId -> value)
-      case ArrayElemGet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
-      case StaticFieldGet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
-      case InstanceFieldGet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
-      case _ => Seq.empty
+    ???   // FIXME once we are a bit more sure of the format of the traces
+//    traceElement match
+//      case LineVisited(_, _, subEvents) =>
+//        subEvents.flatMap(orderedReads)
+//      case VarGet(varId, value) => Seq(varId -> value)
+//      case ArrayElemGet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
+//      case StaticFieldGet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+//      case InstanceFieldGet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
+//      case _ => Seq.empty
   }
 
   /**
    * All the writes performed during this `TraceElement`, in chronological order
    */
   private def orderedWrites(traceElement: TraceElement): Seq[(String, Value)] = {
-    traceElement match
-      case LineVisited(_, _, subEvents) =>
-        subEvents.flatMap(orderedWrites)
-      case VarSet(varId, value) => Seq(varId -> value)
-      case ArrayElemSet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
-      case StaticFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
-      case InstanceFieldSet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
-      case _ => Seq.empty
+    ???   // FIXME once we are a bit more sure of the format of the traces
+//    traceElement match
+//      case LineVisited(_, _, subEvents) =>
+//        subEvents.flatMap(orderedWrites)
+//      case VarSet(varId, value) => Seq(varId -> value)
+//      case ArrayElemSet(array, idx, value) => Seq(s"${array.shortDescr}[$idx]" -> value)
+//      case StaticFieldSet(owner, fieldName, value) => Seq(s"$owner.$fieldName" -> value)
+//      case InstanceFieldSet(owner, fieldName, value) => Seq(s"${owner.shortDescr}.$fieldName" -> value)
+//      case _ => Seq.empty
   }
 
   private def formatTime(dateTime: String): String = {

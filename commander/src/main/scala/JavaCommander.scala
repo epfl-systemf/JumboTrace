@@ -19,7 +19,7 @@ import scala.util.Using
  */
 object JavaCommander {
 
-  private val jsonTraceFilePath = "./trace/trace.json"
+  private def jsonTraceFilePath(idx: Int): String = "./trace/trace_" + idx + ".json"
   private val htmlTraceFilePath = "./trace/trace.html"
   private val additionalCodeDir = "injected"
 
@@ -45,6 +45,8 @@ object JavaCommander {
      * and may call System.exit instead of throwing exceptions
      */
 
+    // FIXME some of the commands have not been adapted to the new multi-file traces format
+
     args.toList match {
       case Nil => {
         System.err.println("No argument: exiting")
@@ -54,13 +56,19 @@ object JavaCommander {
         Instrumenter.performInstrumentation(_ => (), ClassName(mainClass))
       case INSTRUMENT_CMD :: mainClass :: LOG_OPTION :: Nil =>
         Instrumenter.performInstrumentation(println, ClassName(mainClass))
-      case DISPLAY_CMD :: Nil =>
-        Using(Source.fromFile(jsonTraceFilePath)) { src =>
-          DebugCmdlineFrontend.performDisplay(src)(using System.out)
+      case DISPLAY_CMD :: Nil => {
+        var fileIdx = 1
+        while (Files.exists(Paths.get(jsonTraceFilePath(fileIdx)))){
+          Using(Source.fromFile(jsonTraceFilePath(fileIdx))) { src =>
+            DebugCmdlineFrontend.performDisplay(src, fileIdx)(using System.out)
+          }.get
+          fileIdx += 1
         }
+        println("No more file to read. Exiting")
+      }
       case GEN_HTML_CMD :: Nil =>
         JavaHtmlFrontend.generateHtml(
-          jsonTraceFilePath = jsonTraceFilePath,
+          jsonTraceFilePath = ???,  // FIXME
           srcFilesNames = allFileNamesInDirWithExtension("java"),
           outputFilePath = htmlTraceFilePath
         )
@@ -81,7 +89,7 @@ object JavaCommander {
         runJava(mainClassName, classPathOpt = Some(Config.config.transformedClassesDirName))
         println(" > Generating HTML...")
         JavaHtmlFrontend.generateHtml(
-          jsonTraceFilePath = jsonTraceFilePath,
+          jsonTraceFilePath = ???,  // FIXME
           srcFilesNames = allFileNamesInDirWithExtension("java"),
           outputFilePath = htmlTraceFilePath
         )

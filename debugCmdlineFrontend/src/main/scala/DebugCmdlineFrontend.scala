@@ -13,63 +13,74 @@ import java.io.PrintStream
  */
 object DebugCmdlineFrontend {
 
-  def main(args: Array[String]): Unit = {
-    Using(Source.fromFile(args.head)){ bufSrc =>
-      performDisplay(bufSrc)(using System.out)
-    }.get
-  }
-
-  def performDisplay(bufSrc: BufferedSource)(using ps: PrintStream): Unit = {
+  def performDisplay(bufSrc: BufferedSource, fileIdx: Int)(using ps: PrintStream): Unit = {
     val trace = JsonParser.parse(bufSrc.getLines().mkString("\n"))
-    displayAll(trace, 0)
-  }
-
-  private def displayAll(traceElements: Seq[TraceElement], indent: Int)(using ps: PrintStream): Unit = {
-    for (traceElem <- traceElements) do {
-      display(traceElem, indent)
+    ps.println(ansiBlueCode + s"New trace file, index $fileIdx" + ansiResetCode)
+    for (traceElem <- trace) do {
+      display(traceElem, fileIdx)
     }
   }
 
-  private def display(traceElement: TraceElement, indent: Int)(using ps: PrintStream): Unit = {
+  private def display(traceElement: TraceElement, fileIdx: Int)(using ps: PrintStream): Unit = {
 
-    def println(str: String): Unit = ps.println(" " * indent ++ str)
+    val indent = traceElement.nestingLevel
 
-    traceElement match
-      case LineVisited(className, lineNumber, subEvents) =>
-        println(s"VISIT line $lineNumber in class $className")
-        displayAll(subEvents, indent + 1)
-      case VarSet(varId, value) =>
-        println(s"SET $varId = ${value.value}")
-      case VarGet(varId, value) =>
-        println(s"GET $varId = ${value.value}")
-      case ArrayElemSet(array, idx, value) =>
-        println(s"SET ${array.shortDescr}[$idx] = ${value.value}")
-      case ArrayElemGet(array, idx, value) =>
-        println(s"GET ${array.shortDescr}[$idx] = ${value.value}")
-      case StaticFieldSet(owner, fieldName, value) =>
-        println(s"SET $owner.$fieldName = ${value.value}")
-      case StaticFieldGet(owner, fieldName, value) =>
-        println(s"GET $owner.$fieldName = ${value.value}")
-      case InstanceFieldSet(owner, fieldName, value) =>
-        println(s"SET ${owner.shortDescr}.$fieldName = ${value.value}")
-      case InstanceFieldGet(owner, fieldName, value) =>
-        println(s"GET ${owner.shortDescr}.$fieldName = ${value.value}")
-      case Return(methodName, value) =>
-        println(s"RETURN ${value.value} FROM $methodName")
-      case ReturnVoid(methodName) =>
-        println(s"RETURN void FROM $methodName")
-      case MethodCalled(ownerClass, methodName, args, isStatic, subEvents) =>
-        println(s"CALL $ownerClass :: $methodName (${args.map(_.value).mkString(",")})")
-        displayAll(subEvents, indent + 2)
-      case Initialization(dateTime) =>
-        println(s"INITIALIZATION: ${formatTime(dateTime)}")
-      case Termination(msg) =>
-        println(s"TERMINATION: $msg")
+    def printlnTracer(str: String): Unit = {
+      ps.println(ansiYellowCode ++ " " * indent ++ str ++ ansiResetCode)
+    }
+
+    def printlnStdout(str: String): Unit = {
+      ps.println(" " * indent ++ str)
+    }
+
+    def printlnStderr(str: String): Unit = {
+      ps.println(ansiRedCode ++ " " * indent ++ str ++ ansiResetCode)
+    }
+
+    traceElement match {
+      case SystemOutPrinted(text, _) =>
+        printlnStdout(text)
+      case SystemErrPrinted(text, _) =>
+        printlnStderr(text)
+      case LineVisited(className, lineNumber, _) =>
+        printlnTracer(s"VISIT LINE: $className:$lineNumber")
+      case VarSet(varId, value, _) =>
+        printlnTracer(s"SET $varId := $value")
+      case VarGet(varId, value, _) =>
+        printlnTracer(s"GET $varId : $value")
+      case ArrayElemSet(array, idx, value, _) =>
+        printlnTracer(s"SET $array[$idx] := $value")
+      case ArrayElemGet(array, idx, value, _) =>
+        printlnTracer(s"GET $array[$idx] : $value")
+      case StaticFieldSet(owner, fieldName, value, _) =>
+        printlnTracer(s"SET $owner.$fieldName := $value")
+      case StaticFieldGet(owner, fieldName, value, _) =>
+        printlnTracer(s"GET $owner.$fieldName : $value")
+      case InstanceFieldSet(owner, fieldName, value, _) =>
+        printlnTracer(s"SET $owner.$fieldName := $value")
+      case InstanceFieldGet(owner, fieldName, value, _) =>
+        printlnTracer(s"GET $owner.$fieldName : $value")
+      case Return(methodName, value, _) =>
+        printlnTracer(s"$methodName RETURNS $value")
+      case ReturnVoid(methodName, _) =>
+        printlnTracer(s"$methodName RETURNS void")
+      case MethodCalled(ownerClass, methodName, args, isStatic, _) =>
+        printlnTracer(s"CALL $ownerClass.$methodName${args.mkString("(", ",", ")")}")
+      case Initialization(dateTime, _) =>
+        printlnTracer(s"INITIALIZATION AT $dateTime")
+      case Termination(msg, _) =>
+        printlnTracer(s"TERMINATION: $msg")
+    }
   }
 
   private def formatTime(dateTime: String): String = {
     dateTime.reverse.dropWhile(_ != '.').reverse.init   // remove nanoseconds
       .replace("T", " at ")
   }
+
+  private val ansiYellowCode = "\u001B[33m"
+  private val ansiRedCode = "\u001B[31m"
+  private val ansiBlueCode = "\u001B[34m"
+  private val ansiResetCode = "\u001B[0m"
 
 }

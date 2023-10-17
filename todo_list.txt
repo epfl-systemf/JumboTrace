@@ -1,3 +1,4 @@
+FIXME problem with \n and other escaped characters when passed as arguments, returned, etc.
 TODO log calls from callee when not possible from caller
 TODO tests with Serie4 and SudokuSolver
 TODO fix problems with System.in (seems to block System.out or something like that, weird)

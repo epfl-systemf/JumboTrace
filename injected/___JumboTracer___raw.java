@@ -126,10 +126,10 @@ public final class ___JumboTracer___ {
         defaultOut = System.out;
         defaultErr = System.err;
         System.setOut(new LoggingPrintStream(defaultOut, s -> {
-            addTraceElement(new SystemOutPrinted(s, currNestingLevel));
+            addTraceElement(new SystemOutPrinted(replaceLineSeparators(s), currNestingLevel));
         }));
         System.setErr(new LoggingPrintStream(defaultErr, s -> {
-            addTraceElement(new SystemErrPrinted(s, currNestingLevel));
+            addTraceElement(new SystemErrPrinted(replaceLineSeparators(s), currNestingLevel));
         }));
         var time = LocalDateTime.now();
         addTraceElement(new Initialization(time.toString(), currNestingLevel));
@@ -138,6 +138,26 @@ public final class ___JumboTracer___ {
                 writeJsonTrace();
             }
         });
+    }
+
+    private static String replaceLineSeparators(String s){
+        var sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            var c = s.charAt(i);
+            sb.append(
+                    switch (c){
+                        case '\b' -> "\\\\b";
+                        case '\f' -> "\\\\f";
+                        case '\n' -> "\\\\n";
+                        case '\r' -> "\\\\r";
+                        case '\t' -> "\\\\t";
+                        case '\"' -> "\\\\\"";
+                        case '\\' -> "\\\\\\";
+                        default -> Character.toString(c);
+                    }
+            );
+        }
+        return sb.toString();
     }
 
     private static void addTraceElement(TraceElement event){
