@@ -126,10 +126,10 @@ public final class ___JumboTracer___ {
         defaultOut = System.out;
         defaultErr = System.err;
         System.setOut(new LoggingPrintStream(defaultOut, s -> {
-            addTraceElement(new SystemOutPrinted(replaceLineSeparators(s), currNestingLevel));
+            addTraceElement(new SystemOutPrinted(escapeLineSeparators(s), currNestingLevel));
         }));
         System.setErr(new LoggingPrintStream(defaultErr, s -> {
-            addTraceElement(new SystemErrPrinted(replaceLineSeparators(s), currNestingLevel));
+            addTraceElement(new SystemErrPrinted(escapeLineSeparators(s), currNestingLevel));
         }));
         var time = LocalDateTime.now();
         addTraceElement(new Initialization(time.toString(), currNestingLevel));
@@ -140,22 +140,50 @@ public final class ___JumboTracer___ {
         });
     }
 
-    private static String replaceLineSeparators(String s){
+    private static String escapeLineSeparators(String s){
+        // https://www.json.org/json-en.html
         var sb = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             var c = s.charAt(i);
-            sb.append(
-                    switch (c){
-                        case '\b' -> "\\\\b";
-                        case '\f' -> "\\\\f";
-                        case '\n' -> "\\\\n";
-                        case '\r' -> "\\\\r";
-                        case '\t' -> "\\\\t";
-                        case '\"' -> "\\\\\"";
-                        case '\\' -> "\\\\\\";
-                        default -> Character.toString(c);
-                    }
-            );
+            if (!Character.isISOControl(c)) {   // TODO check that this is not a problem
+                sb.append(
+                        switch (c) {
+                            case '\b' -> "\\b";
+                            case '\f' -> "\\f";
+                            case '\n' -> "\\n";
+                            case '\r' -> "\\r";
+                            case '\t' -> "\\t";
+                            case '\"' -> "\\\"";
+                            case '\\' -> "\\\\";
+                            case '/' -> "\\/";
+                            default -> Character.toString(c);
+                        }
+                );
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String replaceLineSeparators(String s){
+        // https://www.json.org/json-en.html
+        var sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            var c = s.charAt(i);
+            if (!Character.isISOControl(c)) {   // TODO check that this is not a problem
+                sb.append(
+                        switch (c) {
+                            case '\b' -> "\\\\b";
+                            case '\f' -> "\\\\f";
+                            case '\n' -> "\\\\n";
+                            case '\r' -> "\\\\r";
+                            case '\t' -> "\\\\t";
+                            case '\"' -> "\\\"";
+                            case '\\' -> "\\\\";
+                            case '/' -> "\\/";
+                            default -> Character.toString(c);
+                        }
+                );
+            }
         }
         return sb.toString();
     }
@@ -354,7 +382,7 @@ public final class ___JumboTracer___ {
             defaultErr.println("JUMBOTRACER: LOGGING ERROR");
             defaultErr.println("Could not write log to " + filePath);
             defaultErr.println("Error message was:");
-            e.printStackTrace();
+            e.printStackTrace(defaultErr);
         }
         currentTraceFileIdx += 1;
     }
@@ -602,7 +630,7 @@ public final class ___JumboTracer___ {
     }
 
     private static JsonStringField fld(String key, String value) {
-        return new JsonStringField(key, value);
+        return new JsonStringField(key, replaceLineSeparators(value));
     }
 
     private static JsonValueField fld(String key, Value value){
