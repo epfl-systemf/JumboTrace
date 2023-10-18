@@ -145,21 +145,25 @@ public final class ___JumboTracer___ {
         var sb = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             var c = s.charAt(i);
-            if (!Character.isISOControl(c)) {   // TODO check that this is not a problem
-                sb.append(
-                        switch (c) {
-                            case '\b' -> "\\b";
-                            case '\f' -> "\\f";
-                            case '\n' -> "\\n";
-                            case '\r' -> "\\r";
-                            case '\t' -> "\\t";
-                            case '\"' -> "\\\"";
-                            case '\\' -> "\\\\";
-                            case '/' -> "\\/";
-                            default -> Character.toString(c);
+            sb.append(
+                    switch (c) {
+                        case '\b' -> "\\b";
+                        case '\f' -> "\\f";
+                        case '\n' -> "\\n";
+                        case '\r' -> "\\r";
+                        case '\t' -> "\\t";
+                        case '\"' -> "\\\"";
+                        case '\\' -> "\\\\";
+                        case '/' -> "\\/";
+                        default -> {
+                            if (Character.isISOControl(c)){
+                                yield "??";
+                            } else {
+                                yield Character.toString(c);
+                            }
                         }
-                );
-            }
+                    }
+            );
         }
         return sb.toString();
     }
@@ -169,21 +173,25 @@ public final class ___JumboTracer___ {
         var sb = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             var c = s.charAt(i);
-            if (!Character.isISOControl(c)) {   // TODO check that this is not a problem
-                sb.append(
-                        switch (c) {
-                            case '\b' -> "\\\\b";
-                            case '\f' -> "\\\\f";
-                            case '\n' -> "\\\\n";
-                            case '\r' -> "\\\\r";
-                            case '\t' -> "\\\\t";
-                            case '\"' -> "\\\"";
-                            case '\\' -> "\\\\";
-                            case '/' -> "\\/";
-                            default -> Character.toString(c);
+            sb.append(
+                    switch (c) {
+                        case '\b' -> "\\\\b";
+                        case '\f' -> "\\\\f";
+                        case '\n' -> "\\\\n";
+                        case '\r' -> "\\\\r";
+                        case '\t' -> "\\\\t";
+                        case '\"' -> "\\\"";
+                        case '\\' -> "\\\\";
+                        case '/' -> "\\/";
+                        default -> {
+                            if (Character.isISOControl(c)){
+                                yield "??";
+                            } else {
+                                yield Character.toString(c);
+                            }
                         }
-                );
-            }
+                    }
+            );
         }
         return sb.toString();
     }
