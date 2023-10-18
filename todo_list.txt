@@ -1,3 +1,4 @@
+FIXME look at calls to Iterator.next in the trace of the SudokuHelper. It seems that these calls are logged from both the callee and the caller
 FIXME problem with \n and other escaped characters when passed as arguments, returned, etc.
 TODO log calls from callee when not possible from caller
 TODO tests with Serie4 and SudokuSolver

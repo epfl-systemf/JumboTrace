@@ -43,8 +43,8 @@ final class MethodTransformer(
     LDC(ownerClass.name)
     LDC(methodName.name)
     LDC(methodTable.isStatic)
-    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)
-    INVOKE_STATIC(jumboTracer, IncrementNestingLevel.methodName, Seq.empty ==> TD.Void)
+    LDC(true)   // push this call, it may have subevents
+    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean, TD.Boolean) ==> TD.Void)
     super.visitCode()
   }
 
@@ -89,7 +89,8 @@ final class MethodTransformer(
     LDC(ownerClass)
     LDC(methodName)
     LDC(isStatic)
-    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean) ==> TD.Void)
+    LDC(false)  // do not push this callevent, it will not have subevents
+    INVOKE_STATIC(jumboTracer, TerminateMethodCall.methodName, Seq(TD.String, TD.String, TD.Boolean, TD.Boolean) ==> TD.Void)
   }
 
   override def visitInsn(opcode: Int): Unit = {

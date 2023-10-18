@@ -22,66 +22,75 @@ import java.lang.reflect.Array;
 
 // C-like macros. Use cpp -P to expand before compiling
 
-#define VARIABLE_SET(_type)                                                                           \
-public static void variableSet(String varId, _type value){                                            \
-    handlingSuspended(() -> addTraceElement(new VarSet(varId, makeValue(value), currNestingLevel)));  \
+#define VARIABLE_SET(_type)                                                          \
+public static void variableSet(String varId, _type value){                           \
+    handlingSuspended(() -> addTraceElement(new VarSet(varId, makeValue(value),      \
+        incrementAndGetNextId(), getCurrentParentId())));                            \
 }
 
-#define VARIABLE_GET(_type)                                                                           \
-public static void variableGet(String varId, _type value){                                            \
-    handlingSuspended(() -> addTraceElement(new VarGet(varId, makeValue(value), currNestingLevel)));  \
+#define VARIABLE_GET(_type)                                                         \
+public static void variableGet(String varId, _type value){                          \
+    handlingSuspended(() -> addTraceElement(new VarGet(varId, makeValue(value),     \
+        incrementAndGetNextId(), getCurrentParentId())));                           \
 }
 
-#define INSTRUMENTED_ARRAY_STORE(_elemType)                                                              \
-public static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){                  \
-    handlingSuspended(() -> {                                                                            \
-        addTraceElement(new ArrayElemSet(makeValue(array), idx, makeValue(value), currNestingLevel));    \
-    });                                                                                                  \
-    array[idx] = value;                                                                                  \
+#define INSTRUMENTED_ARRAY_STORE(_elemType)                                                 \
+public static void instrumentedArrayStore(_elemType[] array, int idx, _elemType value){     \
+    handlingSuspended(() -> {                                                               \
+        addTraceElement(new ArrayElemSet(makeValue(array), idx, makeValue(value),           \
+            incrementAndGetNextId(), getCurrentParentId()));                                \
+    });                                                                                     \
+    array[idx] = value;                                                                     \
 }
 
-#define ARRAY_LOAD(_elemType)                                                                            \
-public static void arrayLoad(_elemType[] array, int idx){                                                \
-    handlingSuspended(() -> {                                                                            \
-        var value = array[idx];                                                                          \
-        addTraceElement(new ArrayElemGet(makeValue(array), idx, makeValue(value), currNestingLevel));    \
-    });                                                                                                  \
+#define ARRAY_LOAD(_elemType)                                                               \
+public static void arrayLoad(_elemType[] array, int idx){                                   \
+    handlingSuspended(() -> {                                                               \
+        var value = array[idx];                                                             \
+        addTraceElement(new ArrayElemGet(makeValue(array), idx, makeValue(value),           \
+            incrementAndGetNextId(), getCurrentParentId()));                                \
+    });                                                                                     \
 }
 
-#define STATIC_FIELD_SET(_type)                                                                           \
-public static void staticFieldSet(String fieldOwner, String fieldName, _type value){                      \
-    handlingSuspended(() -> {                                                                             \
-        addTraceElement(new StaticFieldSet(fieldOwner, fieldName, makeValue(value), currNestingLevel));   \
-    });                                                                                                   \
+#define STATIC_FIELD_SET(_type)                                                              \
+public static void staticFieldSet(String fieldOwner, String fieldName, _type value){         \
+    handlingSuspended(() -> {                                                                \
+        addTraceElement(new StaticFieldSet(fieldOwner, fieldName, makeValue(value),          \
+            incrementAndGetNextId(), getCurrentParentId()));                                 \
+    });                                                                                      \
 }
 
-#define STATIC_FIELD_GET(_type)                                                                           \
-public static void staticFieldGet(String fieldOwner, String fieldName, _type value){                      \
-    handlingSuspended(() -> {                                                                             \
-        addTraceElement(new StaticFieldGet(fieldOwner, fieldName, makeValue(value), currNestingLevel));   \
-    });                                                                                                   \
+#define STATIC_FIELD_GET(_type)                                                             \
+public static void staticFieldGet(String fieldOwner, String fieldName, _type value){        \
+    handlingSuspended(() -> {                                                               \
+        addTraceElement(new StaticFieldGet(fieldOwner, fieldName, makeValue(value),         \
+            incrementAndGetNextId(), getCurrentParentId()));                                \
+    });                                                                                     \
 }
 
-#define INSTANCE_FIELD_SET(_type)                                                                                     \
-public static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){                                \
-    handlingSuspended(() -> {                                                                                         \
-        addTraceElement(new InstanceFieldSet(makeValue(fieldOwner), fieldName, makeValue(value), currNestingLevel));  \
-    });                                                                                                               \
+#define INSTANCE_FIELD_SET(_type)                                                                    \
+public static void instanceFieldSet(Object fieldOwner, String fieldName, _type value){               \
+    handlingSuspended(() -> {                                                                        \
+        addTraceElement(new InstanceFieldSet(makeValue(fieldOwner), fieldName, makeValue(value),     \
+            incrementAndGetNextId(), getCurrentParentId()));                                         \
+    });                                                                                              \
 }
 
-#define INSTANCE_FIELD_GET(_type)                                                                                     \
-public static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){                                \
-    handlingSuspended(() -> {                                                                                         \
-        addTraceElement(new InstanceFieldGet(makeValue(fieldOwner), fieldName, makeValue(value), currNestingLevel));  \
-    });                                                                                                               \
+#define INSTANCE_FIELD_GET(_type)                                                                   \
+public static void instanceFieldGet(_type value, Object fieldOwner, String fieldName){              \
+    handlingSuspended(() -> {                                                                       \
+        addTraceElement(new InstanceFieldGet(makeValue(fieldOwner), fieldName, makeValue(value),    \
+            incrementAndGetNextId(), getCurrentParentId()));                                        \
+    });                                                                                             \
 }
 
-#define RETURNED(_tpe)                                                                    \
-public static void returned(String methodName, _tpe value){                               \
-    handlingSuspended(() -> {                                                             \
-        addTraceElement(new Return(methodName, makeValue(value), currNestingLevel));      \
-        currNestingLevel -= 2;                                                            \
-    });                                                                                   \
+#define RETURNED(_tpe)                                                                                             \
+public static void returned(String methodName, _tpe value){                                                        \
+    handlingSuspended(() -> {                                                                                      \
+        addTraceElement(new Return(methodName, makeValue(value), incrementAndGetNextId(), getCurrentParentId()));  \
+        traceElementsIdsStack.pop();                                                                               \
+        traceElementsIdsStack.pop();                                                                               \
+    });                                                                                                            \
 }
 
 
@@ -113,11 +122,19 @@ public final class ___JumboTracer___ {
     private static final String ANSI_CYAN = "\u001B[36m";
     private static final String ANSI_RESET = "\u001B[0m";
 
-    private static int currentTraceFileIdx = 1;
     private static final TraceElement[] trace = new TraceElement[EVENTS_PER_FILE_THRES];
     private static int nextTraceElemIdx = 0;
-    private static int currNestingLevel = 0;
+
     private static final List<Object> currentArgs = new ArrayList<>();
+
+    private static int currentTraceFileIdx = 1;
+
+    private static long nextId = 0;
+    private static final Deque<Long> traceElementsIdsStack = new LinkedList<>();
+    private static long incrementAndGetNextId(){ return ++nextId; }
+    private static long getCurrentParentId(){
+        return traceElementsIdsStack.isEmpty() ? 0 : traceElementsIdsStack.peek();
+    }
 
     private static PrintStream defaultOut;
     private static PrintStream defaultErr;
@@ -126,13 +143,13 @@ public final class ___JumboTracer___ {
         defaultOut = System.out;
         defaultErr = System.err;
         System.setOut(new LoggingPrintStream(defaultOut, s -> {
-            addTraceElement(new SystemOutPrinted(escapeLineSeparators(s), currNestingLevel));
+            addTraceElement(new SystemOutPrinted(escapeLineSeparators(s), incrementAndGetNextId(), getCurrentParentId()));
         }));
         System.setErr(new LoggingPrintStream(defaultErr, s -> {
-            addTraceElement(new SystemErrPrinted(escapeLineSeparators(s), currNestingLevel));
+            addTraceElement(new SystemErrPrinted(escapeLineSeparators(s), incrementAndGetNextId(), getCurrentParentId()));
         }));
         var time = LocalDateTime.now();
-        addTraceElement(new Initialization(time.toString(), currNestingLevel));
+        addTraceElement(new Initialization(time.toString(), incrementAndGetNextId(), getCurrentParentId()));
         Runtime.getRuntime().addShutdownHook(new Thread(){
             public void run(){
                 writeJsonTrace();
@@ -223,7 +240,10 @@ public final class ___JumboTracer___ {
 
     public static void lineVisited(String className, int lineNum) {
         handlingSuspended(() -> {
-            addTraceElement(new LineVisited(className, lineNum, currNestingLevel-1));
+            traceElementsIdsStack.pop();
+            var id = incrementAndGetNextId();
+            addTraceElement(new LineVisited(className, lineNum, id, getCurrentParentId()));
+            traceElementsIdsStack.push(id);
         });
     }
 
@@ -318,8 +338,9 @@ public final class ___JumboTracer___ {
     RETURNED(Object)
     public static void returnedVoid(String methodName){
         handlingSuspended(() -> {
-            addTraceElement(new ReturnVoid(methodName, currNestingLevel));
-            currNestingLevel -= 2;
+            addTraceElement(new ReturnVoid(methodName, incrementAndGetNextId(), getCurrentParentId()));
+            traceElementsIdsStack.pop();
+            traceElementsIdsStack.pop();
         });
     }
 
@@ -347,19 +368,20 @@ public final class ___JumboTracer___ {
     PUSHBACK_ARG(double)
     PUSHBACK_ARG(Object)
 
-    public static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic){
+    public static void terminateMethodCall(String ownerClass, String methodName, boolean isStatic, boolean pushCallEventId){
         handlingSuspended(() -> {
             var currentArgsValues = new ArrayList<Value>();
             for (var arg: currentArgs){
                 currentArgsValues.add(makeValue(arg));
             }
-            addTraceElement(new MethodCalled(ownerClass, methodName, currentArgsValues, isStatic, currNestingLevel));
+            var callEventId = incrementAndGetNextId();
+            addTraceElement(new MethodCalled(ownerClass, methodName, currentArgsValues, isStatic, callEventId, getCurrentParentId()));
             currentArgs.clear();
+            if (pushCallEventId){
+                traceElementsIdsStack.push(callEventId);
+                traceElementsIdsStack.push(callEventId);  // second one is fake, will be popped by first LineVisited
+            }
         });
-    }
-
-    public static void incrementNestingLevel(){
-        currNestingLevel += 2;
     }
 
     // -----------------------------------------------------------------------------------------
@@ -424,169 +446,176 @@ public final class ___JumboTracer___ {
     }
 
     private interface TraceElement extends JsonWritable {
-        int nestingLevel();
+        long id();
+        long parentId();
     }
 
-    private record SystemOutPrinted(String text, int nestingLevel) implements TraceElement {
+    private record SystemOutPrinted(String text, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("SystemOutPrinted", indent + 1,
                     fld("text", text),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record SystemErrPrinted(String text, int nestingLevel) implements TraceElement {
+    private record SystemErrPrinted(String text, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("SystemErrPrinted", indent + 1,
                     fld("text", text),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record LineVisited(String className, int lineNumber, int nestingLevel) implements TraceElement {
+    private record LineVisited(String className, int lineNumber, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("LineVisited", indent + 1,
                     fld("className", className),
                     fld("lineNumber", lineNumber),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record VarSet(String varId, Value value, int nestingLevel) implements TraceElement {
+    private record VarSet(String varId, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarSet", indent + 1,
                     fld("varId", varId),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record VarGet(String varId, Value value, int nestingLevel) implements TraceElement {
+    private record VarGet(String varId, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("VarGet", indent + 1,
                     fld("varId", varId),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record ArrayElemSet(Value array, int idx, Value value, int nestingLevel) implements TraceElement {
+    private record ArrayElemSet(Value array, int idx, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemSet", indent + 1,
                     fld("array", array),
                     fld("idx", idx),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record ArrayElemGet(Value array, int idx, Value value, int nestingLevel) implements TraceElement {
+    private record ArrayElemGet(Value array, int idx, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ArrayElemGet", indent + 1,
                     fld("array", array),
                     fld("idx", idx),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record StaticFieldSet(String owner, String fieldName, Value value, int nestingLevel) implements TraceElement {
+    private record StaticFieldSet(String owner, String fieldName, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldSet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record StaticFieldGet(String owner, String fieldName, Value value, int nestingLevel) implements TraceElement {
+    private record StaticFieldGet(String owner, String fieldName, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("StaticFieldGet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record InstanceFieldSet(Value owner, String fieldName, Value value, int nestingLevel) implements TraceElement {
+    private record InstanceFieldSet(Value owner, String fieldName, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldSet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record InstanceFieldGet(Value owner, String fieldName, Value value, int nestingLevel) implements TraceElement {
+    private record InstanceFieldGet(Value owner, String fieldName, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("InstanceFieldGet", indent + 1,
                     fld("owner", owner),
                     fld("fieldName", fieldName),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record Return(String methodName, Value value, int nestingLevel) implements TraceElement {
+    private record Return(String methodName, Value value, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("Return", indent + 1,
                     fld("methodName", methodName),
                     fld("value", value),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record ReturnVoid(String methodName, int nestingLevel) implements TraceElement {
+    private record ReturnVoid(String methodName, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("ReturnVoid", indent + 1,
                     fld("methodName", methodName),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
     private record MethodCalled(String ownerClass, String methodName, List<Value> args,
-                                boolean isStatic, int nestingLevel) implements TraceElement {
+                                boolean isStatic, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent){
             return jsonObject("MethodCalled", indent + 1,
                     fld("ownerClass", ownerClass),
                     fld("methodName", methodName),
                     fld("args", args),
                     fld("isStatic", isStatic),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
 
-    private record Initialization(String dateTime, int nestingLevel) implements TraceElement {
+    private record Initialization(String dateTime, long id, long parentId) implements TraceElement {
         @Override public String toJson(int indent) {
             return jsonObject("Initialization", indent + 1,
                     fld("dateTime", dateTime),
-                    fld("nestingLevel", nestingLevel)
-            );
-        }
-    }
-
-    private record Termination(String msg, int nestingLevel) implements TraceElement {
-        @Override public String toJson(int indent) {
-            return jsonObject("Termination", indent + 1,
-                    fld("msg", msg),
-                    fld("nestingLevel", nestingLevel)
+                    fld("id", id),
+                    fld("parentId", parentId)
             );
         }
     }
@@ -619,6 +648,12 @@ public final class ___JumboTracer___ {
         }
     }
 
+    private record JsonLongField(String key, long value) implements JsonField {
+        @Override public String jsonValue(int indent) {
+            return Long.toString(value);
+        }
+    }
+
     private record JsonBooleanField(String key, boolean value) implements JsonField {
         @Override public String jsonValue(int indent) {
             return Boolean.toString(value);
@@ -647,6 +682,10 @@ public final class ___JumboTracer___ {
 
     private static JsonIntegerField fld(String key, int value){
         return new JsonIntegerField(key, value);
+    }
+
+    private static JsonLongField fld(String key, long value){
+        return new JsonLongField(key, value);
     }
 
     private static JsonBooleanField fld(String key, boolean value){

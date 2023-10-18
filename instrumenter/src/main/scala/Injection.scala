@@ -23,7 +23,6 @@ object Injection {
     case ReverseArgsList extends EventMethod("reverseArgsList")
     case PushbackArg(tpe: TypeDescriptor) extends EventMethod("pushbackArgument_" + javaRootTypeName(tpe))
     case TerminateMethodCall extends EventMethod("terminateMethodCall")
-    case IncrementNestingLevel extends EventMethod("incrementNestingLevel")
     case InstrumentedArrayStore extends EventMethod("instrumentedArrayStore")
     case ArrayLoad extends EventMethod("arrayLoad")
     

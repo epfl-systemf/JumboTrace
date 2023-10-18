@@ -29,7 +29,6 @@ private[traceElements] object TraceElementReader {
   implicit val returnVoidReader: Reads[ReturnVoid] = Json.reads[ReturnVoid]
   implicit val methodCalledReader: Reads[MethodCalled] = Json.reads[MethodCalled]
   implicit val initializationReader: Reads[Initialization] = Json.reads[Initialization]
-  implicit val terminationReader: Reads[Termination] = Json.reads[Termination]
 
   implicit val traceElementReader: Reads[TraceElement] = Json.reads[TraceElement]
   implicit val traceReader: Reads[Seq[TraceElement]] = Reads.seq(traceElementReader)

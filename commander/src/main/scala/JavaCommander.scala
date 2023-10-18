@@ -7,6 +7,7 @@ import javaHtmlFrontend.JavaHtmlFrontend
 import java.io.{ByteArrayInputStream, FileOutputStream}
 import java.nio.file.{Files, Paths, StandardCopyOption}
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable
 import scala.io.Source
 import scala.util.Using
 
@@ -57,10 +58,11 @@ object JavaCommander {
       case INSTRUMENT_CMD :: mainClass :: LOG_OPTION :: Nil =>
         Instrumenter.performInstrumentation(println, ClassName(mainClass))
       case DISPLAY_CMD :: Nil => {
+        val ids2Indents = mutable.Map.empty[Long, Int]
         var fileIdx = 1
         while (Files.exists(Paths.get(jsonTraceFilePath(fileIdx)))){
           Using(Source.fromFile(jsonTraceFilePath(fileIdx))) { src =>
-            DebugCmdlineFrontend.performDisplay(src, fileIdx)(using System.out)
+            DebugCmdlineFrontend.performDisplay(src, fileIdx, ids2Indents)(using System.out)
           }.get
           fileIdx += 1
         }

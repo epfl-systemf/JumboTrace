@@ -62,8 +62,6 @@ object JavaHtmlFrontend {
        |""".stripMargin
   }
 
-  private type DisplayableTraceElement = LineVisited | MethodCalled | Return | ReturnVoid | Initialization | Termination
-
   def main(args: Array[String]): Unit = {
 
     if (args.isEmpty || args.tail.exists(!_.endsWith(".java"))) {
@@ -129,7 +127,7 @@ object JavaHtmlFrontend {
 
     val idsGenerator = new AtomicInteger(0)
 
-    def buildRecursively(traceElement: DisplayableTraceElement, currIndentLevel: Int, lastCallIndentLevel: Int): DomContent = {
+    def buildRecursively(traceElement: TraceElement, currIndentLevel: Int, lastCallIndentLevel: Int): DomContent = {
       ???   // FIXME once we are a bit more sure of the format of the traces
 //      traceElement match
 //        case LineVisited(className, lineNumber, subEvents) => {
@@ -191,7 +189,8 @@ object JavaHtmlFrontend {
 
     def buildAllRecursively(traceElements: Seq[TraceElement], indentLevel: Int, lastCallIndentLevel: Int): DivTag = {
       val displayableElems = traceElements.flatMap {
-        case dte: DisplayableTraceElement => Some(dte)
+              // FIXME
+//        case dte: DisplayableTraceElement => Some(dte)
         case _ => None
       }
       div(displayableElems.map(buildRecursively(_, indentLevel, lastCallIndentLevel)): _*)
