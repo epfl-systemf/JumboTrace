@@ -1,6 +1,8 @@
+FIXME log all calls from both caller and callee and remove duplicates in postprocessing (gui). Currently problem with dynamic resolution
 FIXME look at calls to Iterator.next in the trace of the SudokuHelper. It seems that these calls are logged from both the callee and the caller
-FIXME problem with \n and other escaped characters when passed as arguments, returned, etc.
-TODO log calls from callee when not possible from caller
+FIXME problem with \n and other escaped characters when passed as arguments, returned, etc. (use JSON library???)
+TODO preprocessor
 TODO tests with Serie4 and SudokuSolver
 TODO fix problems with System.in (seems to block System.out or something like that, weird)
 TODO report error when trying to instrument a class file compiled without -g
+TODO instrument the custom PrintStream (?) ; try to make SystemOutPrinted a subevent of the call to print
