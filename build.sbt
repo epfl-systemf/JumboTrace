@@ -1,5 +1,5 @@
 ThisBuild / organization := "com.epfl.systemf.jumbotrace"
-ThisBuild / version      := "0.1.0-SNAPSHOT"
+ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.2.2"
 ThisBuild / scalacOptions += "-deprecation"
 
@@ -32,6 +32,16 @@ lazy val debugCmdlineFrontend = project
     name := "debugCmdlineFrontend",
     idePackagePrefix := Some("debugCmdlineFrontend")
   ).dependsOn(traceElements)
+
+lazy val javaPreprocessor = project
+  .settings(
+    name := "javaPreprocessor",
+    idePackagePrefix := Some("javaPreprocessor"),
+    libraryDependencies ++= Seq(
+      "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
+      "com.github.sbt" % "junit-interface" % junitInterfaceVersion % "test"
+    )
+  )
 
 lazy val javaHtmlFrontend = project
   .settings(
