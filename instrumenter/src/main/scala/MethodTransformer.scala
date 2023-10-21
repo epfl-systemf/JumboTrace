@@ -49,9 +49,9 @@ final class MethodTransformer(
   }
 
   override def visitMethodInsn(opcode: Int, ownerClass: String, methodName: String, descriptor: String, isInterface: Boolean): Unit = {
-    // save call from caller iff the callee is not instrumented (o.w. it will save the call itself)
-    if (!instrumentedClasses.contains(ClassName(ownerClass))) {
-      val isStatic = (opcode == Opcodes.INVOKESTATIC)
+    val isStatic = (opcode == Opcodes.INVOKESTATIC)
+    if (!isStatic || !instrumentedClasses.contains(ClassName(ownerClass))) {
+      // in these cases we can not be sure that it will be logged from the callee, so we log from the caller
       generateSaveAndPushbackArgs(ownerClass, methodName, descriptor, isStatic)
     }
     super.visitMethodInsn(opcode, ownerClass, methodName, descriptor, isInterface)
@@ -72,11 +72,13 @@ final class MethodTransformer(
                                            isStatic: Boolean
                                          ): Unit = {
     val methodDescr = MethodDescriptor.parse(descriptor)
-    for (td <- methodDescr.args.reverse) {
+    val receiverTd = TD.Class(Seq.empty, ownerClass)  // TODO what happens if we accept packages?
+    val allArgs = if methodName == initMethodName.name then methodDescr.args else receiverTd +: methodDescr.args
+    for (td <- allArgs.reverse) {
       INVOKE_STATIC(jumboTracer, SaveArgument.methodName, Seq(topmostTypeFor(td)) ==> TD.Void)
     }
     INVOKE_STATIC(jumboTracer, ReverseArgsList.methodName, Seq.empty ==> TD.Void)
-    for ((td, i) <- methodDescr.args.zipWithIndex) do {
+    for ((td, i) <- allArgs.zipWithIndex) do {
       val topmostTd = topmostTypeFor(td)
       LDC(i)
       INVOKE_STATIC(jumboTracer, PushbackArg(topmostTd).methodName, Seq(TD.Int) ==> topmostTd)

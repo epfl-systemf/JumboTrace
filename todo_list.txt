@@ -1,4 +1,4 @@
-FIXME log all calls from both caller and callee and remove duplicates in postprocessing (gui). Currently problem with dynamic resolution
+FIXME log all calls from both caller and callee and remove duplicates in postprocessing (gui). Currently problem with dynamic resolution when the superclass is not instrumented (see example)
 FIXME look at calls to Iterator.next in the trace of the SudokuHelper. It seems that these calls are logged from both the callee and the caller
 FIXME problem with \n and other escaped characters when passed as arguments, returned, etc. (use JSON library???)
 TODO preprocessor
