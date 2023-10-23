@@ -3,7 +3,7 @@ package javaPreprocessor
 import scala.io.Source
 import scala.util.Using
 
-final class Preprocessor {
+object Preprocessor {
 
   type FileName = String
   type Code = String
@@ -34,6 +34,7 @@ final class Preprocessor {
     var origFileColIdx = 1
 
     // TODO recognize if, while, etc.
+    // Plan: transform e.g.  if (x == 0){ ... }  into  boolean ___if_cond_line_78___; if (___if_cond_line_78___ = x == 0){ ... }
 
     def deleteSpaces(): Unit = {
       while (codeIter.peekNextChar.isSpaceChar && codeIter.hasNext) {

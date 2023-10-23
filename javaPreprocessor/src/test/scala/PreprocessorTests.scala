@@ -69,7 +69,7 @@ class PreprocessorTests {
     )
     val linesB = Seq.newBuilder[String]
     origCode.lines().forEach(linesB.addOne)
-    val (actualCode, actualMapping) = (new Preprocessor()).preprocess(linesB.result())
+    val (actualCode, actualMapping) = Preprocessor.preprocess(linesB.result())
     assertEquals(expectedCode, actualCode)
     assertMapEquals(expectedMapping, actualMapping)
   }
