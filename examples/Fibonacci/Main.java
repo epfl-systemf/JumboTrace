@@ -1,6 +1,12 @@
 import java.util.InputMismatchException;
 
 public class Main {
+    int x = 0;
+
+    @Override public String toString(){
+        x = 10;
+        return "Hello";
+    }
 
     public static void main(String[] args) {
         args = new String[]{"ITER", "15"};  // FIXME

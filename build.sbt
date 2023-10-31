@@ -19,36 +19,13 @@ lazy val instrumenter = project
     )
   )
 
-lazy val traceElements = project
+lazy val s2sCompiler = project
   .settings(
-    name := "traceElements",
-    scalaVersion := "2.13.10",
-    idePackagePrefix := Some("traceElements"),
-    libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
-  )
-
-lazy val debugCmdlineFrontend = project
-  .settings(
-    name := "debugCmdlineFrontend",
-    idePackagePrefix := Some("debugCmdlineFrontend")
-  ).dependsOn(traceElements)
-
-lazy val javaHtmlFrontend = project
-  .settings(
-    name := "javaHtmlFrontend",
-    idePackagePrefix := Some("javaHtmlFrontend"),
+    name := "s2sCompiler",
+    idePackagePrefix := Some("s2sCompiler"),
     libraryDependencies ++= Seq(
-      "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
-      "com.j2html" % "j2html" % j2htmlVersion
+      "com.github.javaparser" % "javaparser-core" % "3.25.5",
+      "com.github.javaparser" % "javaparser-symbol-solver-core" % "3.25.5",
+      "org.ow2.asm" % "asm" % "9.6"
     )
-  ).dependsOn(traceElements)
-
-lazy val commander = project
-  .settings(
-    name := "commander",
-    idePackagePrefix := Some("commander"),
-    assembly / assemblyMergeStrategy := {
-      case PathList("META-INF", _*) => MergeStrategy.discard
-      case _ => MergeStrategy.first
-    }
-  ).dependsOn(instrumenter, traceElements, debugCmdlineFrontend, javaHtmlFrontend)
+  )
