@@ -3,10 +3,8 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.2.2"
 ThisBuild / scalacOptions += "-deprecation"
 
-val asmVersion = "9.5"
-val javaParserVersion = "3.25.3"
-val playVersion = "2.9.4"
-val j2htmlVersion = "1.6.0"
+val asmVersion = "9.6"
+val javaParserVersion = "3.25.5"
 val junitInterfaceVersion = "0.13.3"
 
 lazy val instrumenter = project
@@ -24,8 +22,15 @@ lazy val s2sCompiler = project
     name := "s2sCompiler",
     idePackagePrefix := Some("s2sCompiler"),
     libraryDependencies ++= Seq(
-      "com.github.javaparser" % "javaparser-core" % "3.25.5",
-      "com.github.javaparser" % "javaparser-symbol-solver-core" % "3.25.5",
-      "org.ow2.asm" % "asm" % "9.6"
+      "com.github.javaparser" % "javaparser-core" % javaParserVersion,
+      "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
+      "org.ow2.asm" % "asm" % asmVersion
     )
+  )
+
+lazy val injectedHeaderGenerator = project
+  .settings(
+    name := "injectedHeaderGenerator",
+    idePackagePrefix := Some("injectedHeaderGenerator"),
+    libraryDependencies += "com.github.javaparser" % "javaparser-core" % javaParserVersion
   )
