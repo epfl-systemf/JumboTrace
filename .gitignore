@@ -44,4 +44,4 @@ bin/
 # general
 *.class
 
-/htmlReport
+/examples/___jbt$trace_container___.java

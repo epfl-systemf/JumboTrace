@@ -1,3 +1,4 @@
+package s2sCompiler
 
 trait CompilerStage[-In, +Out] {
   thisStage =>

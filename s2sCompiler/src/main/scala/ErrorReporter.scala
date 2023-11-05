@@ -1,3 +1,5 @@
+package s2sCompiler
+
 import com.github.javaparser.{Range, TokenRange}
 
 import java.io.PrintStream

@@ -1,0 +1,18 @@
+public class MyClass {
+    
+    static int logAccess(int access, int[] array, int idx){
+        System.out.println("Array: " + array);
+        System.out.println("Index: " + idx);
+        System.out.println("Result: " + access);
+        return access;
+    }
+    
+    static void consume(int x){
+        System.out.println(x);
+    }
+    
+    public static void main(String args[]) { int[] array; int idx; int res;
+      int[] a = new int[]{1, 2, 3};
+      consume(logAccess((array=a)[(idx = 15)], array, idx));
+    }
+}

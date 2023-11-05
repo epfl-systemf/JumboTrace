@@ -1,3 +1,5 @@
+package s2sCompiler
+
 import java.io.File
 import ErrorReporter.CompileError
 import com.github.javaparser.ast.expr.Expression
@@ -25,13 +27,16 @@ object Compiler {
       errorReporter.reportError(s"$srcDirName is not a directory", FatalError)
     }
 
-    val compiler = new Parser(srcDir).andThen(new Analyzer())
+    val compiler = new Parser(srcDir).andThen(new Transformer()).andThen(new Printer())
 
     Files.walk(srcDir.toPath)
       .map(_.toFile)
       .filter(file => !file.isDirectory && file.getName.endsWith(".java"))
       .forEach { file =>
-        compiler.run(file, errorReporter)
+        val code = compiler.run(file, errorReporter)
+        val linesNumberedCode = code.lines().toArray.zipWithIndex.map((l, i) => s"${i+1}. $l").mkString("\n")
+        println(s"\n [${file.getName}] -----------------------------\n")
+        println(linesNumberedCode)
       }
 
   }

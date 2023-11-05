@@ -1,3 +1,5 @@
+package s2sCompiler
+
 import com.github.javaparser.ParserConfiguration.LanguageLevel
 import com.github.javaparser.ast.CompilationUnit
 import com.github.javaparser.{JavaParser, ParserConfiguration}

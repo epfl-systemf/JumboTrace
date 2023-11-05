@@ -26,11 +26,11 @@ lazy val s2sCompiler = project
       "com.github.javaparser" % "javaparser-symbol-solver-core" % javaParserVersion,
       "org.ow2.asm" % "asm" % asmVersion
     )
-  )
+  ).dependsOn(injectionAutomation)
 
-lazy val injectedHeaderGenerator = project
+lazy val injectionAutomation = project
   .settings(
-    name := "injectedHeaderGenerator",
-    idePackagePrefix := Some("injectedHeaderGenerator"),
+    name := "injectionAutomation",
+    idePackagePrefix := Some("injectionAutomation"),
     libraryDependencies += "com.github.javaparser" % "javaparser-core" % javaParserVersion
   )
