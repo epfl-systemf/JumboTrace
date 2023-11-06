@@ -27,7 +27,11 @@ object Compiler {
       errorReporter.reportError(s"$srcDirName is not a directory", FatalError)
     }
 
-    val compiler = new Parser(srcDir).andThen(new Transformer()).andThen(new Printer())
+    val compiler = {
+      new Parser(srcDir)
+        .andThen(new Transformer())
+        .andThen(new Printer())
+    }
 
     Files.walk(srcDir.toPath)
       .map(_.toFile)

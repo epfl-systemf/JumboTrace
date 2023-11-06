@@ -1,7 +1,7 @@
 package s2sCompiler
 
 import com.github.javaparser.ast.Node
-import injectionAutomation.InjectedMethod
+import injectionAutomation.InjectedMethods
 
 final class ProgramString(indentGranularity: Int) {
   private val sb = new StringBuilder()
