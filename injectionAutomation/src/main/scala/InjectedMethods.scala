@@ -6,8 +6,12 @@ object InjectedMethods {
   
   type VarId = String
   
+  private val injectedClassName: String = "___JumboTrace___"
+  
+  private def makeMethodName(rawName: String): String = injectedClassName ++ "." ++ rawName
+  
   def iArrayAccess(access: Expression, array: VarId, idx: VarId): Expression = {
-    MethodCallExpr("___JumboTrace___.arrayAccess", access, new NameExpr(array), new NameExpr(idx))
+    MethodCallExpr(makeMethodName("arrayAccess"), access, new NameExpr(array), new NameExpr(idx))
   }
   
 }

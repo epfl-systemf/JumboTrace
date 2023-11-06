@@ -2,9 +2,13 @@ package s2sCompiler
 
 import java.io.File
 import ErrorReporter.CompileError
+
 import com.github.javaparser.ast.expr.Expression
 import com.github.javaparser.ast.visitor.VoidVisitor
 import ErrorReporter.ErrorLevel.*
+
+import com.github.javaparser.symbolsolver.JavaSymbolSolver
+import com.github.javaparser.symbolsolver.resolution.typesolvers.{CombinedTypeSolver, JavaParserTypeSolver, ReflectionTypeSolver}
 
 import java.nio.file.Files
 
@@ -29,6 +33,7 @@ object Compiler {
 
     val compiler = {
       new Parser(srcDir)
+        .andThen(new TypeAnalyzer())
         .andThen(new Transformer())
         .andThen(new Printer())
     }

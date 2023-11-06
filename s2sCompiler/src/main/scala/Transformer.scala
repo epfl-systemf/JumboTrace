@@ -10,6 +10,9 @@ import com.github.javaparser.ast.stmt.*
 import com.github.javaparser.ast.visitor.*
 import com.github.javaparser.ast.*
 import com.github.javaparser.ast.Node.PostOrderIterator
+import com.github.javaparser.resolution.types.ResolvedType
+import com.github.javaparser.symbolsolver.JavaSymbolSolver
+import com.github.javaparser.symbolsolver.resolution.typesolvers.{CombinedTypeSolver, JavaParserTypeSolver, ReflectionTypeSolver}
 import injectionAutomation.InjectedMethods
 import s2sCompiler.ErrorReporter.ErrorLevel
 import s2sCompiler.ErrorReporter.ErrorLevel.*
@@ -17,13 +20,21 @@ import s2sCompiler.ErrorReporter.ErrorLevel.*
 import java.util.Optional
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
-final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] {
+final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, Type]), CompilationUnit] {
 
-  override protected def runImpl(input: CompilationUnit, errorReporter: ErrorReporter): Option[CompilationUnit] = {
-    val output = input.accept(
+  override protected def runImpl(input: (CompilationUnit, Map[Expression, Type]), errorReporter: ErrorReporter): Option[CompilationUnit] = {
+    val (cu, typesMap) = input
+    val output = cu.accept(
       new TransformationVisitor(),
-      Ctx(errorReporter, input.getStorage.map(_.getFileName).orElse("<unknown source>"), ListBuffer.empty, new FreshNamesGenerator())
+      Ctx(
+        errorReporter,
+        cu.getStorage.map(_.getFileName).orElse("<unknown source>"),
+        ListBuffer.empty,
+        new FreshNamesGenerator(),
+        typesMap
+      )
     ).asInstanceOf[CompilationUnit]
     Some(output)
   }
@@ -32,7 +43,8 @@ final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] 
                                 er: ErrorReporter,
                                 filename: String,
                                 extraVariables: ListBuffer[VariableDeclarator],
-                                freshNamesGenerator: FreshNamesGenerator
+                                freshNamesGenerator: FreshNamesGenerator,
+                                typesMap: Map[Expression, Type]
                               )
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
@@ -219,7 +231,7 @@ final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] 
       val name = visit(n.getName, externalCtx)
       val parameters = n.getParameters.acceptThis(externalCtx)
       val thrownExceptions = n.getThrownExceptions.acceptThis(externalCtx)
-      val body = n.getBody.propagateAndCast(Ctx(externalCtx.er, externalCtx.filename, variables, new FreshNamesGenerator()))
+      val body = n.getBody.propagateAndCast(Ctx(externalCtx.er, externalCtx.filename, variables, new FreshNamesGenerator(), externalCtx.typesMap))
       for (varDecl <- variables.reverseIterator) { // reversing just for convenience, it would work without too
         body.getStatements.addFirst(new ExpressionStmt(new VariableDeclarationExpr(varDecl)))
       }
@@ -279,12 +291,14 @@ final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] 
     override def visit(tpe: UnknownType, ctx: Ctx): UnknownType = tpe
 
     override def visit(arrayAccessExpr: ArrayAccessExpr, ctx: Ctx): Expression = {
-      import ctx.{freshNamesGenerator, extraVariables}
+      import ctx.{freshNamesGenerator, extraVariables, er, filename}
       val arrayVarId = freshNamesGenerator.nextName("array")
       val idxVarId = freshNamesGenerator.nextName("index")
-      // TODO calculate types instead of using Object everywhere handle failure in calculateResolvedType
-      extraVariables.addOne(new VariableDeclarator(objectType, arrayVarId))
-      extraVariables.addOne(new VariableDeclarator(objectType, idxVarId))
+      // TODO calculate types instead of using Object everywhere and handle failure in calculateResolvedType
+      val arrayType = typeOf(arrayAccessExpr.getName, ctx)
+      val indexType = typeOf(arrayAccessExpr.getIndex, ctx)
+      extraVariables.addOne(new VariableDeclarator(arrayType, arrayVarId))
+      extraVariables.addOne(new VariableDeclarator(indexType, idxVarId))
       val name = arrayAccessExpr.getName.propagateAndCast(ctx)
       val index = arrayAccessExpr.getIndex.propagateAndCast(ctx)
       arrayAccessExpr.setName(new EnclosedExpr(new AssignExpr(new NameExpr(arrayVarId), name, AssignExpr.Operator.ASSIGN)))
@@ -717,11 +731,11 @@ final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] 
       n.setName(name)
     }
 
-    extension[N <: Node](ls: NodeList[N]) private def acceptThis(ctx: Ctx): NodeList[N] = {
+    extension[N <: Node] (ls: NodeList[N]) private def acceptThis(ctx: Ctx): NodeList[N] = {
       val copy = new ListBuffer[N]()
       ls.forEach(copy.addOne)
       ls.clear()
-      for (node <- copy){
+      for (node <- copy) {
         ls.add(node.propagateAndCast(ctx))
       }
       ls
@@ -741,6 +755,18 @@ final class Transformer extends CompilerStage[CompilationUnit, CompilationUnit] 
 
     extension[N >: Null <: Node] (opt: Optional[N]) private def propagateAndCast(ctx: Ctx): N = {
       opt.map(_.propagateAndCast(ctx)).getOrNull()
+    }
+
+    private def typeOf(expr: Expression, ctx: Ctx): Type = {
+      ctx.typesMap.getOrElse(expr, {
+        ctx.er.reportErrorPos(
+          "could not find type of expression; falling back to Object (this may cause unnecessary wrapping and slightly slow down the program)",
+          Warning,
+          ctx.filename,
+          expr.getRange
+        )
+        objectType
+      })
     }
 
   }
