@@ -33,7 +33,7 @@ object Compiler {
 
     val compiler = {
       new Parser(srcDir)
-        .andThen(new TypeAnalyzer())
+        .andThen(new Analyzer())
         .andThen(new Transformer())
         .andThen(new Printer())
     }
