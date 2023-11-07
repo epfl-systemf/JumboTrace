@@ -34,7 +34,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
         ListBuffer.empty,
         new FreshNamesGenerator(),
         typesMap,
-        currentImplicitLabel = None
+        currentBreakTarget = None
       )
     ).asInstanceOf[CompilationUnit]
     Some(output)
@@ -46,7 +46,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
                                 extraVariables: ListBuffer[VariableDeclarator],
                                 freshNamesGenerator: FreshNamesGenerator,
                                 typesMap: Map[Expression, Type],
-                                currentImplicitLabel: Option[String]
+                                currentBreakTarget: Option[Statement]
                               )
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
@@ -234,7 +234,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       val parameters = n.getParameters.acceptThis(externalCtx)
       val thrownExceptions = n.getThrownExceptions.acceptThis(externalCtx)
       val body = n.getBody.propagateAndCast(
-        Ctx(externalCtx.er, externalCtx.filename, variables, new FreshNamesGenerator(), externalCtx.typesMap, currentImplicitLabel = None))
+        Ctx(externalCtx.er, externalCtx.filename, variables, new FreshNamesGenerator(), externalCtx.typesMap, currentBreakTarget = None))
       for (varDecl <- variables.reverseIterator) { // reversing just for convenience, it would work without too
         body.getStatements.addFirst(new ExpressionStmt(new VariableDeclarationExpr(varDecl)))
       }
@@ -507,7 +507,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(labeledStmt: LabeledStmt, ctx: Ctx): Statement = {
       val label = labeledStmt.getLabel.propagateAndCast(ctx)
-      val stat = labeledStmt.getStatement.propagateAndCast(ctx.copy(currentImplicitLabel = Some(labeledStmt.getLabel.getIdentifier)))
+      val stat = labeledStmt.getStatement.propagateAndCast(ctx.copy(currentBreakTarget = Some(labeledStmt)))
       labeledStmt.setLabel(label)
       labeledStmt.setStatement(stat)
     }
@@ -520,12 +520,10 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     }
 
     override def visit(switchStmt: SwitchStmt, ctx: Ctx): Statement = {
-      val labelName = ctx.freshNamesGenerator.nextName("switch")
       val selector = switchStmt.getSelector.propagateAndCast(ctx)
-      val entries = switchStmt.getEntries.acceptThis(ctx.copy(currentImplicitLabel = Some(labelName)))
+      val entries = switchStmt.getEntries.acceptThis(ctx.copy(currentBreakTarget = Some(switchStmt)))
       switchStmt.setSelector(selector)
       switchStmt.setEntries(entries)
-      new LabeledStmt(labelName, switchStmt)
     }
 
     override def visit(n: SwitchEntry, ctx: Ctx): SwitchEntry = {
@@ -555,12 +553,10 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     }
 
     override def visit(whileStmt: WhileStmt, ctx: Ctx): Statement = {
-      val labelName = ctx.freshNamesGenerator.nextName("while")
       val condition = whileStmt.getCondition.propagateAndCast(ctx)
-      val body = whileStmt.getBody.propagateAndCast(ctx.copy(currentImplicitLabel = Some(labelName)))
+      val body = whileStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(whileStmt)))
       whileStmt.setCondition(condition)
       whileStmt.setBody(body)
-      new LabeledStmt(labelName, whileStmt)
     }
 
     override def visit(n: ContinueStmt, ctx: Ctx): Statement = {
@@ -569,36 +565,30 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     }
 
     override def visit(doStmt: DoStmt, ctx: Ctx): Statement = {
-      val labelName = ctx.freshNamesGenerator.nextName("dowhile")
-      val body = doStmt.getBody.propagateAndCast(ctx.copy(currentImplicitLabel = Some(labelName)))
+      val body = doStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(doStmt)))
       val condition = doStmt.getCondition.propagateAndCast(ctx)
       doStmt.setBody(body)
       doStmt.setCondition(condition)
-      new LabeledStmt(labelName, doStmt)
     }
 
     override def visit(forEachStmt: ForEachStmt, ctx: Ctx): Statement = {
-      val labelName = ctx.freshNamesGenerator.nextName("foreach")
       val variable = forEachStmt.getVariable.propagateAndCast(ctx)
       val iterable = forEachStmt.getIterable.propagateAndCast(ctx)
-      val body = forEachStmt.getBody.propagateAndCast(ctx.copy(currentImplicitLabel = Some(labelName)))
+      val body = forEachStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(forEachStmt)))
       forEachStmt.setVariable(variable)
       forEachStmt.setIterable(iterable)
       forEachStmt.setBody(body)
-      new LabeledStmt(labelName, forEachStmt)
     }
 
     override def visit(forStmt: ForStmt, ctx: Ctx): Statement = {
-      val labelName = ctx.freshNamesGenerator.nextName("for")
       val init = forStmt.getInitialization.acceptThis(ctx)
       val compare = forStmt.getCompare.propagateAndCast(ctx)
       val update = forStmt.getUpdate.acceptThis(ctx)
-      val body = forStmt.getBody.propagateAndCast(ctx.copy(currentImplicitLabel = Some(labelName)))
+      val body = forStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(forStmt)))
       forStmt.setInitialization(init)
       forStmt.setCompare(compare)
       forStmt.setUpdate(update)
       forStmt.setBody(body)
-      new LabeledStmt(labelName, forStmt)
     }
 
     override def visit(n: ThrowStmt, ctx: Ctx): Statement = {
