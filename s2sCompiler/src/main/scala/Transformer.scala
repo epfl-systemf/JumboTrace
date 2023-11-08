@@ -34,19 +34,27 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
         ListBuffer.empty,
         new FreshNamesGenerator(),
         typesMap,
-        currentBreakTarget = None
+        currentlyExecutingMethod = None,
+        currentBreakTarget = None,
+        currentContinueTarget = None,
+        currentYieldTarget = None
       )
     ).asInstanceOf[CompilationUnit]
     Some(output)
   }
 
+  // TODO distinct targets for continue and break
+  // TODO save current method (target of return)
   private final case class Ctx(
                                 er: ErrorReporter,
                                 filename: String,
                                 extraVariables: ListBuffer[VariableDeclarator],
                                 freshNamesGenerator: FreshNamesGenerator,
                                 typesMap: Map[Expression, Type],
-                                currentBreakTarget: Option[Statement]
+                                currentlyExecutingMethod: Option[MethodDeclaration],
+                                currentBreakTarget: Option[Statement],
+                                currentContinueTarget: Option[Statement],
+                                currentYieldTarget: Option[SwitchExpr]
                               )
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
@@ -223,31 +231,41 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       n.setReceiverParameter(receiverParameter)
     }
 
-    override def visit(n: MethodDeclaration, externalCtx: Ctx): MethodDeclaration = {
+    override def visit(methodDecl: MethodDeclaration, externalCtx: Ctx): MethodDeclaration = {
       val variables = ListBuffer.empty[VariableDeclarator]
-
-      val modifiers = n.getModifiers.acceptThis(externalCtx)
-      val annotations = n.getAnnotations.acceptThis(externalCtx)
-      val typeParameters = n.getTypeParameters.acceptThis(externalCtx)
-      val tpe = n.getType.propagateAndCast(externalCtx)
-      val name = visit(n.getName, externalCtx)
-      val parameters = n.getParameters.acceptThis(externalCtx)
-      val thrownExceptions = n.getThrownExceptions.acceptThis(externalCtx)
-      val body = n.getBody.propagateAndCast(
-        Ctx(externalCtx.er, externalCtx.filename, variables, new FreshNamesGenerator(), externalCtx.typesMap, currentBreakTarget = None))
+      val modifiers = methodDecl.getModifiers.acceptThis(externalCtx)
+      val annotations = methodDecl.getAnnotations.acceptThis(externalCtx)
+      val typeParameters = methodDecl.getTypeParameters.acceptThis(externalCtx)
+      val tpe = methodDecl.getType.propagateAndCast(externalCtx)
+      val name = visit(methodDecl.getName, externalCtx)
+      val parameters = methodDecl.getParameters.acceptThis(externalCtx)
+      val thrownExceptions = methodDecl.getThrownExceptions.acceptThis(externalCtx)
+      val body = methodDecl.getBody.propagateAndCast(
+        Ctx(
+          externalCtx.er,
+          externalCtx.filename,
+          variables,
+          new FreshNamesGenerator(),
+          externalCtx.typesMap,
+          currentlyExecutingMethod = Some(methodDecl),
+          currentBreakTarget = None,
+          currentContinueTarget = None,
+          currentYieldTarget = None
+        )
+      )
       for (varDecl <- variables.reverseIterator) { // reversing just for convenience, it would work without too
         body.getStatements.addFirst(new ExpressionStmt(new VariableDeclarationExpr(varDecl)))
       }
-      val receiverParameter = n.getReceiverParameter.propagateAndCast(externalCtx)
-      n.setModifiers(modifiers)
-      n.setAnnotations(annotations)
-      n.setTypeParameters(typeParameters)
-      n.setType(tpe)
-      n.setName(name)
-      n.setParameters(parameters)
-      n.setThrownExceptions(thrownExceptions)
-      n.setBody(body)
-      n.setReceiverParameter(receiverParameter)
+      val receiverParameter = methodDecl.getReceiverParameter.propagateAndCast(externalCtx)
+      methodDecl.setModifiers(modifiers)
+      methodDecl.setAnnotations(annotations)
+      methodDecl.setTypeParameters(typeParameters)
+      methodDecl.setType(tpe)
+      methodDecl.setName(name)
+      methodDecl.setParameters(parameters)
+      methodDecl.setThrownExceptions(thrownExceptions)
+      methodDecl.setBody(body)
+      methodDecl.setReceiverParameter(receiverParameter)
     }
 
     override def visit(n: Parameter, ctx: Ctx): Parameter = {
@@ -507,7 +525,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(labeledStmt: LabeledStmt, ctx: Ctx): Statement = {
       val label = labeledStmt.getLabel.propagateAndCast(ctx)
-      val stat = labeledStmt.getStatement.propagateAndCast(ctx.copy(currentBreakTarget = Some(labeledStmt)))
+      val stat = labeledStmt.getStatement.propagateAndCast(ctx)
       labeledStmt.setLabel(label)
       labeledStmt.setStatement(stat)
     }
@@ -554,7 +572,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(whileStmt: WhileStmt, ctx: Ctx): Statement = {
       val condition = whileStmt.getCondition.propagateAndCast(ctx)
-      val body = whileStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(whileStmt)))
+      val body = whileStmt.getBody.propagateAndCast(
+        ctx.copy(currentBreakTarget = Some(whileStmt), currentContinueTarget = Some(whileStmt))
+      )
       whileStmt.setCondition(condition)
       whileStmt.setBody(body)
     }
@@ -565,7 +585,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     }
 
     override def visit(doStmt: DoStmt, ctx: Ctx): Statement = {
-      val body = doStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(doStmt)))
+      val body = doStmt.getBody.propagateAndCast(ctx.copy(
+        currentBreakTarget = Some(doStmt), currentContinueTarget = Some(doStmt))
+      )
       val condition = doStmt.getCondition.propagateAndCast(ctx)
       doStmt.setBody(body)
       doStmt.setCondition(condition)
@@ -574,7 +596,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     override def visit(forEachStmt: ForEachStmt, ctx: Ctx): Statement = {
       val variable = forEachStmt.getVariable.propagateAndCast(ctx)
       val iterable = forEachStmt.getIterable.propagateAndCast(ctx)
-      val body = forEachStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(forEachStmt)))
+      val body = forEachStmt.getBody.propagateAndCast(ctx.copy(
+        currentBreakTarget = Some(forEachStmt), currentContinueTarget = Some(forEachStmt)
+      ))
       forEachStmt.setVariable(variable)
       forEachStmt.setIterable(iterable)
       forEachStmt.setBody(body)
@@ -584,7 +608,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       val init = forStmt.getInitialization.acceptThis(ctx)
       val compare = forStmt.getCompare.propagateAndCast(ctx)
       val update = forStmt.getUpdate.acceptThis(ctx)
-      val body = forStmt.getBody.propagateAndCast(ctx.copy(currentBreakTarget = Some(forStmt)))
+      val body = forStmt.getBody.propagateAndCast(ctx.copy(
+        currentBreakTarget = Some(forStmt), currentContinueTarget = Some(forStmt)
+      ))
       forStmt.setInitialization(init)
       forStmt.setCompare(compare)
       forStmt.setUpdate(update)
@@ -711,11 +737,11 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(modifier: Modifier, ctx: Ctx): Modifier = modifier
 
-    override def visit(n: SwitchExpr, ctx: Ctx): Expression = {
-      val selector = n.getSelector.propagateAndCast(ctx)
-      val entries = n.getEntries.acceptThis(ctx)
-      n.setSelector(selector)
-      n.setEntries(entries)
+    override def visit(switchExpr: SwitchExpr, ctx: Ctx): Expression = {
+      val selector = switchExpr.getSelector.propagateAndCast(ctx)
+      val entries = switchExpr.getEntries.acceptThis(ctx.copy(currentYieldTarget = Some(switchExpr)))
+      switchExpr.setSelector(selector)
+      switchExpr.setEntries(entries)
     }
 
     override def visit(n: YieldStmt, ctx: Ctx): Statement = {
