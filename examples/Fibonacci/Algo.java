@@ -18,7 +18,8 @@ enum Algo {
         return switch (algoStr.toLowerCase()) {
             case "rec" -> Algo.REC;
             case "iter" -> Algo.ITER;
-            default -> throw new UnsupportedOperationException("unknown algorithm: " + algoStr);
+            default -> throw new UnsupportedOperationException(
+                    "unknown algorithm: " + algoStr);
         };
     }
 }
