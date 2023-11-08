@@ -8,7 +8,8 @@ final class Printer extends CompilerStage[CompilationUnit, String] {
 
   override protected def runImpl(cu: CompilationUnit, errorReporter: ErrorReporter): Option[String] = {
     // TODO printer that actually preserves line numbers
-    val codeStr = LexicalPreservingPrinter.print(cu)
+//    LexicalPreservingPrinter.setup(cu)
+    val codeStr = cu.toString
     Some(codeStr)
   }
 

@@ -11,6 +11,8 @@ import com.github.javaparser.symbolsolver.JavaSymbolSolver
 import com.github.javaparser.symbolsolver.resolution.typesolvers.{CombinedTypeSolver, JavaParserTypeSolver, ReflectionTypeSolver}
 
 import java.nio.file.Files
+import scala.io.Source
+import scala.util.Using
 
 object Compiler {
 
@@ -42,10 +44,21 @@ object Compiler {
       .map(_.toFile)
       .filter(file => !file.isDirectory && file.getName.endsWith(".java"))
       .forEach { file =>
-        val code = compiler.run(file, errorReporter)
-        val linesNumberedCode = code.lines().toArray.zipWithIndex.map((l, i) => s"${i+1}. $l").mkString("\n")
-        println(s"\n [${file.getName}] -----------------------------\n")
-        println(linesNumberedCode)
+        val origCodeLines = Using(Source.fromFile(file))(
+          _.getLines().toSeq
+        ).get
+        val finalCodeLines = compiler.run(file, errorReporter).lines().toArray()
+        val origCodeLinesWidth = origCodeLines.maxBy(_.length).length
+        println(s"\n ---- [${file.getName}] ${"-".repeat(origCodeLinesWidth*2)}\n")
+        for (lineIdx <- (0 until (origCodeLines.length.max(finalCodeLines.length)))){
+          print(s"${lineIdx+1}. ".padTo(5, ' '))
+          print((if lineIdx < origCodeLines.length then origCodeLines(lineIdx) else "").padTo(origCodeLinesWidth, ' '))
+          print(s" | ${lineIdx+1}. ".padTo(8, ' '))
+          if (lineIdx < finalCodeLines.length){
+            print(finalCodeLines(lineIdx))
+          }
+          println()
+        }
       }
 
   }

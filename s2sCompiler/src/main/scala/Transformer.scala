@@ -22,17 +22,17 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
-final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, Type]), CompilationUnit] {
+final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] {
 
-  override protected def runImpl(input: (CompilationUnit, Map[Expression, Type]), errorReporter: ErrorReporter): Option[CompilationUnit] = {
-    val (cu, typesMap) = input
+  override protected def runImpl(input: Analyzer.Result, errorReporter: ErrorReporter): Option[CompilationUnit] = {
+    val Analyzer.Result(cu, typesMap, usedVariableNames) = input
     val output = cu.accept(
       new TransformationVisitor(),
       Ctx(
         errorReporter,
         cu.getStorage.map(_.getFileName).orElse("<unknown source>"),
         ListBuffer.empty,
-        new FreshNamesGenerator(),
+        new FreshNamesGenerator(usedVariableNames),
         typesMap,
         currentlyExecutingMethod = None,
         currentBreakTarget = None,
@@ -43,8 +43,6 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
     Some(output)
   }
 
-  // TODO distinct targets for continue and break
-  // TODO save current method (target of return)
   private final case class Ctx(
                                 er: ErrorReporter,
                                 filename: String,
@@ -245,7 +243,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
           externalCtx.er,
           externalCtx.filename,
           variables,
-          new FreshNamesGenerator(),
+          externalCtx.freshNamesGenerator.emptyCopy,
           externalCtx.typesMap,
           currentlyExecutingMethod = Some(methodDecl),
           currentBreakTarget = None,
@@ -315,7 +313,6 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       import ctx.{freshNamesGenerator, extraVariables, er, filename}
       val arrayVarId = freshNamesGenerator.nextName("array")
       val idxVarId = freshNamesGenerator.nextName("index")
-      // TODO calculate types instead of using Object everywhere and handle failure in calculateResolvedType
       val arrayType = typeOf(arrayAccessExpr.getName, ctx)
       val indexType = typeOf(arrayAccessExpr.getIndex, ctx)
       extraVariables.addOne(new VariableDeclarator(arrayType, arrayVarId))
@@ -341,11 +338,11 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       n.setValues(values)
     }
 
-    override def visit(n: AssignExpr, ctx: Ctx): Expression = {
-      val target = n.getTarget.propagateAndCast(ctx)
-      val value = n.getValue.propagateAndCast(ctx)
-      n.setTarget(target)
-      n.setValue(value)
+    override def visit(assignExpr: AssignExpr, ctx: Ctx): Expression = {
+      val target = assignExpr.getTarget.propagateAndCast(ctx)
+      val value = assignExpr.getValue.propagateAndCast(ctx)
+      assignExpr.setTarget(target)
+      assignExpr.setValue(value)
     }
 
     override def visit(n: BinaryExpr, ctx: Ctx): Expression = {
@@ -511,11 +508,11 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       n.setRecordDeclaration(recordDeclaration)
     }
 
-    override def visit(n: AssertStmt, ctx: Ctx): Statement = {
-      val check = n.getCheck.propagateAndCast(ctx)
-      val msg = n.getMessage.propagateAndCast(ctx)
-      n.setCheck(check)
-      n.setMessage(msg)
+    override def visit(assertStmt: AssertStmt, ctx: Ctx): Statement = {
+      val check = assertStmt.getCheck.propagateAndCast(ctx)
+      val msg = assertStmt.getMessage.propagateAndCast(ctx)
+      assertStmt.setCheck(check)
+      assertStmt.setMessage(msg)
     }
 
     override def visit(n: BlockStmt, ctx: Ctx): Statement = {
@@ -532,9 +529,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(emptyStmt: EmptyStmt, ctx: Ctx): Statement = emptyStmt
 
-    override def visit(n: ExpressionStmt, ctx: Ctx): Statement = {
-      val expr = n.getExpression.propagateAndCast(ctx)
-      n.setExpression(expr)
+    override def visit(expressionStmt: ExpressionStmt, ctx: Ctx): Statement = {
+      val expr = expressionStmt.getExpression.propagateAndCast(ctx)
+      expressionStmt.setExpression(expr)
     }
 
     override def visit(switchStmt: SwitchStmt, ctx: Ctx): Statement = {
@@ -551,9 +548,9 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       n.setStatements(statements)
     }
 
-    override def visit(n: BreakStmt, ctx: Ctx): Statement = {
-      val label = n.getLabel.propagateAndCast(ctx)
-      n.setLabel(label)
+    override def visit(breakStmt: BreakStmt, ctx: Ctx): Statement = {
+      val label = breakStmt.getLabel.propagateAndCast(ctx)
+      breakStmt.setLabel(label)
     }
 
     override def visit(n: ReturnStmt, ctx: Ctx): Statement = {
@@ -563,8 +560,8 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(n: IfStmt, ctx: Ctx): Statement = {
       val condition = n.getCondition.propagateAndCast(ctx)
-      val thenStat = n.getThenStmt.propagateAndCast(ctx)
-      val elseStat = n.getElseStmt.propagateAndCast(ctx)
+      val thenStat = n.getThenStmt.propagateAndCast(ctx).makeBlockIfNotAlready
+      val elseStat = n.getElseStmt.propagateAndCast(ctx).makeBlockIfNotAlready
       n.setCondition(condition)
       n.setThenStmt(thenStat)
       n.setElseStmt(elseStat)
@@ -574,20 +571,20 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       val condition = whileStmt.getCondition.propagateAndCast(ctx)
       val body = whileStmt.getBody.propagateAndCast(
         ctx.copy(currentBreakTarget = Some(whileStmt), currentContinueTarget = Some(whileStmt))
-      )
+      ).makeBlockIfNotAlready
       whileStmt.setCondition(condition)
       whileStmt.setBody(body)
     }
 
-    override def visit(n: ContinueStmt, ctx: Ctx): Statement = {
-      val label = n.getLabel.propagateAndCast(ctx)
-      n.setLabel(label)
+    override def visit(continueStmt: ContinueStmt, ctx: Ctx): Statement = {
+      val label = continueStmt.getLabel.propagateAndCast(ctx)
+      continueStmt.setLabel(label)
     }
 
     override def visit(doStmt: DoStmt, ctx: Ctx): Statement = {
       val body = doStmt.getBody.propagateAndCast(ctx.copy(
         currentBreakTarget = Some(doStmt), currentContinueTarget = Some(doStmt))
-      )
+      ).makeBlockIfNotAlready
       val condition = doStmt.getCondition.propagateAndCast(ctx)
       doStmt.setBody(body)
       doStmt.setCondition(condition)
@@ -598,7 +595,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       val iterable = forEachStmt.getIterable.propagateAndCast(ctx)
       val body = forEachStmt.getBody.propagateAndCast(ctx.copy(
         currentBreakTarget = Some(forEachStmt), currentContinueTarget = Some(forEachStmt)
-      ))
+      )).makeBlockIfNotAlready
       forEachStmt.setVariable(variable)
       forEachStmt.setIterable(iterable)
       forEachStmt.setBody(body)
@@ -610,7 +607,7 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       val update = forStmt.getUpdate.acceptThis(ctx)
       val body = forStmt.getBody.propagateAndCast(ctx.copy(
         currentBreakTarget = Some(forStmt), currentContinueTarget = Some(forStmt)
-      ))
+      )).makeBlockIfNotAlready
       forStmt.setInitialization(init)
       forStmt.setCompare(compare)
       forStmt.setUpdate(update)
@@ -624,7 +621,10 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
 
     override def visit(n: SynchronizedStmt, ctx: Ctx): Statement = {
       ctx.er.reportErrorPos("'synchronized' found: JumboTrace does not support concurrency", NonFatalError, ctx.filename, n.getRange)
-      new EmptyStmt(n.getTokenRange.getOrNull())
+      val expr = n.getExpression.propagateAndCast(ctx)
+      val body = n.getBody.propagateAndCast(ctx)
+      n.setExpression(expr)
+      n.setBody(body)
     }
 
     override def visit(n: TryStmt, ctx: Ctx): Statement = {
@@ -786,10 +786,18 @@ final class Transformer extends CompilerStage[(CompilationUnit, Map[Expression, 
       opt.map(_.propagateAndCast(ctx)).getOrNull()
     }
 
+    extension(stat: Statement) private def makeBlockIfNotAlready: BlockStmt = {
+      stat match {
+        case blockStmt: BlockStmt => blockStmt
+        case _ => new BlockStmt(new NodeList[Statement](stat))
+      }
+    }
+
     private def typeOf(expr: Expression, ctx: Ctx): Type = {
       ctx.typesMap.getOrElse(expr, {
         ctx.er.reportErrorPos(
-          "could not find type of expression; falling back to Object (this may cause unnecessary wrapping and slightly slow down the program)",
+          "could not find type of expression; falling back to Object (this may cause unnecessary wrapping and " +
+            "slightly slow down the program)",
           Warning,
           ctx.filename,
           expr.getRange
