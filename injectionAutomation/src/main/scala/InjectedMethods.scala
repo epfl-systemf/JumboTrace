@@ -13,7 +13,7 @@ object InjectedMethods {
 
   private def makeMethodName(rawName: String): String = injectedClassName ++ "." ++ rawName
 
-  def iArrayAccess(access: Expression, array: VarId, idx: VarId): Expression = {
+  def iArrayRead(access: Expression, array: VarId, idx: VarId): Expression = {
     val range = access.getRange.get()
     new MethodCallExpr(
       makeMethodName("arrayAccess"),

@@ -57,19 +57,6 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
 
-    private def makeBlock(stats: Seq[Statement | Expression]): BlockStmt = {
-      val block = new BlockStmt()
-      stats.foreach {
-        {
-          case stat: Statement =>
-            block.addStatement(stat)
-          case expr: Expression =>
-            block.addStatement(new ExpressionStmt(expr))
-        }
-      }
-      block
-    }
-
     override def visit(n: CompilationUnit, ctx: Ctx): CompilationUnit = {
       val packageDeclaration = n.getPackageDeclaration.propagateAndCast(ctx)
       val importDeclarations = n.getImports.acceptThis(ctx)
@@ -321,24 +308,35 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       val index = arrayAccessExpr.getIndex.propagateAndCast(ctx)
       arrayAccessExpr.setName(new EnclosedExpr(new AssignExpr(new NameExpr(arrayVarId), name, AssignExpr.Operator.ASSIGN)))
       arrayAccessExpr.setIndex(new AssignExpr(new NameExpr(idxVarId), index, AssignExpr.Operator.ASSIGN))
-      InjectedMethods.iArrayAccess(arrayAccessExpr, arrayVarId, idxVarId)
+      InjectedMethods.iArrayRead(arrayAccessExpr, arrayVarId, idxVarId)
     }
 
-    override def visit(n: ArrayCreationExpr, ctx: Ctx): Expression = {
-      val elemType = n.getElementType.propagateAndCast(ctx)
-      val levels = n.getLevels.acceptThis(ctx)
-      val initializerExpr = n.getInitializer.propagateAndCast(ctx)
-      n.setElementType(elemType)
-      n.setLevels(levels)
-      n.setInitializer(initializerExpr)
+    override def visit(arrayCreationExpr: ArrayCreationExpr, ctx: Ctx): Expression = {
+      val elemType = arrayCreationExpr.getElementType.propagateAndCast(ctx)
+      val levels = arrayCreationExpr.getLevels.acceptThis(ctx)
+      val initializerExpr = arrayCreationExpr.getInitializer.propagateAndCast(ctx)
+      arrayCreationExpr.setElementType(elemType)
+      arrayCreationExpr.setLevels(levels)
+      arrayCreationExpr.setInitializer(initializerExpr)
     }
 
-    override def visit(n: ArrayInitializerExpr, ctx: Ctx): Expression = {
-      val values = n.getValues.acceptThis(ctx)
-      n.setValues(values)
+    override def visit(arrayInitExpr: ArrayInitializerExpr, ctx: Ctx): Expression = {
+      val values = arrayInitExpr.getValues.acceptThis(ctx)
+      arrayInitExpr.setValues(values)
     }
 
     override def visit(assignExpr: AssignExpr, ctx: Ctx): Expression = {
+
+      // TODO treat cases separately
+      assignExpr.getTarget match {
+        case nameExpr: NameExpr =>
+
+        case fieldAccessExpr: FieldAccessExpr =>
+
+        case arrayAccessExpr: ArrayAccessExpr =>
+
+      }
+
       val target = assignExpr.getTarget.propagateAndCast(ctx)
       val value = assignExpr.getValue.propagateAndCast(ctx)
       assignExpr.setTarget(target)
@@ -558,13 +556,16 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       n.setExpression(expr)
     }
 
-    override def visit(n: IfStmt, ctx: Ctx): Statement = {
-      val condition = n.getCondition.propagateAndCast(ctx)
-      val thenStat = n.getThenStmt.propagateAndCast(ctx).makeBlockIfNotAlready
-      val elseStat = n.getElseStmt.propagateAndCast(ctx).makeBlockIfNotAlready
-      n.setCondition(condition)
-      n.setThenStmt(thenStat)
-      n.setElseStmt(elseStat)
+    override def visit(ifStmt: IfStmt, ctx: Ctx): Statement = {
+      val condition = ifStmt.getCondition.propagateAndCast(ctx)
+      val thenStat = ifStmt.getThenStmt.propagateAndCast(ctx).makeBlockIfNotAlready
+      ifStmt.setCondition(condition)
+      ifStmt.setThenStmt(thenStat)
+      if (ifStmt.getElseStmt.isPresent){
+        val elseStat = ifStmt.getElseStmt.propagateAndCast(ctx).makeBlockIfNotAlready
+        ifStmt.setElseStmt(elseStat)
+      }
+      ifStmt
     }
 
     override def visit(whileStmt: WhileStmt, ctx: Ctx): Statement = {
@@ -789,7 +790,7 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     extension(stat: Statement) private def makeBlockIfNotAlready: BlockStmt = {
       stat match {
         case blockStmt: BlockStmt => blockStmt
-        case _ => new BlockStmt(new NodeList[Statement](stat))
+        case _ => new BlockStmt().addStatement(stat)
       }
     }
 
