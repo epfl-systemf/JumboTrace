@@ -14,10 +14,12 @@ import com.github.javaparser.ast.expr.*
 import com.github.javaparser.ast.modules.*
 import com.github.javaparser.ast.stmt.*
 import com.github.javaparser.ast.visitor.*
+import com.github.javaparser.resolution.Resolvable
 import com.github.javaparser.resolution.declarations.ResolvedDeclaration
 import com.github.javaparser.resolution.types.ResolvedType
 import com.github.javaparser.symbolsolver.JavaSymbolSolver
-import com.github.javaparser.symbolsolver.javaparsermodel.declarations.{JavaParserFieldDeclaration, JavaParserParameterDeclaration, JavaParserPatternDeclaration, JavaParserVariableDeclaration}
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.{JavaParserEnumConstantDeclaration, JavaParserFieldDeclaration, JavaParserParameterDeclaration, JavaParserPatternDeclaration, JavaParserVariableDeclaration}
+import com.github.javaparser.symbolsolver.reflectionmodel.ReflectionFieldDeclaration
 import com.github.javaparser.symbolsolver.resolution.typesolvers.{CombinedTypeSolver, JavaParserTypeSolver, ReflectionTypeSolver}
 import injectionAutomation.InjectedMethods
 
@@ -54,12 +56,12 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
                                 extraVariables: ListBuffer[VariableDeclarator],
                                 freshNamesGenerator: FreshNamesGenerator,
                                 typesMap: Map[Expression, Type],
-                                declMap: Map[NameExpr, ResolvedDeclaration],
+                                declMap: Map[Resolvable[_], ResolvedDeclaration],
                                 currentlyExecutingMethodDescr: Option[String],
                                 currentBreakTarget: Option[Statement],
                                 currentContinueTarget: Option[Statement],
                                 currentYieldTarget: Option[SwitchExpr]
-                              ){
+                              ) {
     def createAndSaveExtraVar(middleFix: String, tpe: Type): String = {
       val id = freshNamesGenerator.nextName(middleFix)
       extraVariables.addOne(new VariableDeclarator(tpe, id))
@@ -68,6 +70,8 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
   }
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
+
+    private type VariableDecl = JavaParserVariableDeclaration | JavaParserParameterDeclaration | JavaParserPatternDeclaration
 
     override def visit(cu: CompilationUnit, ctx: Ctx): CompilationUnit = {
       val packageDeclaration = cu.getPackageDeclaration.propagateAndCast(ctx)
@@ -222,7 +226,7 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       val name = visit(varDecl.getName, ctx)
       varDecl.setType(tpe)
       varDecl.setName(name)
-      if (varDecl.getInitializer.isPresent){
+      if (varDecl.getInitializer.isPresent) {
         val init = varDecl.getInitializer.get().propagateAndCast(ctx)
         varDecl.setInitializer(InjectedMethods.iVarWrite(init, varId))
       }
@@ -373,17 +377,32 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     override def visit(assignExpr: AssignExpr, ctx: Ctx): Expression = {
       assignExpr.getTarget match {
         case nameExpr: NameExpr => {
-          // FIXME what if nameExpr is a field of this? Maybe we can detect this from the bytecode
-          val value = assignExpr.getValue.propagateAndCast(ctx)
-          assignExpr.setValue(value)
-          InjectedMethods.iVarWrite(assignExpr, nameExpr.getName.getIdentifier)
+          ctx.declMap.get(nameExpr) match {
+            case Some(resolvedVariableDeclaration: VariableDecl) => {
+              val value = assignExpr.getValue.propagateAndCast(ctx)
+              assignExpr.setValue(value)
+              InjectedMethods.iVarWrite(assignExpr, nameExpr.getName.getIdentifier)
+            }
+            case _ =>
+              InjectedMethods.iInstanceFieldWrite(assignExpr, "this", nameExpr.getName.getIdentifier)
+          }
         }
         case fieldAccessExpr: FieldAccessExpr => {
-          val receiverType = typeOf(fieldAccessExpr.getScope, ctx)
-          val receiverVarId = ctx.createAndSaveExtraVar("receiver", receiverType)
           val scope = fieldAccessExpr.getScope.propagateAndCast(ctx)
-          fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverVarId), scope, AssignExpr.Operator.ASSIGN)))
-          InjectedMethods.iFieldWrite(assignExpr, receiverVarId, fieldAccessExpr.getName.getIdentifier)
+          ctx.declMap.get(fieldAccessExpr) match {
+            case Some(fieldDeclaration: JavaParserFieldDeclaration) if fieldDeclaration.isStatic => {
+              fieldAccessExpr.setScope(scope)
+              InjectedMethods.iStaticFieldWrite(assignExpr, fieldDeclaration.declaringType().getClassName,
+                fieldAccessExpr.getName.getIdentifier)
+            }
+            case Some(fieldDeclaration: JavaParserFieldDeclaration) => {
+              val receiverType = typeOf(fieldAccessExpr.getScope, ctx)
+              val receiverVarId = ctx.createAndSaveExtraVar("receiver", receiverType)
+              fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverVarId), scope, AssignExpr.Operator.ASSIGN)))
+              InjectedMethods.iInstanceFieldWrite(assignExpr, receiverVarId, fieldAccessExpr.getName.getIdentifier)
+            }
+            case unexpected => throw new AssertionError(s"unexpected: $unexpected")
+          }
         }
         case arrayAccessExpr: ArrayAccessExpr => {
           val arrayType = typeOf(arrayAccessExpr.getName, ctx)
@@ -437,16 +456,35 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     }
 
     override def visit(fieldAccessExpr: FieldAccessExpr, ctx: Ctx): Expression = {
-      val receiverId = ctx.createAndSaveExtraVar("receiver", typeOf(fieldAccessExpr.getScope, ctx))
+      val scopeTypeOpt = ctx.typesMap.get(fieldAccessExpr.getScope)
       val fieldId = fieldAccessExpr.getName.getIdentifier
       val scope = fieldAccessExpr.getScope.propagateAndCast(ctx)
       val typeArgs = fieldAccessExpr.getTypeArguments.map(_.acceptThis(ctx)).getOrNull()
       val name = visit(fieldAccessExpr.getName, ctx)
-      // FIXME don't save the receiver as a value for static field accesses
-      fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverId), scope, AssignExpr.Operator.ASSIGN)))
       fieldAccessExpr.setTypeArguments(typeArgs)
       fieldAccessExpr.setName(name)
-      InjectedMethods.iFieldRead(fieldAccessExpr, receiverId, fieldId)
+      ctx.declMap.get(fieldAccessExpr) match {
+        case Some(fieldDeclaration: JavaParserFieldDeclaration) if fieldDeclaration.isStatic => {
+          fieldAccessExpr.setScope(scope)
+          InjectedMethods.iStaticFieldRead(fieldAccessExpr, fieldDeclaration.declaringType().getClassName, fieldId)
+        }
+        case Some(decl) if (decl.isInstanceOf[JavaParserFieldDeclaration]
+          || (scopeTypeOpt.exists(_.isArrayType) && fieldId == "length")) => {
+          val receiverId = ctx.createAndSaveExtraVar("receiver", typeOf(fieldAccessExpr.getScope, ctx))
+          fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverId), scope, AssignExpr.Operator.ASSIGN)))
+          InjectedMethods.iInstanceFieldRead(fieldAccessExpr, receiverId, fieldId)
+        }
+        case Some(enumConstantDeclaration: JavaParserEnumConstantDeclaration) => {
+          fieldAccessExpr.setScope(scope)
+          InjectedMethods.iStaticFieldRead(fieldAccessExpr, enumConstantDeclaration.getType.describe(), fieldId)
+        }
+        case Some(reflectionFieldDeclaration: ReflectionFieldDeclaration) => {
+          fieldAccessExpr.setScope(scope)
+          InjectedMethods.iStaticFieldRead(fieldAccessExpr, reflectionFieldDeclaration.declaringType().getClassName, fieldId)
+        }
+        case unexpected =>
+          throw new AssertionError(s"unexpected: $unexpected")
+      }
     }
 
     override def visit(instanceOfExpr: InstanceOfExpr, ctx: Ctx): Expression = {
@@ -488,11 +526,11 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       val name = visit(nameExpr.getName, ctx)
       nameExpr.setName(name)
       declMap.get(nameExpr) match
-        case Some(_: (JavaParserVariableDeclaration | JavaParserParameterDeclaration | JavaParserPatternDeclaration)) =>
+        case Some(_: VariableDecl) =>
           InjectedMethods.iVarRead(nameExpr, name.getIdentifier)
         case Some(_: JavaParserFieldDeclaration) =>
-          InjectedMethods.iFieldRead(nameExpr, "this", nameExpr.getName.getIdentifier)
-        case _ => nameExpr  // TODO other cases?
+          InjectedMethods.iInstanceFieldRead(nameExpr, "this", nameExpr.getName.getIdentifier)
+        case _ => nameExpr // TODO other cases?
     }
 
     override def visit(objectCreationExpr: ObjectCreationExpr, ctx: Ctx): Expression = {
@@ -842,8 +880,8 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       ls
     }
 
-    private val objectType = StaticJavaParser.parseClassOrInterfaceType("Object")
-    private val stringType = StaticJavaParser.parseClassOrInterfaceType("String")
+    private val objectType = StaticJavaParser.parseClassOrInterfaceType("java.lang.Object")
+    private val stringType = StaticJavaParser.parseClassOrInterfaceType("java.lang.String")
 
 
     extension[T >: Null] (opt: Optional[T]) private def getOrNull(): T = {

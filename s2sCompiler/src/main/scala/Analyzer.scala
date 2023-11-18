@@ -3,9 +3,9 @@ package s2sCompiler
 import com.github.javaparser.StaticJavaParser
 import com.github.javaparser.ast.{CompilationUnit, Node}
 import com.github.javaparser.ast.`type`.Type
-import com.github.javaparser.ast.expr.{Expression, NameExpr, SimpleName}
+import com.github.javaparser.ast.expr.{Expression, FieldAccessExpr, NameExpr, SimpleName}
 import com.github.javaparser.ast.stmt.LabeledStmt
-import com.github.javaparser.resolution.UnsolvedSymbolException
+import com.github.javaparser.resolution.{Resolvable, UnsolvedSymbolException}
 import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration
 import s2sCompiler.ErrorReporter.ErrorLevel
 
@@ -22,14 +22,15 @@ final class Analyzer extends CompilerStage[CompilationUnit, Analyzer.Result] {
   override protected def runImpl(cu: CompilationUnit, errorReporter: ErrorReporter): Option[Analyzer.Result] = {
     val filename = cu.getStorage.map(_.getFileName).orElseGet { () => "<missing file name>" }
     val typesMapB = Map.newBuilder[Expression, Type]
-    val declarationsMapB = Map.newBuilder[NameExpr, ResolvedValueDeclaration]
+    val declarationsMapB = Map.newBuilder[Resolvable[_], ResolvedValueDeclaration]
     val varIdsSetB = Set.newBuilder[String]
     cu.findAll(classOf[Node]).forEach { node =>
       computeAndAddTypeIfExpr(typesMapB, node)
       node match {
-        case nameExpr: NameExpr =>
+        case resolvable: (NameExpr | FieldAccessExpr) =>
           try {
-            declarationsMapB.addOne(nameExpr -> nameExpr.resolve())
+            val pair = resolvable -> resolvable.resolve()
+            declarationsMapB.addOne(pair)
           } catch {
             case _: Exception => ()
           }
@@ -63,7 +64,7 @@ object Analyzer {
   final case class Result(
                            cu: CompilationUnit,
                            types: Map[Expression, Type],
-                           declarations: Map[NameExpr, ResolvedValueDeclaration],
+                           declarations: Map[Resolvable[_], ResolvedValueDeclaration],
                            usedVariableNames: Set[String]
                          )
 

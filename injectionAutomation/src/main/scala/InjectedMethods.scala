@@ -66,11 +66,39 @@ object InjectedMethods {
       new IntegerLiteralExpr(range.end.column.toString)
     ).withRangeSet(range)
   }
-  
-  def iFieldWrite(subject: Expression, receiver: VarId, fieldName: String): Expression = {
+
+  def iStaticFieldWrite(subject: Expression, className: String, fieldName: String): Expression = {
     val range = subject.getRange.get()
     new MethodCallExpr(
-      makeMethodName("fieldWrite"),
+      makeMethodName("staticFieldWrite"),
+      subject,
+      new StringLiteralExpr(className),
+      new StringLiteralExpr(fieldName),
+      new IntegerLiteralExpr(range.begin.line.toString),
+      new IntegerLiteralExpr(range.begin.column.toString),
+      new IntegerLiteralExpr(range.end.line.toString),
+      new IntegerLiteralExpr(range.end.column.toString)
+    ).withRangeSet(range)
+  }
+
+  def iStaticFieldRead(subject: Expression, className: String, fieldName: String): Expression = {
+    val range = subject.getRange.get()
+    new MethodCallExpr(
+      makeMethodName("staticFieldRead"),
+      subject,
+      new StringLiteralExpr(className),
+      new StringLiteralExpr(fieldName),
+      new IntegerLiteralExpr(range.begin.line.toString),
+      new IntegerLiteralExpr(range.begin.column.toString),
+      new IntegerLiteralExpr(range.end.line.toString),
+      new IntegerLiteralExpr(range.end.column.toString)
+    ).withRangeSet(range)
+  }
+  
+  def iInstanceFieldWrite(subject: Expression, receiver: VarId, fieldName: String): Expression = {
+    val range = subject.getRange.get()
+    new MethodCallExpr(
+      makeMethodName("instanceFieldWrite"),
       subject,
       new NameExpr(receiver),
       new StringLiteralExpr(fieldName),
@@ -81,10 +109,10 @@ object InjectedMethods {
     ).withRangeSet(range)
   }
   
-  def iFieldRead(subject: Expression, receiver: VarId, fieldName: String): Expression = {
+  def iInstanceFieldRead(subject: Expression, receiver: VarId, fieldName: String): Expression = {
     val range = subject.getRange.get()
     new MethodCallExpr(
-      makeMethodName("fieldRead"),
+      makeMethodName("instanceFieldRead"),
       subject,
       new NameExpr(receiver),
       new StringLiteralExpr(fieldName),
