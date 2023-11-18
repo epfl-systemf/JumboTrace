@@ -5,9 +5,12 @@ import com.github.javaparser.ast.{CompilationUnit, Node}
 import com.github.javaparser.ast.`type`.Type
 import com.github.javaparser.ast.expr.{Expression, NameExpr, SimpleName}
 import com.github.javaparser.ast.stmt.LabeledStmt
+import com.github.javaparser.resolution.UnsolvedSymbolException
+import com.github.javaparser.resolution.declarations.ResolvedValueDeclaration
 import s2sCompiler.ErrorReporter.ErrorLevel
 
 import scala.collection.mutable
+import scala.util.Try
 
 /**
  * Builds a map from expressions to their types
@@ -19,16 +22,23 @@ final class Analyzer extends CompilerStage[CompilationUnit, Analyzer.Result] {
   override protected def runImpl(cu: CompilationUnit, errorReporter: ErrorReporter): Option[Analyzer.Result] = {
     val filename = cu.getStorage.map(_.getFileName).orElseGet { () => "<missing file name>" }
     val typesMapB = Map.newBuilder[Expression, Type]
+    val declarationsMapB = Map.newBuilder[NameExpr, ResolvedValueDeclaration]
     val varIdsSetB = Set.newBuilder[String]
     cu.findAll(classOf[Node]).forEach { node =>
       computeAndAddTypeIfExpr(typesMapB, node)
       node match {
+        case nameExpr: NameExpr =>
+          try {
+            declarationsMapB.addOne(nameExpr -> nameExpr.resolve())
+          } catch {
+            case _: Exception => ()
+          }
         case simpleName: SimpleName =>
           varIdsSetB.addOne(simpleName.getIdentifier)
         case _ => ()
       }
     }
-    Some(Analyzer.Result(cu, typesMapB.result(), varIdsSetB.result()))
+    Some(Analyzer.Result(cu, typesMapB.result(), declarationsMapB.result(), varIdsSetB.result()))
   }
 
   private def computeAndAddTypeIfExpr(mapB: mutable.Builder[(Expression, Type), Map[Expression, Type]], node: Node): Unit = {
@@ -45,11 +55,16 @@ final class Analyzer extends CompilerStage[CompilationUnit, Analyzer.Result] {
       case _ => ()
     }
   }
-  
+
 }
 
 object Analyzer {
-  
-  final case class Result(cu: CompilationUnit, types: Map[Expression, Type], usedVariableNames: Set[String])
-  
+
+  final case class Result(
+                           cu: CompilationUnit,
+                           types: Map[Expression, Type],
+                           declarations: Map[NameExpr, ResolvedValueDeclaration],
+                           usedVariableNames: Set[String]
+                         )
+
 }

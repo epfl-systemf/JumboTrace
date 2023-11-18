@@ -14,8 +14,10 @@ import com.github.javaparser.ast.expr.*
 import com.github.javaparser.ast.modules.*
 import com.github.javaparser.ast.stmt.*
 import com.github.javaparser.ast.visitor.*
+import com.github.javaparser.resolution.declarations.ResolvedDeclaration
 import com.github.javaparser.resolution.types.ResolvedType
 import com.github.javaparser.symbolsolver.JavaSymbolSolver
+import com.github.javaparser.symbolsolver.javaparsermodel.declarations.{JavaParserFieldDeclaration, JavaParserParameterDeclaration, JavaParserPatternDeclaration, JavaParserVariableDeclaration}
 import com.github.javaparser.symbolsolver.resolution.typesolvers.{CombinedTypeSolver, JavaParserTypeSolver, ReflectionTypeSolver}
 import injectionAutomation.InjectedMethods
 
@@ -27,7 +29,7 @@ import scala.util.Try
 final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] {
 
   override protected def runImpl(input: Analyzer.Result, errorReporter: ErrorReporter): Option[CompilationUnit] = {
-    val Analyzer.Result(cu, typesMap, usedVariableNames) = input
+    val Analyzer.Result(cu, typesMap, declMap, usedVariableNames) = input
     val output = cu.accept(
       new TransformationVisitor(),
       Ctx(
@@ -36,6 +38,7 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
         ListBuffer.empty,
         new FreshNamesGenerator(usedVariableNames),
         typesMap,
+        declMap,
         currentlyExecutingMethodDescr = None,
         currentBreakTarget = None,
         currentContinueTarget = None,
@@ -51,11 +54,18 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
                                 extraVariables: ListBuffer[VariableDeclarator],
                                 freshNamesGenerator: FreshNamesGenerator,
                                 typesMap: Map[Expression, Type],
+                                declMap: Map[NameExpr, ResolvedDeclaration],
                                 currentlyExecutingMethodDescr: Option[String],
                                 currentBreakTarget: Option[Statement],
                                 currentContinueTarget: Option[Statement],
                                 currentYieldTarget: Option[SwitchExpr]
-                              )
+                              ){
+    def createAndSaveExtraVar(middleFix: String, tpe: Type): String = {
+      val id = freshNamesGenerator.nextName(middleFix)
+      extraVariables.addOne(new VariableDeclarator(tpe, id))
+      id
+    }
+  }
 
   private final class TransformationVisitor extends GenericVisitor[Node, Ctx] {
 
@@ -78,45 +88,46 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
 
     override def visit(bc: BlockComment, ctx: Ctx): BlockComment = bc
 
-    override def visit(n: ClassOrInterfaceDeclaration, ctx: Ctx): ClassOrInterfaceDeclaration = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val name = visit(n.getName, ctx)
-      val typeParameters = n.getTypeParameters.acceptThis(ctx)
-      val extendedTypes = n.getExtendedTypes.acceptThis(ctx)
-      val implementedTypes = n.getImplementedTypes.acceptThis(ctx)
-      val permittedTypes = n.getPermittedTypes.acceptThis(ctx)
-      val members = n.getMembers.acceptThis(ctx)
-      n.setModifiers(modifiers)
-      n.setAnnotations(annotations)
-      n.setName(name)
-      n.setTypeParameters(typeParameters)
-      n.setExtendedTypes(extendedTypes)
-      n.setImplementedTypes(implementedTypes)
-      n.setPermittedTypes(permittedTypes)
-      n.setMembers(members)
+    override def visit(classOrInterfaceDecl: ClassOrInterfaceDeclaration, ctx: Ctx): ClassOrInterfaceDeclaration = {
+      val modifiers = classOrInterfaceDecl.getModifiers.acceptThis(ctx)
+      val annotations = classOrInterfaceDecl.getAnnotations.acceptThis(ctx)
+      val name = visit(classOrInterfaceDecl.getName, ctx)
+      val typeParameters = classOrInterfaceDecl.getTypeParameters.acceptThis(ctx)
+      val extendedTypes = classOrInterfaceDecl.getExtendedTypes.acceptThis(ctx)
+      val implementedTypes = classOrInterfaceDecl.getImplementedTypes.acceptThis(ctx)
+      val permittedTypes = classOrInterfaceDecl.getPermittedTypes.acceptThis(ctx)
+      val members = classOrInterfaceDecl.getMembers.acceptThis(ctx)
+      classOrInterfaceDecl.setModifiers(modifiers)
+      classOrInterfaceDecl.setAnnotations(annotations)
+      classOrInterfaceDecl.setName(name)
+      classOrInterfaceDecl.setTypeParameters(typeParameters)
+      classOrInterfaceDecl.setExtendedTypes(extendedTypes)
+      classOrInterfaceDecl.setImplementedTypes(implementedTypes)
+      classOrInterfaceDecl.setPermittedTypes(permittedTypes)
+      classOrInterfaceDecl.setMembers(members)
     }
 
-    override def visit(n: RecordDeclaration, ctx: Ctx): RecordDeclaration = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val name = visit(n.getName, ctx)
-      val parameters = n.getParameters.acceptThis(ctx)
-      val typeParameters = n.getTypeParameters.acceptThis(ctx)
-      val implementedTypes = n.getImplementedTypes.acceptThis(ctx)
-      val members = n.getMembers.acceptThis(ctx)
-      val receiverParameter = n.getReceiverParameter.propagateAndCast(ctx)
-      n.setModifiers(modifiers)
-      n.setAnnotations(annotations)
-      n.setName(name)
-      n.setParameters(parameters)
-      n.setTypeParameters(typeParameters)
-      n.setImplementedTypes(implementedTypes)
-      n.setMembers(members)
-      n.setReceiverParameter(receiverParameter)
+    override def visit(recordDecl: RecordDeclaration, ctx: Ctx): RecordDeclaration = {
+      val modifiers = recordDecl.getModifiers.acceptThis(ctx)
+      val annotations = recordDecl.getAnnotations.acceptThis(ctx)
+      val name = visit(recordDecl.getName, ctx)
+      val parameters = recordDecl.getParameters.acceptThis(ctx)
+      val typeParameters = recordDecl.getTypeParameters.acceptThis(ctx)
+      val implementedTypes = recordDecl.getImplementedTypes.acceptThis(ctx)
+      val members = recordDecl.getMembers.acceptThis(ctx)
+      val receiverParameter = recordDecl.getReceiverParameter.propagateAndCast(ctx)
+      recordDecl.setModifiers(modifiers)
+      recordDecl.setAnnotations(annotations)
+      recordDecl.setName(name)
+      recordDecl.setParameters(parameters)
+      recordDecl.setTypeParameters(typeParameters)
+      recordDecl.setImplementedTypes(implementedTypes)
+      recordDecl.setMembers(members)
+      recordDecl.setReceiverParameter(receiverParameter)
     }
 
     override def visit(cConstrDecl: CompactConstructorDeclaration, externalCtx: Ctx): CompactConstructorDeclaration = {
+      val id = cConstrDecl.getName.getIdentifier
       val variables = ListBuffer.empty[VariableDeclarator]
       val modifiers = cConstrDecl.getModifiers.acceptThis(externalCtx)
       val annotations = cConstrDecl.getAnnotations.acceptThis(externalCtx)
@@ -130,7 +141,8 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
           variables,
           externalCtx.freshNamesGenerator.emptyCopy,
           externalCtx.typesMap,
-          currentlyExecutingMethodDescr = Some(s"compact constructor of ${cConstrDecl.getName.getIdentifier}"),
+          externalCtx.declMap,
+          currentlyExecutingMethodDescr = Some(s"compact constructor of $id"),
           currentBreakTarget = None,
           currentContinueTarget = None,
           currentYieldTarget = None
@@ -145,19 +157,19 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       cConstrDecl.setBody(body)
     }
 
-    override def visit(n: EnumDeclaration, ctx: Ctx): EnumDeclaration = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val name = visit(n.getName, ctx)
-      val implementedTypes = n.getImplementedTypes.acceptThis(ctx)
-      val entries = n.getEntries.acceptThis(ctx)
-      val members = n.getMembers.acceptThis(ctx)
-      n.setModifiers(modifiers)
-      n.setAnnotations(annotations)
-      n.setName(name)
-      n.setImplementedTypes(implementedTypes)
-      n.setEntries(entries)
-      n.setMembers(members)
+    override def visit(enumDecl: EnumDeclaration, ctx: Ctx): EnumDeclaration = {
+      val modifiers = enumDecl.getModifiers.acceptThis(ctx)
+      val annotations = enumDecl.getAnnotations.acceptThis(ctx)
+      val name = visit(enumDecl.getName, ctx)
+      val implementedTypes = enumDecl.getImplementedTypes.acceptThis(ctx)
+      val entries = enumDecl.getEntries.acceptThis(ctx)
+      val members = enumDecl.getMembers.acceptThis(ctx)
+      enumDecl.setModifiers(modifiers)
+      enumDecl.setAnnotations(annotations)
+      enumDecl.setName(name)
+      enumDecl.setImplementedTypes(implementedTypes)
+      enumDecl.setEntries(entries)
+      enumDecl.setMembers(members)
     }
 
     override def visit(enumConstDecl: EnumConstantDeclaration, ctx: Ctx): EnumConstantDeclaration = {
@@ -205,15 +217,20 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     }
 
     override def visit(varDecl: VariableDeclarator, ctx: Ctx): VariableDeclarator = {
+      val varId = varDecl.getName.getIdentifier
       val tpe = varDecl.getType.propagateAndCast(ctx)
       val name = visit(varDecl.getName, ctx)
-      val initializer = varDecl.getInitializer.propagateAndCast(ctx)
       varDecl.setType(tpe)
       varDecl.setName(name)
-      varDecl.setInitializer(initializer)
+      if (varDecl.getInitializer.isPresent){
+        val init = varDecl.getInitializer.get().propagateAndCast(ctx)
+        varDecl.setInitializer(InjectedMethods.iVarWrite(init, varId))
+      }
+      varDecl
     }
 
     override def visit(constrDecl: ConstructorDeclaration, externalCtx: Ctx): ConstructorDeclaration = {
+      val id = constrDecl.getName.getIdentifier
       val variables = ListBuffer.empty[VariableDeclarator]
       val modifiers = constrDecl.getModifiers.acceptThis(externalCtx)
       val annotations = constrDecl.getAnnotations.acceptThis(externalCtx)
@@ -228,7 +245,8 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
           variables,
           externalCtx.freshNamesGenerator.emptyCopy,
           externalCtx.typesMap,
-          currentlyExecutingMethodDescr = Some(s"constructor of ${constrDecl.getName.getIdentifier}"),
+          externalCtx.declMap,
+          currentlyExecutingMethodDescr = Some(s"constructor of $id"),
           currentBreakTarget = None,
           currentContinueTarget = None,
           currentYieldTarget = None
@@ -247,6 +265,7 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     }
 
     override def visit(methodDecl: MethodDeclaration, externalCtx: Ctx): MethodDeclaration = {
+      val id = methodDecl.getName.getIdentifier
       val variables = ListBuffer.empty[VariableDeclarator]
       val modifiers = methodDecl.getModifiers.acceptThis(externalCtx)
       val annotations = methodDecl.getAnnotations.acceptThis(externalCtx)
@@ -262,7 +281,8 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
           variables,
           externalCtx.freshNamesGenerator.emptyCopy,
           externalCtx.typesMap,
-          currentlyExecutingMethodDescr = Some(s"method ${methodDecl.getName.getIdentifier}"),
+          externalCtx.declMap,
+          currentlyExecutingMethodDescr = Some(s"method $id"),
           currentBreakTarget = None,
           currentContinueTarget = None,
           currentYieldTarget = None
@@ -281,22 +301,22 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       methodDecl.setReceiverParameter(receiverParameter)
     }
 
-    override def visit(n: Parameter, ctx: Ctx): Parameter = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val tpe = n.getType.propagateAndCast(ctx)
-      val varArgsAnnotations = n.getVarArgsAnnotations.acceptThis(ctx)
-      val name = visit(n.getName, ctx)
-      n.setModifiers(modifiers)
-      n.setAnnotations(annotations)
-      n.setType(tpe)
-      n.setVarArgsAnnotations(varArgsAnnotations)
-      n.setName(name)
+    override def visit(param: Parameter, ctx: Ctx): Parameter = {
+      val modifiers = param.getModifiers.acceptThis(ctx)
+      val annotations = param.getAnnotations.acceptThis(ctx)
+      val tpe = param.getType.propagateAndCast(ctx)
+      val varArgsAnnotations = param.getVarArgsAnnotations.acceptThis(ctx)
+      val name = visit(param.getName, ctx)
+      param.setModifiers(modifiers)
+      param.setAnnotations(annotations)
+      param.setType(tpe)
+      param.setVarArgsAnnotations(varArgsAnnotations)
+      param.setName(name)
     }
 
-    override def visit(n: InitializerDeclaration, ctx: Ctx): InitializerDeclaration = {
-      val body = n.getBody.propagateAndCast(ctx)
-      n.setBody(body)
+    override def visit(initDecl: InitializerDeclaration, ctx: Ctx): InitializerDeclaration = {
+      val body = initDecl.getBody.propagateAndCast(ctx)
+      initDecl.setBody(body)
     }
 
     override def visit(jdocComment: JavadocComment, ctx: Ctx): JavadocComment = jdocComment
@@ -307,11 +327,11 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
 
     override def visit(tpe: ArrayType, ctx: Ctx): ArrayType = tpe
 
-    override def visit(n: ArrayCreationLevel, ctx: Ctx): ArrayCreationLevel = {
-      val dimension = n.getDimension.propagateAndCast(ctx)
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      n.setDimension(dimension)
-      n.setAnnotations(annotations)
+    override def visit(arrayCreationLevel: ArrayCreationLevel, ctx: Ctx): ArrayCreationLevel = {
+      val dimension = arrayCreationLevel.getDimension.propagateAndCast(ctx)
+      val annotations = arrayCreationLevel.getAnnotations.acceptThis(ctx)
+      arrayCreationLevel.setDimension(dimension)
+      arrayCreationLevel.setAnnotations(annotations)
     }
 
     override def visit(tpe: IntersectionType, ctx: Ctx): IntersectionType = tpe
@@ -325,12 +345,10 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     override def visit(tpe: UnknownType, ctx: Ctx): UnknownType = tpe
 
     override def visit(arrayAccessExpr: ArrayAccessExpr, ctx: Ctx): Expression = {
-      import ctx.{er, extraVariables, filename, freshNamesGenerator}
-      val arrayVarId = freshNamesGenerator.nextName("array")
-      val idxVarId = freshNamesGenerator.nextName("index")
+      import ctx.{er, filename}
       val arrayType = typeOf(arrayAccessExpr.getName, ctx)
-      extraVariables.addOne(new VariableDeclarator(arrayType, arrayVarId))
-      extraVariables.addOne(new VariableDeclarator(intType(), idxVarId))
+      val arrayVarId = ctx.createAndSaveExtraVar("array", arrayType)
+      val idxVarId = ctx.createAndSaveExtraVar("index", intType())
       val name = arrayAccessExpr.getName.propagateAndCast(ctx)
       val index = arrayAccessExpr.getIndex.propagateAndCast(ctx)
       arrayAccessExpr.setName(new EnclosedExpr(new AssignExpr(new NameExpr(arrayVarId), name, AssignExpr.Operator.ASSIGN)))
@@ -353,31 +371,24 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
     }
 
     override def visit(assignExpr: AssignExpr, ctx: Ctx): Expression = {
-      import ctx.{freshNamesGenerator, extraVariables}
-
       assignExpr.getTarget match {
         case nameExpr: NameExpr => {
           // FIXME what if nameExpr is a field of this? Maybe we can detect this from the bytecode
           val value = assignExpr.getValue.propagateAndCast(ctx)
           assignExpr.setValue(value)
-          InjectedMethods.iVarAssign(assignExpr, nameExpr.getName.getIdentifier)
+          InjectedMethods.iVarWrite(assignExpr, nameExpr.getName.getIdentifier)
         }
         case fieldAccessExpr: FieldAccessExpr => {
-          val receiverVarId = freshNamesGenerator.nextName("receiver")
           val receiverType = typeOf(fieldAccessExpr.getScope, ctx)
-          extraVariables.addOne(new VariableDeclarator(receiverType, receiverVarId))
+          val receiverVarId = ctx.createAndSaveExtraVar("receiver", receiverType)
           val scope = fieldAccessExpr.getScope.propagateAndCast(ctx)
-          val name = fieldAccessExpr.getName.propagateAndCast(ctx)
           fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverVarId), scope, AssignExpr.Operator.ASSIGN)))
-          fieldAccessExpr.setName(name)
           InjectedMethods.iFieldWrite(assignExpr, receiverVarId, fieldAccessExpr.getName.getIdentifier)
         }
         case arrayAccessExpr: ArrayAccessExpr => {
-          val arrayVarId = freshNamesGenerator.nextName("array")
-          val idxVarId = freshNamesGenerator.nextName("index")
           val arrayType = typeOf(arrayAccessExpr.getName, ctx)
-          extraVariables.addOne(new VariableDeclarator(arrayType, arrayVarId))
-          extraVariables.addOne(new VariableDeclarator(intType(), idxVarId))
+          val arrayVarId = ctx.createAndSaveExtraVar("array", arrayType)
+          val idxVarId = ctx.createAndSaveExtraVar("index", intType())
           val name = arrayAccessExpr.getName.propagateAndCast(ctx)
           val index = arrayAccessExpr.getIndex.propagateAndCast(ctx)
           val value = assignExpr.getValue.propagateAndCast(ctx)
@@ -386,58 +397,65 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
           assignExpr.setValue(value)
           InjectedMethods.iArrayWrite(assignExpr, arrayVarId, idxVarId)
         }
+        case unexpected => throw new AssertionError(
+          s"unexpected lhs of assignment: ${unexpected.getClass.getSimpleName} ($unexpected)"
+        )
       }
     }
 
-    override def visit(n: BinaryExpr, ctx: Ctx): Expression = {
-      val left = n.getLeft.propagateAndCast(ctx)
-      val right = n.getRight.propagateAndCast(ctx)
-      n.setLeft(left)
-      n.setRight(right)
+    override def visit(binaryExpr: BinaryExpr, ctx: Ctx): Expression = {
+      val left = binaryExpr.getLeft.propagateAndCast(ctx)
+      val right = binaryExpr.getRight.propagateAndCast(ctx)
+      binaryExpr.setLeft(left)
+      binaryExpr.setRight(right)
     }
 
-    override def visit(n: CastExpr, ctx: Ctx): Expression = {
-      val tpe = n.getType.propagateAndCast(ctx)
-      val expr = n.getExpression.propagateAndCast(ctx)
-      n.setType(tpe)
-      n.setExpression(expr)
+    override def visit(castExpr: CastExpr, ctx: Ctx): Expression = {
+      val tpe = castExpr.getType.propagateAndCast(ctx)
+      val expr = castExpr.getExpression.propagateAndCast(ctx)
+      castExpr.setType(tpe)
+      castExpr.setExpression(expr)
     }
 
-    override def visit(n: ClassExpr, ctx: Ctx): Expression = {
-      val tpe = n.getType.propagateAndCast(ctx)
-      n.setType(tpe)
+    override def visit(classExpr: ClassExpr, ctx: Ctx): Expression = {
+      val tpe = classExpr.getType.propagateAndCast(ctx)
+      classExpr.setType(tpe)
     }
 
-    override def visit(n: ConditionalExpr, ctx: Ctx): Expression = {
-      val condition = n.getCondition.propagateAndCast(ctx)
-      val thenExpr = n.getThenExpr.propagateAndCast(ctx)
-      val elseExpr = n.getElseExpr.propagateAndCast(ctx)
-      n.setCondition(condition)
-      n.setThenExpr(thenExpr)
-      n.setElseExpr(elseExpr)
+    override def visit(conditionalExpr: ConditionalExpr, ctx: Ctx): Expression = {
+      val condition = conditionalExpr.getCondition.propagateAndCast(ctx)
+      val thenExpr = conditionalExpr.getThenExpr.propagateAndCast(ctx)
+      val elseExpr = conditionalExpr.getElseExpr.propagateAndCast(ctx)
+      conditionalExpr.setCondition(condition)
+      conditionalExpr.setThenExpr(thenExpr)
+      conditionalExpr.setElseExpr(elseExpr)
     }
 
-    override def visit(n: EnclosedExpr, ctx: Ctx): Expression = {
-      val inner = n.getInner.propagateAndCast(ctx)
-      n.setInner(inner)
+    override def visit(enclosedExpr: EnclosedExpr, ctx: Ctx): Expression = {
+      val inner = enclosedExpr.getInner.propagateAndCast(ctx)
+      enclosedExpr.setInner(inner)
     }
 
-    override def visit(n: FieldAccessExpr, ctx: Ctx): Expression = {
-      val scope = n.getScope.propagateAndCast(ctx)
-      val typeArgs = n.getTypeArguments.map(_.acceptThis(ctx)).getOrNull()
-      val name = visit(n.getName, ctx)
-      n.setScope(scope)
-      n.setTypeArguments(typeArgs)
-      n.setName(name)
+    override def visit(fieldAccessExpr: FieldAccessExpr, ctx: Ctx): Expression = {
+      val receiverId = ctx.createAndSaveExtraVar("receiver", typeOf(fieldAccessExpr.getScope, ctx))
+      val fieldId = fieldAccessExpr.getName.getIdentifier
+      val scope = fieldAccessExpr.getScope.propagateAndCast(ctx)
+      val typeArgs = fieldAccessExpr.getTypeArguments.map(_.acceptThis(ctx)).getOrNull()
+      val name = visit(fieldAccessExpr.getName, ctx)
+      // FIXME don't save the receiver as a value for static field accesses
+      fieldAccessExpr.setScope(new EnclosedExpr(new AssignExpr(new NameExpr(receiverId), scope, AssignExpr.Operator.ASSIGN)))
+      fieldAccessExpr.setTypeArguments(typeArgs)
+      fieldAccessExpr.setName(name)
+      InjectedMethods.iFieldRead(fieldAccessExpr, receiverId, fieldId)
     }
 
-    override def visit(n: InstanceOfExpr, ctx: Ctx): Expression = {
-      val expr = n.getExpression.propagateAndCast(ctx)
-      val tpe = n.getType.propagateAndCast(ctx)
-      val pattern = n.getPattern.propagateAndCast(ctx)
-      n.setExpression(expr)
-      n.setType(tpe)
-      n.setPattern(pattern)
+    override def visit(instanceOfExpr: InstanceOfExpr, ctx: Ctx): Expression = {
+      val expr = instanceOfExpr.getExpression.propagateAndCast(ctx)
+      val tpe = instanceOfExpr.getType.propagateAndCast(ctx)
+      val pattern = instanceOfExpr.getPattern.propagateAndCast(ctx)
+      instanceOfExpr.setExpression(expr)
+      instanceOfExpr.setType(tpe)
+      instanceOfExpr.setPattern(pattern)
     }
 
     override def visit(lit: StringLiteralExpr, ctx: Ctx): Expression = lit
@@ -465,22 +483,29 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       n.setArguments(args)
     }
 
-    override def visit(n: NameExpr, ctx: Ctx): Expression = {
-      val name = visit(n.getName, ctx)
-      n.setName(name)
+    override def visit(nameExpr: NameExpr, ctx: Ctx): Expression = {
+      import ctx.{freshNamesGenerator, extraVariables, declMap}
+      val name = visit(nameExpr.getName, ctx)
+      nameExpr.setName(name)
+      declMap.get(nameExpr) match
+        case Some(_: (JavaParserVariableDeclaration | JavaParserParameterDeclaration | JavaParserPatternDeclaration)) =>
+          InjectedMethods.iVarRead(nameExpr, name.getIdentifier)
+        case Some(_: JavaParserFieldDeclaration) =>
+          InjectedMethods.iFieldRead(nameExpr, "this", nameExpr.getName.getIdentifier)
+        case _ => nameExpr  // TODO other cases?
     }
 
-    override def visit(n: ObjectCreationExpr, ctx: Ctx): Expression = {
-      val scope = n.getScope.propagateAndCast(ctx)
-      val tpe = n.getType.propagateAndCast(ctx)
-      val typeArgs = n.getTypeArguments.map(_.acceptThis(ctx)).getOrNull()
-      val args = n.getArguments.acceptThis(ctx)
-      val anonymousClassBody = n.getAnonymousClassBody.map(_.acceptThis(ctx)).getOrNull()
-      n.setScope(scope)
-      n.setType(tpe)
-      n.setTypeArguments(typeArgs)
-      n.setArguments(args)
-      n.setAnonymousClassBody(anonymousClassBody)
+    override def visit(objectCreationExpr: ObjectCreationExpr, ctx: Ctx): Expression = {
+      val scope = objectCreationExpr.getScope.propagateAndCast(ctx)
+      val tpe = objectCreationExpr.getType.propagateAndCast(ctx)
+      val typeArgs = objectCreationExpr.getTypeArguments.map(_.acceptThis(ctx)).getOrNull()
+      val args = objectCreationExpr.getArguments.acceptThis(ctx)
+      val anonymousClassBody = objectCreationExpr.getAnonymousClassBody.map(_.acceptThis(ctx)).getOrNull()
+      objectCreationExpr.setScope(scope)
+      objectCreationExpr.setType(tpe)
+      objectCreationExpr.setTypeArguments(typeArgs)
+      objectCreationExpr.setArguments(args)
+      objectCreationExpr.setAnonymousClassBody(anonymousClassBody)
     }
 
     override def visit(n: ThisExpr, ctx: Ctx): Expression = {
@@ -661,28 +686,28 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       forStmt.setBody(body)
     }
 
-    override def visit(n: ThrowStmt, ctx: Ctx): Statement = {
-      val expr = n.getExpression.propagateAndCast(ctx)
-      n.setExpression(expr)
+    override def visit(throwStmt: ThrowStmt, ctx: Ctx): Statement = {
+      val expr = throwStmt.getExpression.propagateAndCast(ctx)
+      throwStmt.setExpression(expr)
     }
 
-    override def visit(n: SynchronizedStmt, ctx: Ctx): Statement = {
-      ctx.er.reportErrorPos("'synchronized' found: JumboTrace does not support concurrency", NonFatalError, ctx.filename, n.getRange)
-      val expr = n.getExpression.propagateAndCast(ctx)
-      val body = n.getBody.propagateAndCast(ctx)
-      n.setExpression(expr)
-      n.setBody(body)
+    override def visit(synchronizedStmt: SynchronizedStmt, ctx: Ctx): Statement = {
+      ctx.er.reportErrorPos("'synchronized' found: JumboTrace does not support concurrency", NonFatalError, ctx.filename, synchronizedStmt.getRange)
+      val expr = synchronizedStmt.getExpression.propagateAndCast(ctx)
+      val body = synchronizedStmt.getBody.propagateAndCast(ctx)
+      synchronizedStmt.setExpression(expr)
+      synchronizedStmt.setBody(body)
     }
 
-    override def visit(n: TryStmt, ctx: Ctx): Statement = {
-      val resources = n.getResources.acceptThis(ctx)
-      val tryBlock = n.getTryBlock.propagateAndCast(ctx)
-      val catchClauses = n.getCatchClauses.acceptThis(ctx)
-      val finallyBlock = n.getFinallyBlock.propagateAndCast(ctx)
-      n.setResources(resources)
-      n.setTryBlock(tryBlock)
-      n.setCatchClauses(catchClauses)
-      n.setFinallyBlock(finallyBlock)
+    override def visit(tryStmt: TryStmt, ctx: Ctx): Statement = {
+      val resources = tryStmt.getResources.acceptThis(ctx)
+      val tryBlock = tryStmt.getTryBlock.propagateAndCast(ctx)
+      val catchClauses = tryStmt.getCatchClauses.acceptThis(ctx)
+      val finallyBlock = tryStmt.getFinallyBlock.propagateAndCast(ctx)
+      tryStmt.setResources(resources)
+      tryStmt.setTryBlock(tryBlock)
+      tryStmt.setCatchClauses(catchClauses)
+      tryStmt.setFinallyBlock(finallyBlock)
     }
 
     override def visit(n: CatchClause, ctx: Ctx): CatchClause = {
@@ -715,69 +740,69 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       throw new UnsupportedOperationException()
     }
 
-    override def visit(n: Name, ctx: Ctx): Name = {
-      val qualifier = n.getQualifier.propagateAndCast(ctx)
-      n.setQualifier(qualifier)
+    override def visit(name: Name, ctx: Ctx): Name = {
+      val qualifier = name.getQualifier.propagateAndCast(ctx)
+      name.setQualifier(qualifier)
     }
 
     override def visit(sn: SimpleName, ctx: Ctx): SimpleName = sn
 
-    override def visit(n: ImportDeclaration, ctx: Ctx): ImportDeclaration = {
-      val name = n.getName.propagateAndCast(ctx)
-      n.setName(name)
+    override def visit(importDecl: ImportDeclaration, ctx: Ctx): ImportDeclaration = {
+      val name = importDecl.getName.propagateAndCast(ctx)
+      importDecl.setName(name)
     }
 
-    override def visit(n: ModuleDeclaration, ctx: Ctx): ModuleDeclaration = {
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val name = n.getName.propagateAndCast(ctx)
-      val directives = n.getDirectives.acceptThis(ctx)
-      n.setAnnotations(annotations)
-      n.setName(name)
-      n.setDirectives(directives)
+    override def visit(moduleDecl: ModuleDeclaration, ctx: Ctx): ModuleDeclaration = {
+      val annotations = moduleDecl.getAnnotations.acceptThis(ctx)
+      val name = moduleDecl.getName.propagateAndCast(ctx)
+      val directives = moduleDecl.getDirectives.acceptThis(ctx)
+      moduleDecl.setAnnotations(annotations)
+      moduleDecl.setName(name)
+      moduleDecl.setDirectives(directives)
     }
 
-    override def visit(n: ModuleRequiresDirective, ctx: Ctx): ModuleRequiresDirective = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val name = n.getName.propagateAndCast(ctx)
-      n.setModifiers(modifiers)
-      n.setName(name)
+    override def visit(moduleReqDecl: ModuleRequiresDirective, ctx: Ctx): ModuleRequiresDirective = {
+      val modifiers = moduleReqDecl.getModifiers.acceptThis(ctx)
+      val name = moduleReqDecl.getName.propagateAndCast(ctx)
+      moduleReqDecl.setModifiers(modifiers)
+      moduleReqDecl.setName(name)
     }
 
-    override def visit(n: ModuleExportsDirective, ctx: Ctx): ModuleExportsDirective = {
-      val name = n.getName.propagateAndCast(ctx)
-      val moduleNames = n.getModuleNames.acceptThis(ctx)
-      n.setName(name)
-      n.setModuleNames(moduleNames)
+    override def visit(moduleExportsDirective: ModuleExportsDirective, ctx: Ctx): ModuleExportsDirective = {
+      val name = moduleExportsDirective.getName.propagateAndCast(ctx)
+      val moduleNames = moduleExportsDirective.getModuleNames.acceptThis(ctx)
+      moduleExportsDirective.setName(name)
+      moduleExportsDirective.setModuleNames(moduleNames)
     }
 
-    override def visit(n: ModuleProvidesDirective, ctx: Ctx): ModuleProvidesDirective = {
-      val name = n.getName.propagateAndCast(ctx)
-      val wth = n.getWith.acceptThis(ctx)
-      n.setName(name)
-      n.setWith(wth)
+    override def visit(moduleProviedsDirective: ModuleProvidesDirective, ctx: Ctx): ModuleProvidesDirective = {
+      val name = moduleProviedsDirective.getName.propagateAndCast(ctx)
+      val wth = moduleProviedsDirective.getWith.acceptThis(ctx)
+      moduleProviedsDirective.setName(name)
+      moduleProviedsDirective.setWith(wth)
     }
 
-    override def visit(n: ModuleUsesDirective, ctx: Ctx): ModuleUsesDirective = {
-      val name = n.getName.propagateAndCast(ctx)
-      n.setName(name)
+    override def visit(moduleUsesDirective: ModuleUsesDirective, ctx: Ctx): ModuleUsesDirective = {
+      val name = moduleUsesDirective.getName.propagateAndCast(ctx)
+      moduleUsesDirective.setName(name)
     }
 
-    override def visit(n: ModuleOpensDirective, ctx: Ctx): ModuleOpensDirective = {
-      val name = n.getName.propagateAndCast(ctx)
-      val moduleNames = n.getModuleNames.acceptThis(ctx)
-      n.setName(name)
-      n.setModuleNames(moduleNames)
+    override def visit(moduleOpensDirective: ModuleOpensDirective, ctx: Ctx): ModuleOpensDirective = {
+      val name = moduleOpensDirective.getName.propagateAndCast(ctx)
+      val moduleNames = moduleOpensDirective.getModuleNames.acceptThis(ctx)
+      moduleOpensDirective.setName(name)
+      moduleOpensDirective.setModuleNames(moduleNames)
     }
 
     override def visit(unparsableStmt: UnparsableStmt, ctx: Ctx): Statement = unparsableStmt
 
-    override def visit(n: ReceiverParameter, ctx: Ctx): ReceiverParameter = {
-      val annotations = n.getAnnotations.acceptThis(ctx)
-      val tpe = n.getType.propagateAndCast(ctx)
-      val name = n.getName.propagateAndCast(ctx)
-      n.setAnnotations(annotations)
-      n.setType(tpe)
-      n.setName(name)
+    override def visit(receiverParameter: ReceiverParameter, ctx: Ctx): ReceiverParameter = {
+      val annotations = receiverParameter.getAnnotations.acceptThis(ctx)
+      val tpe = receiverParameter.getType.propagateAndCast(ctx)
+      val name = receiverParameter.getName.propagateAndCast(ctx)
+      receiverParameter.setAnnotations(annotations)
+      receiverParameter.setType(tpe)
+      receiverParameter.setName(name)
     }
 
     override def visit(varType: VarType, ctx: Ctx): VarType = varType
@@ -791,20 +816,20 @@ final class Transformer extends CompilerStage[Analyzer.Result, CompilationUnit] 
       switchExpr.setEntries(entries)
     }
 
-    override def visit(n: YieldStmt, ctx: Ctx): Statement = {
-      val expr = n.getExpression.propagateAndCast(ctx)
-      n.setExpression(expr)
+    override def visit(yieldStmt: YieldStmt, ctx: Ctx): Statement = {
+      val expr = yieldStmt.getExpression.propagateAndCast(ctx)
+      yieldStmt.setExpression(expr)
     }
 
     override def visit(tbLitExpr: TextBlockLiteralExpr, ctx: Ctx): Expression = tbLitExpr
 
-    override def visit(n: PatternExpr, ctx: Ctx): Expression = {
-      val modifiers = n.getModifiers.acceptThis(ctx)
-      val tpe = n.getType.propagateAndCast(ctx)
-      val name = n.getName.propagateAndCast(ctx)
-      n.setModifiers(modifiers)
-      n.setType(tpe)
-      n.setName(name)
+    override def visit(patternExpr: PatternExpr, ctx: Ctx): Expression = {
+      val modifiers = patternExpr.getModifiers.acceptThis(ctx)
+      val tpe = patternExpr.getType.propagateAndCast(ctx)
+      val name = patternExpr.getName.propagateAndCast(ctx)
+      patternExpr.setModifiers(modifiers)
+      patternExpr.setType(tpe)
+      patternExpr.setName(name)
     }
 
     extension[N <: Node] (ls: NodeList[N]) private def acceptThis(ctx: Ctx): NodeList[N] = {

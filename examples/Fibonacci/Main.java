@@ -9,7 +9,8 @@ public class Main {
     }
 
     public static void main(String[] args) {
-        args = new String[]{"ITER", "15"};  // FIXME
+        args = new String[]{"error", "15"};  // FIXME
+        args[0] = "ITER";
         if (args.length != 2){
             throw new InputMismatchException(
                     "required input format: <algo> <n>, with algo " +

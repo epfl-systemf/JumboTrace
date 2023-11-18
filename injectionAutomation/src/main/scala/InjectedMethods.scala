@@ -13,59 +13,91 @@ object InjectedMethods {
 
   private def makeMethodName(rawName: String): String = injectedClassName ++ "." ++ rawName
 
-  def iVarAssign(assignExpr: Expression, assignedVarId: VarId): Expression = {
-    val range = assignExpr.getRange.get()
+  def iVarWrite(subject: Expression, assignedVarId: VarId): Expression = {
+    val range = subject.getRange.get()
     new MethodCallExpr(
-      makeMethodName("varAssign"),
-      assignExpr,
+      makeMethodName("varWrite"),
+      subject,
       new StringLiteralExpr(assignedVarId),  // passing the name of the variable, not its value
       new IntegerLiteralExpr(range.begin.line.toString),
       new IntegerLiteralExpr(range.begin.column.toString),
       new IntegerLiteralExpr(range.end.line.toString),
       new IntegerLiteralExpr(range.end.column.toString)
-    )
+    ).withRangeSet(range)
   }
-
-  def iArrayRead(access: Expression, array: VarId, idx: VarId): Expression = {
-    val range = access.getRange.get()
+  
+  def iVarRead(subject: Expression, varId: VarId): Expression = {
+    val range = subject.getRange.get()
     new MethodCallExpr(
-      makeMethodName("arrayAccess"),
-      access,
-      new NameExpr(array),
-      new NameExpr(idx),
+      makeMethodName("varRead"),
+      subject,
+      new StringLiteralExpr(varId), // passing the name of the variable, not its value
       new IntegerLiteralExpr(range.begin.line.toString),
       new IntegerLiteralExpr(range.begin.column.toString),
       new IntegerLiteralExpr(range.end.line.toString),
       new IntegerLiteralExpr(range.end.column.toString)
-    )
+    ).withRangeSet(range)
   }
   
-  def iArrayWrite(write: Expression, array: VarId, idx: VarId): Expression = {
-    val range = write.getRange.get()
+  def iArrayWrite(subject: Expression, array: VarId, idx: VarId): Expression = {
+    val range = subject.getRange.get()
     new MethodCallExpr(
       makeMethodName("arrayWrite"),
-      write,
+      subject,
       new NameExpr(array),
       new NameExpr(idx),
       new IntegerLiteralExpr(range.begin.line.toString),
       new IntegerLiteralExpr(range.begin.column.toString),
       new IntegerLiteralExpr(range.end.line.toString),
       new IntegerLiteralExpr(range.end.column.toString)
-    )
+    ).withRangeSet(range)
+  }
+
+  def iArrayRead(subject: Expression, array: VarId, idx: VarId): Expression = {
+    val range = subject.getRange.get()
+    new MethodCallExpr(
+      makeMethodName("arrayAccess"),
+      subject,
+      new NameExpr(array),
+      new NameExpr(idx),
+      new IntegerLiteralExpr(range.begin.line.toString),
+      new IntegerLiteralExpr(range.begin.column.toString),
+      new IntegerLiteralExpr(range.end.line.toString),
+      new IntegerLiteralExpr(range.end.column.toString)
+    ).withRangeSet(range)
   }
   
-  def iFieldWrite(write: Expression, receiver: VarId, fieldName: VarId): Expression = {
-    val range = write.getRange.get()
+  def iFieldWrite(subject: Expression, receiver: VarId, fieldName: String): Expression = {
+    val range = subject.getRange.get()
     new MethodCallExpr(
       makeMethodName("fieldWrite"),
-      write,
+      subject,
       new NameExpr(receiver),
       new StringLiteralExpr(fieldName),
       new IntegerLiteralExpr(range.begin.line.toString),
       new IntegerLiteralExpr(range.begin.column.toString),
       new IntegerLiteralExpr(range.end.line.toString),
       new IntegerLiteralExpr(range.end.column.toString)
-    )
+    ).withRangeSet(range)
+  }
+  
+  def iFieldRead(subject: Expression, receiver: VarId, fieldName: String): Expression = {
+    val range = subject.getRange.get()
+    new MethodCallExpr(
+      makeMethodName("fieldRead"),
+      subject,
+      new NameExpr(receiver),
+      new StringLiteralExpr(fieldName),
+      new IntegerLiteralExpr(range.begin.line.toString),
+      new IntegerLiteralExpr(range.begin.column.toString),
+      new IntegerLiteralExpr(range.end.line.toString),
+      new IntegerLiteralExpr(range.end.column.toString)
+    ).withRangeSet(range)
+  }
+  
+  extension(expr: Expression) private def withRangeSet(range: Rng): Expression = {
+    expr.setRange(range)
+    expr
   }
 
 }
