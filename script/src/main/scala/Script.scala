@@ -161,6 +161,6 @@
       |  int IFNONNULL = 199; // -
       |""".stripMargin
   end raw
-  val lines = raw.lines().map(_.trim).filter(_.nonEmpty).map(_.drop(4).takeWhile(!_.isSpaceChar))
-  lines.forEach(line => println(s"case $line => \"${line.toLowerCase}\""))
+  val lines = raw.lines().map(_.trim).filter(_.nonEmpty).map(_.drop(4).takeWhile(_ != ';').split(Array('=')).map(_.trim))
+  lines.forEach(arr => println(s"type ${arr(0)} = ${arr(1)}"))
 }

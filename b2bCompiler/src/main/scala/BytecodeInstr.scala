@@ -267,3 +267,7 @@ final case class EndB() extends RegularBytecodeInstr {
 
   override protected def opcode: Int = -1
 }
+
+final case class StatementSeparator() extends BytecodeInstr {
+  override def descr: String = "------- new-stat -------"
+}

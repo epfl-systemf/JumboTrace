@@ -1,9 +1,13 @@
 package b2bCompiler
 
+import org.objectweb.asm.Opcodes.*
+import TypeSignature.*
+
 object OpcodesHelpers {
+
+  type StackUpdate = (Seq[TypeSignature], Seq[TypeSignature])
   
   def opcodeName(opcode: Int): String = {
-    import org.objectweb.asm.Opcodes.*
     opcode match {
       case NOP => "nop"
       case ACONST_NULL => "aconst_null"
@@ -164,5 +168,213 @@ object OpcodesHelpers {
       case IFNONNULL => "ifnonnull"
     }
   }
+
+  /**
+   * @return (popped, pushed)
+   */
+  def stackUpdate(opcode: Int): StackUpdate = {
+    opcode match {
+      case NOP => noChange
+      case ACONST_NULL => produce(ObjectRefT)
+      case ICONST_M1 => produce(IntT)
+      case ICONST_0 => produce(IntT)
+      case ICONST_1 => produce(IntT)
+      case ICONST_2 => produce(IntT)
+      case ICONST_3 => produce(IntT)
+      case ICONST_4 => produce(IntT)
+      case ICONST_5 => produce(IntT)
+      case LCONST_0 => produce(LongT)
+      case LCONST_1 => produce(LongT)
+      case FCONST_0 => produce(FloatT)
+      case FCONST_1 => produce(FloatT)
+      case FCONST_2 => produce(FloatT)
+      case DCONST_0 => produce(DoubleT)
+      case DCONST_1 => produce(DoubleT)
+      case BIPUSH => produce(ByteT)
+      case SIPUSH => produce(ShortT)
+      // LDC excluded
+      case ILOAD => produce(IntT)
+      case LLOAD => produce(LongT)
+      case FLOAD => produce(FloatT)
+      case DLOAD => produce(DoubleT)
+      case ALOAD => produce(ObjectRefT)
+      case IALOAD => (Seq(ObjectRefT, IntT), Seq(IntT))
+      case LALOAD => (Seq(ObjectRefT, IntT), Seq(LongT))
+      case FALOAD => (Seq(ObjectRefT, IntT), Seq(FloatT))
+      case DALOAD => (Seq(ObjectRefT, IntT), Seq(DoubleT))
+      case AALOAD => (Seq(ObjectRefT, IntT), Seq(ObjectRefT))
+      case BALOAD => (Seq(ObjectRefT, IntT), Seq(ByteT))  // might actually be a boolean
+      case CALOAD => (Seq(ObjectRefT, IntT), Seq(CharT))
+      case SALOAD => (Seq(ObjectRefT, IntT), Seq(ShortT))
+      case ISTORE => consume(IntT)
+      case LSTORE => consume(LongT)
+      case FSTORE => consume(FloatT)
+      case DSTORE => consume(DoubleT)
+      case ASTORE => consume(ObjectRefT)
+      case IASTORE => consume(ObjectRefT, IntT, IntT)
+      case LASTORE => consume(ObjectRefT, IntT, LongT)
+      case FASTORE => consume(ObjectRefT, IntT, FloatT)
+      case DASTORE => consume(ObjectRefT, IntT, DoubleT)
+      case AASTORE => consume(ObjectRefT, IntT, ObjectRefT)
+      case BASTORE => consume(ObjectRefT, IntT, ByteT) // byte or boolean
+      case CASTORE => consume(ObjectRefT, IntT, CharT)
+      case SASTORE => consume(ObjectRefT, IntT, ShortT)
+      case POP => consume(UnknownT)
+      case POP2 => consume(UnknownT, UnknownT)
+      case DUP =>
+        val v = UnknownT
+        Seq(v) -> Seq(v, v)
+      case DUP_X1 =>
+        val (v1, v2) = (UnknownT, UnknownT)
+        Seq(v2, v1) -> Seq(v1, v2, v1)
+      case DUP_X2 =>
+        val (v1, v2, v3) = (UnknownT, UnknownT, UnknownT)
+        Seq(v3, v2, v1) -> Seq(v1, v3, v2, v1)
+      case DUP2 =>
+        val (v1, v2) = (UnknownT, UnknownT)
+        Seq(v2, v1) -> Seq(v2, v1, v2, v1)
+      case DUP2_X1 =>
+        val (v1, v2, v3) = (UnknownT, UnknownT, UnknownT)
+        Seq(v3, v2, v1) -> Seq(v2, v1, v3, v2, v1)
+      case DUP2_X2 =>
+        val (v1, v2, v3, v4) = (UnknownT, UnknownT, UnknownT, UnknownT)
+        Seq(v4, v3, v2, v1) -> Seq(v2, v1, v4, v3, v2, v1)
+      case SWAP =>
+        val (v1, v2) = (UnknownT, UnknownT)
+        Seq(v2, v1) -> Seq(v1, v2)
+      case IADD => update(2, 1, IntT)
+      case LADD => update(2, 1, LongT)
+      case FADD => update(2, 1, FloatT)
+      case DADD => update(2, 1, DoubleT)
+      case ISUB => update(2, 1, IntT)
+      case LSUB => update(2, 1, LongT)
+      case FSUB => update(2, 1, FloatT)
+      case DSUB => update(2, 1, DoubleT)
+      case IMUL => update(2, 1, IntT)
+      case LMUL => update(2, 1, LongT)
+      case FMUL => update(2, 1, FloatT)
+      case DMUL => update(2, 1, DoubleT)
+      case IDIV => update(2, 1, IntT)
+      case LDIV => update(2, 1, LongT)
+      case FDIV => update(2, 1, FloatT)
+      case DDIV => update(2, 1, DoubleT)
+      case IREM => update(2, 1, IntT)
+      case LREM => update(2, 1, LongT)
+      case FREM => update(2, 1, FloatT)
+      case DREM => update(2, 1, DoubleT)
+      case INEG => update(1, 1, IntT)
+      case LNEG => update(1, 1, LongT)
+      case FNEG => update(1, 1, FloatT)
+      case DNEG => update(1, 1, DoubleT)
+      case ISHL => Seq(IntT, IntT) -> Seq(IntT)
+      case LSHL => Seq(LongT, IntT) -> Seq(LongT)
+      case ISHR => Seq(IntT, IntT) -> Seq(IntT)
+      case LSHR => Seq(LongT, IntT) -> Seq(LongT)
+      case IUSHR => Seq(IntT, IntT) -> Seq(IntT)
+      case LUSHR => Seq(LongT, IntT) -> Seq(LongT)
+      case IAND => update(2, 1, IntT)
+      case LAND => update(2, 1, LongT)
+      case IOR => update(2, 1, IntT)
+      case LOR => update(2, 1, LongT)
+      case IXOR => update(2, 1, IntT)
+      case LXOR => update(2, 1, LongT)
+      case IINC => noChange
+      case I2L => IntT converted LongT
+      case I2F => IntT converted FloatT
+      case I2D => IntT converted DoubleT
+      case L2I => LongT converted IntT
+      case L2F => LongT converted FloatT
+      case L2D => LongT converted DoubleT
+      case F2I => FloatT converted IntT
+      case F2L => FloatT converted LongT
+      case F2D => FloatT converted DoubleT
+      case D2I => DoubleT converted IntT
+      case D2L => DoubleT converted LongT
+      case D2F => DoubleT converted FloatT
+      case I2B => IntT converted ByteT
+      case I2C => IntT converted CharT
+      case I2S => IntT converted ShortT
+      case LCMP => Seq(LongT, LongT) -> Seq(IntT)
+      case FCMPL => Seq(FloatT, FloatT) -> Seq(IntT)
+      case FCMPG => Seq(FloatT, FloatT) -> Seq(IntT)
+      case DCMPL => Seq(DoubleT, DoubleT) -> Seq(IntT)
+      case DCMPG => Seq(DoubleT, DoubleT) -> Seq(IntT)
+      case IFEQ => consume(IntT)
+      case IFNE => consume(IntT)
+      case IFLT => consume(IntT)
+      case IFGE => consume(IntT)
+      case IFGT => consume(IntT)
+      case IFLE => consume(IntT)
+      case IF_ICMPEQ => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ICMPNE => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ICMPLT => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ICMPGE => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ICMPGT => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ICMPLE => Seq(IntT, IntT) -> Seq(BooleanT)
+      case IF_ACMPEQ => Seq(ObjectRefT, ObjectRefT) -> Seq(BooleanT)
+      case IF_ACMPNE => Seq(ObjectRefT, ObjectRefT) -> Seq(BooleanT)
+      case GOTO => noChange
+      case JSR => produce(UnknownT)
+      case RET => noChange
+      case TABLESWITCH => consume(IntT)
+      case LOOKUPSWITCH => consume(IntT)
+      case IRETURN => consume(IntT)
+      case LRETURN => consume(LongT)
+      case FRETURN => consume(FloatT)
+      case DRETURN => consume(DoubleT)
+      case ARETURN => consume(ObjectRefT)
+      case RETURN => noChange
+      // opcodes for fields and methods are excluded
+      case NEW => produce(ObjectRefT)
+      case NEWARRAY => Seq(IntT) -> Seq(ObjectRefT)
+      case ANEWARRAY => Seq(IntT) -> Seq(ObjectRefT)
+      case ARRAYLENGTH => Seq(ObjectRefT) -> Seq(IntT)
+      case ATHROW => consume(ObjectRefT)   // TODO check this one (clears the stack)
+      case CHECKCAST => noChange  // no change as long as we do not consider types more precise than Object
+      case INSTANCEOF => Seq(ObjectRefT) -> Seq(BooleanT)
+      case MONITORENTER => consume(ObjectRefT)
+      case MONITOREXIT => consume(ObjectRefT)
+//    MULTIANEWARRAY excluded
+      case IFNULL => consume(ObjectRefT)
+      case IFNONNULL => consume(ObjectRefT)
+    }
+  }
+
+  def stackUpdateLdc(constant: Any): StackUpdate = {
+    produce(TypeSignature.of(constant))
+  }
+
+  def stackUpdateMultianewarray(nDim: Int): StackUpdate = {
+    produce(Seq.fill(nDim)(IntT):_*)
+  }
+
+  def stackUpdateInvocation(sig: MethodSignature): StackUpdate = {
+    (sig.params, sig.retType.toSeq)
+  }
+
+  def stackUpdateField(opcode: Int, fieldTypeSig: TypeSignature): StackUpdate = {
+    opcode match {
+      case GETSTATIC | GETFIELD =>
+        produce(fieldTypeSig)
+      case PUTSTATIC | PUTFIELD =>
+        consume(fieldTypeSig)
+    }
+  }
+
+  def isFieldInstruction(opcode: Int): Boolean = {
+    GETSTATIC <= opcode && opcode <= PUTFIELD
+  }
+
+  def isInvocationInstruction(opcode: Int): Boolean = {
+    INVOKEVIRTUAL <= opcode && opcode <= INVOKEDYNAMIC
+  }
+
+  private val noChange: StackUpdate = Seq.empty[TypeSignature] -> Seq.empty[TypeSignature]
+  private def produce(ts: TypeSignature*): StackUpdate = (Seq.empty, ts.toSeq)
+  private def consume(ts: TypeSignature*): StackUpdate = (ts.toSeq, Seq.empty)
+  private def update(consumed: Int, produced: Int, tpe: => TypeSignature): StackUpdate = {
+    (Seq.fill(consumed)(tpe), Seq.fill(produced)(tpe))
+  }
+  extension(src: TypeSignature) private def converted(dst: TypeSignature): StackUpdate = (Seq(src), Seq(dst))
   
 }
