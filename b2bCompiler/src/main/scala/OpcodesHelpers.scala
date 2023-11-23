@@ -305,14 +305,14 @@ object OpcodesHelpers {
       case IFGE => consume(IntT)
       case IFGT => consume(IntT)
       case IFLE => consume(IntT)
-      case IF_ICMPEQ => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ICMPNE => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ICMPLT => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ICMPGE => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ICMPGT => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ICMPLE => Seq(IntT, IntT) -> Seq(BooleanT)
-      case IF_ACMPEQ => Seq(ObjectRefT, ObjectRefT) -> Seq(BooleanT)
-      case IF_ACMPNE => Seq(ObjectRefT, ObjectRefT) -> Seq(BooleanT)
+      case IF_ICMPEQ => consume(IntT, IntT)
+      case IF_ICMPNE => consume(IntT, IntT)
+      case IF_ICMPLT => consume(IntT, IntT)
+      case IF_ICMPGE => consume(IntT, IntT)
+      case IF_ICMPGT => consume(IntT, IntT)
+      case IF_ICMPLE => consume(IntT, IntT)
+      case IF_ACMPEQ => consume(ObjectRefT, ObjectRefT)
+      case IF_ACMPNE => consume(ObjectRefT, ObjectRefT)
       case GOTO => noChange
       case JSR => produce(UnknownT)
       case RET => noChange
@@ -348,11 +348,17 @@ object OpcodesHelpers {
     produce(Seq.fill(nDim)(IntT):_*)
   }
 
-  def stackUpdateInvocation(sig: MethodSignature): StackUpdate = {
-    (sig.params, sig.retType.toSeq)
+  def stackUpdateInvocation(opcode: Int, sig: MethodSignature): StackUpdate = {
+    require(isInvocationInstruction(opcode))
+    opcode match
+      case INVOKESTATIC | INVOKEDYNAMIC =>
+        (sig.params, sig.retType.toSeq)
+      case INVOKEINTERFACE | INVOKEVIRTUAL | INVOKESPECIAL =>
+        (ObjectRefT +: sig.params, sig.retType.toSeq)
   }
 
   def stackUpdateField(opcode: Int, fieldTypeSig: TypeSignature): StackUpdate = {
+    require(isFieldInstruction(opcode))
     opcode match {
       case GETSTATIC | GETFIELD =>
         produce(fieldTypeSig)

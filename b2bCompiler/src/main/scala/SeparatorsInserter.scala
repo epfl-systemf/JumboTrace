@@ -9,25 +9,27 @@ final class SeparatorsInserter extends PipelineStage[Seq[(MethodUid, Seq[Regular
     input.map((uid, code) => (uid, insertSeparators(code)))
   }
 
-  private def insertSeparators(code: Seq[RegularBytecodeInstr]): Seq[BytecodeInstr] = {
-    val reversedInstr = List.newBuilder[BytecodeInstr]
-    var demand = 0
-    var alreadyInserted = true  // do not mark end of last statement
-    for (instr <- code.reverse){
-      alreadyInserted &= (demand == 0)
-      if (demand == 0 && !alreadyInserted){
-        reversedInstr.addOne(StatementSeparator())
-        alreadyInserted = true
+  private def insertSeparators(rawCode: Seq[RegularBytecodeInstr]): Seq[BytecodeInstr] = {
+    val codeB = Seq.newBuilder[BytecodeInstr]
+    var stackCnt = 0
+    var currLine = -1
+    for (instr <- rawCode){
+      instr match {
+        case LineNumberB(line, start) =>
+          currLine = line
+        case _ => ()
       }
-      reversedInstr.addOne(instr)
-      demand += deltaDemand(instr)
+      if (stackCnt == 0 && !instr.isMetadata){
+        codeB.addOne(StatementSeparator(currLine))
+      }
+      codeB.addOne(instr)
+      stackCnt += stackDelta(instr)
     }
-    reversedInstr.addOne(StatementSeparator())  // mark beginning of first statement
-    reversedInstr.result().reverse
+    codeB.result()
   }
 
-  private def deltaDemand(instr: RegularBytecodeInstr): Int = {
-    deltaDemand(
+  private def stackDelta(instr: RegularBytecodeInstr): Int = {
+    stackDelta(
       instr match {
         case LdcInsn(value) =>
           stackUpdateLdc(value)
@@ -36,17 +38,17 @@ final class SeparatorsInserter extends PipelineStage[Seq[(MethodUid, Seq[Regular
         case FieldInsn(opcode, owner, name, descriptor) =>
           stackUpdateField(opcode, TypeSignature.parse(descriptor))
         case MethodInsn(opcode, owner, name, descriptor, isInterface) =>
-          stackUpdateInvocation(MethodSignature.parse(descriptor))
+          stackUpdateInvocation(opcode, MethodSignature.parse(descriptor))
         case _ =>
           instr.opcodeOpt.map(stackUpdate).getOrElse(Seq.empty -> Seq.empty)
       }
     )
   }
 
-  private def deltaDemand(stackUpdate: StackUpdate): Int = {
+  private def stackDelta(stackUpdate: StackUpdate): Int = {
     val consumedSum = stackUpdate._1.map(_.nSlots).sum
     val producedSum = stackUpdate._2.map(_.nSlots).sum
-    consumedSum - producedSum
+    producedSum - consumedSum
   }
 
 }

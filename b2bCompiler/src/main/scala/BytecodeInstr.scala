@@ -11,6 +11,8 @@ sealed trait BytecodeInstr {
 }
 
 sealed trait RegularBytecodeInstr extends BytecodeInstr {
+  
+  def isMetadata: Boolean
 
   /**
    * should return a negative number if no opcode corresponds to this instruction
@@ -31,26 +33,44 @@ final case class FrameB(
                          numStack: Int,
                          stack: Array[AnyRef]
                        ) extends RegularBytecodeInstr {
+  override def isMetadata: Boolean = true
+
   override def descr: String = "frame"
 }
 
 final case class Insn(opcode: Int) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = opcodeName(opcode)
 }
 
 final case class IntInsn(opcode: Int, operand: Int) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = s"${opcodeName(opcode)} $operand"
 }
 
 final case class VarInsn(opcode: Int, varIndex: Int) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = s"${opcodeName(opcode)} $varIndex"
 }
 
 final case class TypeInsn(opcode: Int, tpe: String) extends RegularBytecodeInstr {
+
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = s"${opcodeName(opcode)} $tpe"
 }
 
 final case class FieldInsn(opcode: Int, owner: String, name: String, descriptor: String) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = s"${opcodeName(opcode)} $owner $name $descriptor"
 }
 
@@ -61,6 +81,9 @@ final case class MethodInsn(
                              descriptor: String,
                              isInterface: Boolean
                            ) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = false
+
   override def descr: String = {
     val isInterfaceDescr = if isInterface then "(itf)" else ""
     s"${opcodeName(opcode)} $owner $name $descriptor $isInterfaceDescr"
@@ -73,6 +96,9 @@ final case class InvokeDynamicInsn(
                                     bootstrapMethodHandle: Handle,
                                     bootstrapMethodArguments: Any*
                                   ) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = false
+
   override def descr: String = {
     s"${opcodeName(Opcodes.INVOKEDYNAMIC)} $name $descriptor handle:$bootstrapMethodHandle" ++ bootstrapMethodArguments.mkString("(", ",", ")")
   }
@@ -81,10 +107,15 @@ final case class InvokeDynamicInsn(
 }
 
 final case class JumpInsn(opcode: Int, label: Label) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
+
   override def descr: String = s"${opcodeName(opcode)} $label"
 }
 
 final case class LabelOccurenceB(label: Label) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = true
 
   override def descr: String = s"label $label"
 
@@ -92,6 +123,8 @@ final case class LabelOccurenceB(label: Label) extends RegularBytecodeInstr {
 }
 
 final case class LdcInsn(value: Any) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = false
 
   override def descr: String = s"${opcodeName(Opcodes.LDC)} $value"
 
@@ -99,6 +132,8 @@ final case class LdcInsn(value: Any) extends RegularBytecodeInstr {
 }
 
 final case class IincInsn(varIndex: Int, increment: Int) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = false
 
   override def descr: String = s"${opcodeName(Opcodes.IINC)} $varIndex $increment"
 
@@ -106,6 +141,8 @@ final case class IincInsn(varIndex: Int, increment: Int) extends RegularBytecode
 }
 
 final case class TableSwitchInsn(min: Int, max: Int, dflt: Label, labels: Label*) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
 
   override def descr: String = {
     s"${opcodeName(Opcodes.TABLESWITCH)} $min $max $dflt " ++ labels.mkString("[", ",", "]")
@@ -116,6 +153,8 @@ final case class TableSwitchInsn(min: Int, max: Int, dflt: Label, labels: Label*
 
 final case class LookupSwitchInsn(dflt: Label, keys: Array[Int], labels: Array[Label]) extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = false
+
   override def descr: String = {
     s"${opcodeName(Opcodes.LOOKUPSWITCH)} $dflt " ++ keys.mkString("[", ",", "]") ++ " " ++ labels.mkString("[", ",", "]")
   }
@@ -124,6 +163,8 @@ final case class LookupSwitchInsn(dflt: Label, keys: Array[Int], labels: Array[L
 }
 
 final case class MultiANewArrayInsn(descriptor: String, numDimensions: Int) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = false
 
   override def descr: String = s"${opcodeName(Opcodes.MULTIANEWARRAY)} $descriptor $numDimensions"
 
@@ -136,12 +177,17 @@ final case class InsnAnnotationB(
                                   descriptor: String,
                                   visible: Boolean
                                 ) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = true
+  
   override def descr: String = "insn-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class TryCatchBlockB(start: Label, end: Label, handler: Label, tpe: String) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = s"try-catch start=$start end=$end handler=$handler $tpe"
 
@@ -154,6 +200,8 @@ final case class TryCatchAnnotationB(
                                       descriptor: String,
                                       visible: Boolean
                                     ) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
   override def descr: String = "try-catch-annot"
 
   override protected def opcode: Int = -1
@@ -167,6 +215,9 @@ final case class LocalVarB(
                             end: Label,
                             index: Int
                           ) extends RegularBytecodeInstr {
+  
+  override def isMetadata: Boolean = true
+  
   override def descr: String = s"local $name $descriptor $signature [$start,$end] idx=$index"
 
   override protected def opcode: Int = -1
@@ -181,12 +232,17 @@ final case class LocalVarAnnotB(
                                  descriptor: String,
                                  visible: Boolean
                                ) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
+  
   override def descr: String = s"local-var-annot"
 
   override protected def opcode: Int = -1
 }
 
 final case class LineNumberB(line: Int, start: Label) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = s"line $line $start"
 
@@ -195,12 +251,16 @@ final case class LineNumberB(line: Int, start: Label) extends RegularBytecodeIns
 
 final case class MaxsB(maxStack: Int, maxLocals: Int) extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = s"maxs maxStack=$maxStack maxLocals=$maxLocals"
 
   override protected def opcode: Int = -1
 }
 
 final case class ParamB(name: String, access: Int) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = s"param $name access=$access"
 
@@ -209,12 +269,16 @@ final case class ParamB(name: String, access: Int) extends RegularBytecodeInstr 
 
 final case class AnnotationDefaultB() extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = "annotation-default"
 
   override protected def opcode: Int = -1
 }
 
 final case class AnnotationB(descriptor: String, visible: Boolean) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = "annotation"
 
@@ -228,12 +292,16 @@ final case class TypeAnnotB(
                              visible: Boolean
                            ) extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = "type-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class AnnotableParameterCountB(parameterCount: Int, visible: Boolean) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = "annotable-parameter-count"
 
@@ -242,12 +310,16 @@ final case class AnnotableParameterCountB(parameterCount: Int, visible: Boolean)
 
 final case class ParameterAnnotationB(parameter: Int, descriptor: String, visible: Boolean) extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = "parameter-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class AttributeB(attribute: Attribute) extends RegularBytecodeInstr {
+
+  override def isMetadata: Boolean = true
 
   override def descr: String = "attribute"
 
@@ -256,6 +328,8 @@ final case class AttributeB(attribute: Attribute) extends RegularBytecodeInstr {
 
 final case class CodeB() extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = "code-start"
 
   override protected def opcode: Int = -1
@@ -263,11 +337,13 @@ final case class CodeB() extends RegularBytecodeInstr {
 
 final case class EndB() extends RegularBytecodeInstr {
 
+  override def isMetadata: Boolean = true
+
   override def descr: String = "code-end"
 
   override protected def opcode: Int = -1
 }
 
-final case class StatementSeparator() extends BytecodeInstr {
-  override def descr: String = "------- new-stat -------"
+final case class StatementSeparator(startLine: Int) extends BytecodeInstr {
+  override def descr: String = s"---- new-stat ($startLine) ----"
 }
