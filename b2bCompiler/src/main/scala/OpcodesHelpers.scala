@@ -166,6 +166,7 @@ object OpcodesHelpers {
       case MULTIANEWARRAY => "multianewarray"
       case IFNULL => "ifnull"
       case IFNONNULL => "ifnonnull"
+      case unexpected => throw new AssertionError(s"unexpected opcode: $unexpected")
     }
   }
 
@@ -337,6 +338,7 @@ object OpcodesHelpers {
 //    MULTIANEWARRAY excluded
       case IFNULL => consume(ObjectRefT)
       case IFNONNULL => consume(ObjectRefT)
+      case unexpected => throw new AssertionError(s"unexpected opcode: $unexpected")
     }
   }
 
@@ -355,6 +357,7 @@ object OpcodesHelpers {
         (sig.params, sig.retType.toSeq)
       case INVOKEINTERFACE | INVOKEVIRTUAL | INVOKESPECIAL =>
         (ObjectRefT +: sig.params, sig.retType.toSeq)
+      case unexpected => throw new AssertionError(s"unexpected opcode: $unexpected")
   }
 
   def stackUpdateField(opcode: Int, fieldTypeSig: TypeSignature): StackUpdate = {
@@ -364,6 +367,7 @@ object OpcodesHelpers {
         produce(fieldTypeSig)
       case PUTSTATIC | PUTFIELD =>
         consume(fieldTypeSig)
+      case unexpected => throw new AssertionError(s"unexpected opcode: $unexpected")
     }
   }
 

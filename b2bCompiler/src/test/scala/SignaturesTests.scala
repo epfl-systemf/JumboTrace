@@ -3,7 +3,7 @@ package b2bCompiler
 import org.junit.Test
 import org.junit.Assert.assertEquals
 
-class MethodSignatureTest {
+class SignaturesTests {
 
   // inputs are taken/inspired from https://asm.ow2.io/asm4-guide.pdf, page 12
 

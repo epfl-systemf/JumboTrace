@@ -4,7 +4,7 @@ import org.objectweb.asm.ClassReader
 
 import scala.collection.mutable.ListBuffer
 
-final class BytecodeParser extends PipelineStage[Array[Byte], Seq[(MethodUid, Seq[RegularBytecodeInstr])]] {
+final class BytecodeParser extends PipelineStage[Array[Byte], BytecodeParser.Output] {
 
   override def run(in: Array[Byte]): Seq[(MethodUid, Seq[RegularBytecodeInstr])] = {
     val methodsSeq = ListBuffer.empty[(MethodUid, ListBuffer[RegularBytecodeInstr])]
@@ -14,4 +14,10 @@ final class BytecodeParser extends PipelineStage[Array[Byte], Seq[(MethodUid, Se
     methodsSeq.map((descr, lsBuf) => (descr, lsBuf.toSeq)).toSeq
   }
 
+}
+
+object BytecodeParser {
+  
+  type Output = Seq[(MethodUid, Seq[RegularBytecodeInstr])]
+  
 }

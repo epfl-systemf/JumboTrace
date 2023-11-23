@@ -1,5 +1,6 @@
 package b2bCompiler
 
+import b2bCompiler.OpcodesTyping.{InsnOpcode, IntInsnOpcode}
 import org.objectweb.asm.{AnnotationVisitor, Attribute, Handle, Label, MethodVisitor, Opcodes, TypePath}
 
 import scala.collection.mutable.ListBuffer
@@ -12,32 +13,32 @@ final class MethodParsingVisitor(bytecodeList: ListBuffer[RegularBytecodeInstr])
   }
 
   override def visitInsn(opcode: Int): Unit = {
-    bytecodeList.addOne(Insn(opcode))
+    bytecodeList.addOne(Insn(opcode.CAST))
     super.visitInsn(opcode)
   }
 
   override def visitIntInsn(opcode: Int, operand: Int): Unit = {
-    bytecodeList.addOne(IntInsn(opcode, operand))
+    bytecodeList.addOne(IntInsn(opcode.CAST, operand))
     super.visitIntInsn(opcode, operand)
   }
 
   override def visitVarInsn(opcode: Int, varIndex: Int): Unit = {
-    bytecodeList.addOne(VarInsn(opcode, varIndex))
+    bytecodeList.addOne(VarInsn(opcode.CAST, varIndex))
     super.visitVarInsn(opcode, varIndex)
   }
 
   override def visitTypeInsn(opcode: Int, tpe: String): Unit = {
-    bytecodeList.addOne(TypeInsn(opcode, tpe))
+    bytecodeList.addOne(TypeInsn(opcode.CAST, tpe))
     super.visitTypeInsn(opcode, tpe)
   }
 
   override def visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String): Unit = {
-    bytecodeList.addOne(FieldInsn(opcode, owner, name, descriptor))
+    bytecodeList.addOne(FieldInsn(opcode.CAST, owner, name, descriptor))
     super.visitFieldInsn(opcode, owner, name, descriptor)
   }
 
   override def visitMethodInsn(opcode: Int, owner: String, name: String, descriptor: String, isInterface: Boolean): Unit = {
-    bytecodeList.addOne(MethodInsn(opcode, owner, name, descriptor, isInterface))
+    bytecodeList.addOne(MethodInsn(opcode.CAST, owner, name, descriptor, isInterface))
     super.visitMethodInsn(opcode, owner, name, descriptor, isInterface)
   }
 
@@ -53,7 +54,7 @@ final class MethodParsingVisitor(bytecodeList: ListBuffer[RegularBytecodeInstr])
   }
 
   override def visitJumpInsn(opcode: Int, label: Label): Unit = {
-    bytecodeList.addOne(JumpInsn(opcode, label))
+    bytecodeList.addOne(JumpInsn(opcode.CAST, label))
     super.visitJumpInsn(opcode, label)
   }
 
@@ -73,7 +74,7 @@ final class MethodParsingVisitor(bytecodeList: ListBuffer[RegularBytecodeInstr])
   }
 
   override def visitTableSwitchInsn(min: Int, max: Int, dflt: Label, labels: Label*): Unit = {
-    bytecodeList.addOne(TableSwitchInsn(min, max, dflt, labels: _*))
+    bytecodeList.addOne(TableSwitchInsn(min, max, dflt, labels))
     super.visitTableSwitchInsn(min, max, dflt, labels: _*)
   }
 
@@ -174,4 +175,6 @@ final class MethodParsingVisitor(bytecodeList: ListBuffer[RegularBytecodeInstr])
     bytecodeList.addOne(EndB())
     super.visitEnd()
   }
+  
+  extension(opcode: Int) private def CAST[T <: Int]: T = opcode.asInstanceOf[T]
 }

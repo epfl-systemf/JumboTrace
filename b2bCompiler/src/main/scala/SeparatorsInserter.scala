@@ -3,7 +3,7 @@ package b2bCompiler
 import OpcodesHelpers.*
 import org.objectweb.asm.Opcodes
 
-final class SeparatorsInserter extends PipelineStage[Seq[(MethodUid, Seq[RegularBytecodeInstr])], Seq[(MethodUid, Seq[BytecodeInstr])]] {
+final class SeparatorsInserter extends PipelineStage[BytecodeParser.Output, SeparatorsInserter.Output] {
 
   override def run(input: Seq[(MethodUid, Seq[RegularBytecodeInstr])]): Seq[(MethodUid, Seq[BytecodeInstr])] = {
     input.map((uid, code) => (uid, insertSeparators(code)))
@@ -51,4 +51,10 @@ final class SeparatorsInserter extends PipelineStage[Seq[(MethodUid, Seq[Regular
     producedSum - consumedSum
   }
 
+}
+
+object SeparatorsInserter {
+  
+  type Output = Seq[(MethodUid, Seq[BytecodeInstr])]
+  
 }
