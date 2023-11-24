@@ -38,6 +38,14 @@ object AbsIntValue {
                                        receiver: AbsIntValue, args: Seq[AbsIntValue]) extends AbsIntValue {
       override def tpe: TypeSignature = sig.retType.getOrElse(throw UnsupportedOperationException("not supported for void methods"))
     }
+    
+    final case class UnaryOperation(operator: UnaryOperator, operand: AbsIntValue, tpe: TypeSignature) extends AbsIntValue
+    
+    final case class BinaryOperation(operation: BinaryOperator, operand1: AbsIntValue,
+                                     operand2: AbsIntValue, tpe: TypeSignature) extends AbsIntValue
+    
+    final case class Converted(value: AbsIntValue, tpe: TypeSignature) extends AbsIntValue
+    
   }
 
 }

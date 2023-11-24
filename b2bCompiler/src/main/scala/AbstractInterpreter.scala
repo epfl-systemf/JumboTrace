@@ -1,7 +1,10 @@
 package b2bCompiler
 
-import b2bCompiler.AbstractInterpreter.{AbsIntException, AbsIntStack}
+import AbstractInterpreter.{AbsIntException, AbsIntStack}
 import org.objectweb.asm.Label
+
+import UnaryOperator.*
+import BinaryOperator.*
 
 import scala.collection.mutable
 
@@ -83,39 +86,119 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(BASTORE) => ???
             case Insn(CASTORE) => ???
             case Insn(SASTORE) => ???
-            case Insn(POP) => ???
-            case Insn(POP2) => ???
-            case Insn(DUP) => ???
+            case Insn(POP) =>
+              stack.pop1()
+            case Insn(POP2) =>
+              stack.pop2()
+            case Insn(DUP) =>
+              val e = stack.pop1()
+              stack.push(e)
+              stack.push(e)
             case Insn(DUP_X1) => ???
             case Insn(DUP_X2) => ???
-            case Insn(DUP2) => ???
+            case Insn(DUP2) =>
+              val e = stack.pop2()
+              stack.push(e)
+              stack.push(e)
             case Insn(DUP2_X1) => ???
             case Insn(DUP2_X2) => ???
-            case Insn(SWAP) => ???
-            case Insn(IADD) => ???
-            case Insn(LADD) => ???
-            case Insn(FADD) => ???
-            case Insn(DADD) => ???
-            case Insn(ISUB) => ???
-            case Insn(LSUB) => ???
-            case Insn(FSUB) => ???
-            case Insn(DSUB) => ???
-            case Insn(IMUL) => ???
-            case Insn(LMUL) => ???
-            case Insn(FMUL) => ???
-            case Insn(DMUL) => ???
-            case Insn(IDIV) => ???
-            case Insn(LDIV) => ???
-            case Insn(FDIV) => ???
-            case Insn(DDIV) => ???
-            case Insn(IREM) => ???
-            case Insn(LREM) => ???
-            case Insn(FREM) => ???
-            case Insn(DREM) => ???
-            case Insn(INEG) => ???
-            case Insn(LNEG) => ???
-            case Insn(FNEG) => ???
-            case Insn(DNEG) => ???
+            case Insn(SWAP) =>
+              val v1 = stack.pop1()
+              val v2 = stack.pop1()
+              stack.push(v1)
+              stack.push(v2)
+            case Insn(IADD) =>
+              val v1 = stack.pop(IntT)
+              val v2 = stack.pop(IntT)
+              stack.push(BinaryOperation(Add, v1, v2, IntT))
+            case Insn(LADD) =>
+              val v1 = stack.pop(LongT)
+              val v2 = stack.pop(LongT)
+              stack.push(BinaryOperation(Add, v1, v2, LongT))
+            case Insn(FADD) =>
+              val v1 = stack.pop(FloatT)
+              val v2 = stack.pop(FloatT)
+              stack.push(BinaryOperation(Add, v1, v2, FloatT))
+            case Insn(DADD) =>
+              val v1 = stack.pop(DoubleT)
+              val v2 = stack.pop(DoubleT)
+              stack.push(BinaryOperation(Add, v1, v2, DoubleT))
+            case Insn(ISUB) =>
+              val v1 = stack.pop(IntT)
+              val v2 = stack.pop(IntT)
+              stack.push(BinaryOperation(Sub, v1, v2, IntT))
+            case Insn(LSUB) =>
+              val v1 = stack.pop(LongT)
+              val v2 = stack.pop(LongT)
+              stack.push(BinaryOperation(Sub, v1, v2, LongT))
+            case Insn(FSUB) =>
+              val v1 = stack.pop(FloatT)
+              val v2 = stack.pop(FloatT)
+              stack.push(BinaryOperation(Sub, v1, v2, FloatT))
+            case Insn(DSUB) =>
+              val v1 = stack.pop(DoubleT)
+              val v2 = stack.pop(DoubleT)
+              stack.push(BinaryOperation(Sub, v1, v2, DoubleT))
+            case Insn(IMUL) =>
+              val v1 = stack.pop(IntT)
+              val v2 = stack.pop(IntT)
+              stack.push(BinaryOperation(Mul, v1, v2, IntT))
+            case Insn(LMUL) =>
+              val v1 = stack.pop(LongT)
+              val v2 = stack.pop(LongT)
+              stack.push(BinaryOperation(Mul, v1, v2, LongT))
+            case Insn(FMUL) =>
+              val v1 = stack.pop(FloatT)
+              val v2 = stack.pop(FloatT)
+              stack.push(BinaryOperation(Mul, v1, v2, FloatT))
+            case Insn(DMUL) =>
+              val v1 = stack.pop(DoubleT)
+              val v2 = stack.pop(DoubleT)
+              stack.push(BinaryOperation(Mul, v1, v2, DoubleT))
+            case Insn(IDIV) =>
+              val v1 = stack.pop(IntT)
+              val v2 = stack.pop(IntT)
+              stack.push(BinaryOperation(Div, v1, v2, IntT))
+            case Insn(LDIV) =>
+              val v1 = stack.pop(LongT)
+              val v2 = stack.pop(LongT)
+              stack.push(BinaryOperation(Div, v1, v2, LongT))
+            case Insn(FDIV) =>
+              val v1 = stack.pop(FloatT)
+              val v2 = stack.pop(FloatT)
+              stack.push(BinaryOperation(Div, v1, v2, FloatT))
+            case Insn(DDIV) =>
+              val v1 = stack.pop(DoubleT)
+              val v2 = stack.pop(DoubleT)
+              stack.push(BinaryOperation(Div, v1, v2, DoubleT))
+            case Insn(IREM) =>
+              val v1 = stack.pop(IntT)
+              val v2 = stack.pop(IntT)
+              stack.push(BinaryOperation(Mod, v1, v2, IntT))
+            case Insn(LREM) =>
+              val v1 = stack.pop(LongT)
+              val v2 = stack.pop(LongT)
+              stack.push(BinaryOperation(Mod, v1, v2, LongT))
+            case Insn(FREM) =>
+              val v1 = stack.pop(FloatT)
+              val v2 = stack.pop(FloatT)
+              stack.push(BinaryOperation(Mod, v1, v2, FloatT))
+            case Insn(DREM) =>
+              val v1 = stack.pop(DoubleT)
+              val v2 = stack.pop(DoubleT)
+              stack.push(BinaryOperation(Mod, v1, v2, DoubleT))
+            case Insn(INEG) =>
+              val v = stack.pop(IntT)
+              stack.push(UnaryOperation(Neg, v, IntT))
+            case Insn(LNEG) =>
+              val v = stack.pop(LongT)
+              stack.push(UnaryOperation(Neg, v, LongT))
+            case Insn(FNEG) =>
+              val v = stack.pop(FloatT)
+              stack.push(UnaryOperation(Neg, v, FloatT))
+            case Insn(DNEG) =>
+              val v = stack.pop(DoubleT)
+              stack.push(UnaryOperation(Neg, v, DoubleT))
             case Insn(ISHL) => ???
             case Insn(LSHL) => ???
             case Insn(ISHR) => ???
@@ -128,9 +211,15 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(LOR) => ???
             case Insn(IXOR) => ???
             case Insn(LXOR) => ???
-            case Insn(I2L) => ???
-            case Insn(I2F) => ???
-            case Insn(I2D) => ???
+            case Insn(I2L) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, LongT))
+            case Insn(I2F) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, FloatT))
+            case Insn(I2D) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, DoubleT))
             case Insn(L2I) => ???
             case Insn(L2F) => ???
             case Insn(L2D) => ???
@@ -280,12 +369,23 @@ object AbstractInterpreter {
           throw AbsIntException("empty stack")
         case topElem :: others =>
           elems = others
-          if (topElem.tpe != sig) {
+          if (typeCheck(sig, topElem.tpe)) {
             throw AbsIntException(s"expected $sig, found ${topElem.tpe} ($topElem)")
           }
           topElem
       }
     }
+  }
+
+  private def typeCheck(expected: TypeSignature, actual: TypeSignature): Boolean = {
+    (expected, actual) match
+      case _ if expected == actual => true
+      case (BooleanT, ByteT) => true  // may result from array access, as baload works on both boolean[] and byte[]
+      case (BooleanT, IntT) => true   // for constants
+      case (ByteT, IntT) => true      // for constants
+      case (CharT, IntT) => true      // for constants
+      case (ShortT, IntT) => true     // for constants
+      case _ => false
   }
 
 }
