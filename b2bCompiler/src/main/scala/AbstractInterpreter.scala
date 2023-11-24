@@ -35,11 +35,12 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
         // second layer so that the compiler checks that all cases are covered
         case effectingBytecodeInstr: EffectingBytecodeInstr => {
 
+          assert(!effectingBytecodeInstr.isInstanceOf[JumpInsn] || stack.isEmpty)
+
           import org.objectweb.asm.Opcodes.*
           effectingBytecodeInstr match {
 
-            case Insn(NOP) =>
-            // do nothing
+            case Insn(NOP) => ()
             case Insn(ACONST_NULL) =>
               stack.push(Constant(null))
             case Insn(ICONST_M1) =>
@@ -70,22 +71,70 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               stack.push(Constant(0.0))
             case Insn(DCONST_1) =>
               stack.push(Constant(1.0))
-            case Insn(IALOAD) => ???
-            case Insn(LALOAD) => ???
-            case Insn(FALOAD) => ???
-            case Insn(DALOAD) => ???
-            case Insn(AALOAD) => ???
-            case Insn(BALOAD) => ???
-            case Insn(CALOAD) => ???
-            case Insn(SALOAD) => ???
-            case Insn(IASTORE) => ???
-            case Insn(LASTORE) => ???
-            case Insn(FASTORE) => ???
-            case Insn(DASTORE) => ???
-            case Insn(AASTORE) => ???
-            case Insn(BASTORE) => ???
-            case Insn(CASTORE) => ???
-            case Insn(SASTORE) => ???
+            case Insn(IALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, IntT))
+            case Insn(LALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, LongT))
+            case Insn(FALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, FloatT))
+            case Insn(DALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, DoubleT))
+            case Insn(AALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, ObjectRefT))
+            case Insn(BALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, ByteT))
+            case Insn(CALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, CharT))
+            case Insn(SALOAD) =>
+              val idx = stack.pop(IntT)
+              val arr = stack.pop(ObjectRefT)
+              stack.push(ArrayAccess(arr, idx, ShortT))
+            case Insn(IASTORE) =>
+              stack.pop(IntT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(LASTORE) =>
+              stack.pop(LongT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(FASTORE) =>
+              stack.pop(FloatT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(DASTORE) =>
+              stack.pop(DoubleT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(AASTORE) =>
+              stack.pop(ObjectRefT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(BASTORE) =>
+              stack.pop(ByteT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(CASTORE) =>
+              stack.pop(CharT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
+            case Insn(SASTORE) =>
+              stack.pop(ShortT)
+              stack.pop(IntT)
+              stack.pop(ObjectRefT)
             case Insn(POP) =>
               stack.pop1()
             case Insn(POP2) =>
@@ -103,89 +152,89 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(DUP2_X1) => ???
             case Insn(DUP2_X2) => ???
             case Insn(SWAP) =>
-              val v1 = stack.pop1()
               val v2 = stack.pop1()
-              stack.push(v1)
+              val v1 = stack.pop1()
               stack.push(v2)
+              stack.push(v1)
             case Insn(IADD) =>
-              val v1 = stack.pop(IntT)
               val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
               stack.push(BinaryOperation(Add, v1, v2, IntT))
             case Insn(LADD) =>
-              val v1 = stack.pop(LongT)
               val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
               stack.push(BinaryOperation(Add, v1, v2, LongT))
             case Insn(FADD) =>
-              val v1 = stack.pop(FloatT)
               val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
               stack.push(BinaryOperation(Add, v1, v2, FloatT))
             case Insn(DADD) =>
-              val v1 = stack.pop(DoubleT)
               val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
               stack.push(BinaryOperation(Add, v1, v2, DoubleT))
             case Insn(ISUB) =>
-              val v1 = stack.pop(IntT)
               val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
               stack.push(BinaryOperation(Sub, v1, v2, IntT))
             case Insn(LSUB) =>
-              val v1 = stack.pop(LongT)
               val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
               stack.push(BinaryOperation(Sub, v1, v2, LongT))
             case Insn(FSUB) =>
-              val v1 = stack.pop(FloatT)
               val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
               stack.push(BinaryOperation(Sub, v1, v2, FloatT))
             case Insn(DSUB) =>
-              val v1 = stack.pop(DoubleT)
               val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
               stack.push(BinaryOperation(Sub, v1, v2, DoubleT))
             case Insn(IMUL) =>
-              val v1 = stack.pop(IntT)
               val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
               stack.push(BinaryOperation(Mul, v1, v2, IntT))
             case Insn(LMUL) =>
-              val v1 = stack.pop(LongT)
               val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
               stack.push(BinaryOperation(Mul, v1, v2, LongT))
             case Insn(FMUL) =>
-              val v1 = stack.pop(FloatT)
               val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
               stack.push(BinaryOperation(Mul, v1, v2, FloatT))
             case Insn(DMUL) =>
-              val v1 = stack.pop(DoubleT)
               val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
               stack.push(BinaryOperation(Mul, v1, v2, DoubleT))
             case Insn(IDIV) =>
-              val v1 = stack.pop(IntT)
               val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
               stack.push(BinaryOperation(Div, v1, v2, IntT))
             case Insn(LDIV) =>
-              val v1 = stack.pop(LongT)
               val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
               stack.push(BinaryOperation(Div, v1, v2, LongT))
             case Insn(FDIV) =>
-              val v1 = stack.pop(FloatT)
               val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
               stack.push(BinaryOperation(Div, v1, v2, FloatT))
             case Insn(DDIV) =>
-              val v1 = stack.pop(DoubleT)
               val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
               stack.push(BinaryOperation(Div, v1, v2, DoubleT))
             case Insn(IREM) =>
-              val v1 = stack.pop(IntT)
               val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
               stack.push(BinaryOperation(Mod, v1, v2, IntT))
             case Insn(LREM) =>
-              val v1 = stack.pop(LongT)
               val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
               stack.push(BinaryOperation(Mod, v1, v2, LongT))
             case Insn(FREM) =>
-              val v1 = stack.pop(FloatT)
               val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
               stack.push(BinaryOperation(Mod, v1, v2, FloatT))
             case Insn(DREM) =>
-              val v1 = stack.pop(DoubleT)
               val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
               stack.push(BinaryOperation(Mod, v1, v2, DoubleT))
             case Insn(INEG) =>
               val v = stack.pop(IntT)
@@ -199,12 +248,30 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(DNEG) =>
               val v = stack.pop(DoubleT)
               stack.push(UnaryOperation(Neg, v, DoubleT))
-            case Insn(ISHL) => ???
-            case Insn(LSHL) => ???
-            case Insn(ISHR) => ???
-            case Insn(LSHR) => ???
-            case Insn(IUSHR) => ???
-            case Insn(LUSHR) => ???
+            case Insn(ISHL) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(IntT)
+              stack.push(BinaryOperation(ShiftLeft, v, shift, IntT))
+            case Insn(LSHL) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(LongT)
+              stack.push(BinaryOperation(ShiftLeft, v, shift, LongT))
+            case Insn(ISHR) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(IntT)
+              stack.push(BinaryOperation(ShiftRight, v, shift, IntT))
+            case Insn(LSHR) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(LongT)
+              stack.push(BinaryOperation(ShiftRight, v, shift, LongT))
+            case Insn(IUSHR) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(IntT)
+              stack.push(BinaryOperation(UnsignedShiftRight, v, shift, IntT))
+            case Insn(LUSHR) =>
+              val shift = stack.pop(IntT)
+              val v = stack.pop(LongT)
+              stack.push(BinaryOperation(UnsignedShiftRight, v, shift, LongT))
             case Insn(IAND) => ???
             case Insn(LAND) => ???
             case Insn(IOR) => ???
@@ -220,31 +287,64 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(I2D) =>
               val v = stack.pop(IntT)
               stack.push(Converted(v, DoubleT))
-            case Insn(L2I) => ???
-            case Insn(L2F) => ???
-            case Insn(L2D) => ???
-            case Insn(F2I) => ???
-            case Insn(F2L) => ???
-            case Insn(F2D) => ???
-            case Insn(D2I) => ???
-            case Insn(D2L) => ???
-            case Insn(D2F) => ???
-            case Insn(I2B) => ???
-            case Insn(I2C) => ???
-            case Insn(I2S) => ???
+            case Insn(L2I) =>
+              val v = stack.pop(LongT)
+              stack.push(Converted(v, IntT))
+            case Insn(L2F) =>
+              val v = stack.pop(LongT)
+              stack.push(Converted(v, FloatT))
+            case Insn(L2D) =>
+              val v = stack.pop(LongT)
+              stack.push(Converted(v, DoubleT))
+            case Insn(F2I) =>
+              val v = stack.pop(FloatT)
+              stack.push(Converted(v, IntT))
+            case Insn(F2L) =>
+              val v = stack.pop(FloatT)
+              stack.push(Converted(v, LongT))
+            case Insn(F2D) =>
+              val v = stack.pop(FloatT)
+              stack.push(Converted(v, DoubleT))
+            case Insn(D2I) =>
+              val v = stack.pop(DoubleT)
+              stack.push(Converted(v, IntT))
+            case Insn(D2L) =>
+              val v = stack.pop(DoubleT)
+              stack.push(Converted(v, LongT))
+            case Insn(D2F) =>
+              val v = stack.pop(DoubleT)
+              stack.push(Converted(v, FloatT))
+            case Insn(I2B) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, ByteT))
+            case Insn(I2C) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, CharT))
+            case Insn(I2S) =>
+              val v = stack.pop(IntT)
+              stack.push(Converted(v, ShortT))
             case Insn(LCMP) => ???
             case Insn(FCMPL) => ???
             case Insn(FCMPG) => ???
             case Insn(DCMPL) => ???
             case Insn(DCMPG) => ???
-            case Insn(IRETURN) => ???
-            case Insn(LRETURN) => ???
-            case Insn(FRETURN) => ???
-            case Insn(DRETURN) => ???
-            case Insn(ARETURN) => ???
-            case Insn(RETURN) => ???
+            case Insn(IRETURN) =>
+              stack.pop(IntT)
+            case Insn(LRETURN) =>
+              stack.pop(LongT)
+            case Insn(FRETURN) =>
+              stack.pop(LongT)
+            case Insn(DRETURN) =>
+              stack.pop(DoubleT)
+            case Insn(ARETURN) =>
+              stack.pop(ObjectRefT)
+            case Insn(RETURN) => ()
             case Insn(ARRAYLENGTH) => ???
-            case Insn(ATHROW) => ???
+            case Insn(ATHROW) => {
+              /* Leave it on the stack for the handler. Frame may have to be cleared, but it seems to not be an issue
+              *  if we don't do it (will just keep unused values on the stack) */
+              ()
+            }
             case Insn(MONITORENTER) => ???
             case Insn(MONITOREXIT) => ???
 
@@ -252,17 +352,32 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case IntInsn(SIPUSH, operand) => ???
             case IntInsn(NEWARRAY, operand) => ???
 
-            case VarInsn(ILOAD, varIndex) => ???
-            case VarInsn(LLOAD, varIndex) => ???
-            case VarInsn(FLOAD, varIndex) => ???
-            case VarInsn(DLOAD, varIndex) => ???
-            case VarInsn(ALOAD, varIndex) => ???
-            case VarInsn(ISTORE, varIndex) => ???
-            case VarInsn(LSTORE, varIndex) => ???
-            case VarInsn(FSTORE, varIndex) => ???
-            case VarInsn(DSTORE, varIndex) => ???
-            case VarInsn(ASTORE, varIndex) => ???
-            case VarInsn(RET, varIndex) => ???
+            case VarInsn(ILOAD, varIndex) =>
+              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
+              stack.push(VariableAccess(varName, IntT))
+            case VarInsn(LLOAD, varIndex) =>
+              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
+              stack.push(VariableAccess(varName, LongT))
+            case VarInsn(FLOAD, varIndex) =>
+              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
+              stack.push(VariableAccess(varName, FloatT))
+            case VarInsn(DLOAD, varIndex) =>
+              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
+              stack.push(VariableAccess(varName, DoubleT))
+            case VarInsn(ALOAD, varIndex) =>
+              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
+              stack.push(VariableAccess(varName, ObjectRefT))
+            case VarInsn(ISTORE, varIndex) =>
+              stack.pop(IntT)
+            case VarInsn(LSTORE, varIndex) =>
+              stack.pop(LongT)
+            case VarInsn(FSTORE, varIndex) =>
+              stack.pop(FloatT)
+            case VarInsn(DSTORE, varIndex) =>
+              stack.pop(DoubleT)
+            case VarInsn(ASTORE, varIndex) =>
+              stack.pop(ObjectRefT)
+            case VarInsn(RET, varIndex) => ()
 
             case TypeInsn(NEW, tpe) => ???
             case TypeInsn(ANEWARRAY, tpe) => ???
@@ -331,6 +446,8 @@ object AbstractInterpreter {
   final class AbsIntStack {
     private var elems: List[AbsIntValue] = List.empty
 
+    def isEmpty: Boolean = elems.isEmpty
+
     def currState: List[AbsIntValue] = elems
 
     def push(absIntValue: AbsIntValue): Unit = {
@@ -380,11 +497,11 @@ object AbstractInterpreter {
   private def typeCheck(expected: TypeSignature, actual: TypeSignature): Boolean = {
     (expected, actual) match
       case _ if expected == actual => true
-      case (BooleanT, ByteT) => true  // may result from array access, as baload works on both boolean[] and byte[]
-      case (BooleanT, IntT) => true   // for constants
-      case (ByteT, IntT) => true      // for constants
-      case (CharT, IntT) => true      // for constants
-      case (ShortT, IntT) => true     // for constants
+      case (BooleanT, ByteT) => true // may result from array access, as baload works on both boolean[] and byte[]
+      case (BooleanT, IntT) => true // for constants
+      case (ByteT, IntT) => true // for constants
+      case (CharT, IntT) => true // for constants
+      case (ShortT, IntT) => true // for constants
       case _ => false
   }
 

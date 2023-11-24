@@ -1,9 +1,23 @@
 package b2bCompiler
 
-enum UnaryOperator {
-  case Not, Neg
+enum UnaryOperator(symbol: String) {
+  case Not extends UnaryOperator("!")
+  case Neg extends UnaryOperator("-")
+
+  override def toString: String = symbol
 }
 
-enum BinaryOperator {
-  case Add, Sub, Mul, Div, Mod
+enum BinaryOperator(symbol: String) {
+
+  case Add extends BinaryOperator("+")
+  case Sub extends BinaryOperator("-")
+  case Mul extends BinaryOperator("*")
+  case Div extends BinaryOperator("/")
+  case Mod extends BinaryOperator("%")
+
+  case ShiftLeft extends BinaryOperator("<<")
+  case ShiftRight extends BinaryOperator(">>")
+  case UnsignedShiftRight extends BinaryOperator(">>>")
+
+  override def toString: String = symbol
 }
