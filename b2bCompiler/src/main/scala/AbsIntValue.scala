@@ -1,22 +1,43 @@
 package b2bCompiler
 
+import AbsIntValue.Stamp
+
 import java.util.concurrent.atomic.AtomicLong
 
-final class AbsIntValue private(val descr: String, val tpe: TypeSignature, stamp: Long){
+sealed abstract class AbsIntValue(using creator: AbsIntValue.Creator) {
+  val stamp: Stamp = creator.stampGen.incrementAndGet()
 
-  override def toString: String = s"$descr ($tpe, stamp=$stamp)"
-
+  def tpe: TypeSignature
 }
 
 object AbsIntValue {
 
-  final class Creator {
-    private val stampGen = new AtomicLong(0)
+  type Stamp = Long
 
-    def newInstance(descr: String, tpe: RegularTypeSignature): AbsIntValue = {
-      AbsIntValue(descr, tpe, stampGen.incrementAndGet())
+  final class Creator {
+    private[AbsIntValue] val stampGen = new AtomicLong(0)
+
+    private given Creator = this
+
+    final case class Constant(cst: Any) extends AbsIntValue {
+      override def tpe: TypeSignature = TypeSignature.of(cst)
     }
 
+    final case class VariableAccess(name: String, tpe: TypeSignature) extends AbsIntValue
+
+    final case class StaticFieldAccess(className: String, fieldName: String, tpe: TypeSignature) extends AbsIntValue
+
+    final case class InstanceFieldAccess(instance: AbsIntValue, fieldName: String, tpe: TypeSignature) extends AbsIntValue
+
+    final case class StaticInvocation(className: String, methodName: String, sig: MethodSignature,
+                                      args: Seq[AbsIntValue]) extends AbsIntValue {
+      override def tpe: TypeSignature = sig.retType.getOrElse(throw UnsupportedOperationException("not supported for void methods"))
+    }
+
+    final case class DynamicInvocation(className: String, methodName: String, sig: MethodSignature,
+                                       receiver: AbsIntValue, args: Seq[AbsIntValue]) extends AbsIntValue {
+      override def tpe: TypeSignature = sig.retType.getOrElse(throw UnsupportedOperationException("not supported for void methods"))
+    }
   }
 
 }
