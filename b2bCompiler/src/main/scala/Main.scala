@@ -9,6 +9,12 @@ object Main {
     val pipeline =
       new BytecodeParser()
         .andThen(new TablesCreator())
+        .andThen(methodInfos => {
+          for ((table, _) <- methodInfos){
+            println(table)
+          }
+          methodInfos
+        })
         .andThen(new AbstractInterpreter())
         .andThen(new BytecodePrinter())
     end pipeline

@@ -13,7 +13,7 @@ final class BytecodePrinter extends PipelineStage[Seq[(MethodUid, Seq[BytecodeIn
       for (instr <- bytecode){
         sb
           .append("   ")
-          .append(instr.descr)
+          .append(instr.toString)
           .append("\n")
       }
       sb.append("\n")

@@ -53,6 +53,11 @@ object AbsIntValue {
       override protected def toStringImpl: String = name
     }
 
+    final case class AutoGenVarAccess(tpe: TypeSignature, varIdx: Int) extends AbsIntValue {
+      val name: String = "auto#" + varIdx
+      override protected def toStringImpl: String = name
+    }
+
     final case class StaticFieldAccess(className: String, fieldName: String, tpe: TypeSignature) extends AbsIntValue {
       override protected def toStringImpl: String = s"$className.$fieldName"
     }
@@ -106,7 +111,7 @@ object AbsIntValue {
 
     private def p(absIntValue: AbsIntValue): String = {
       absIntValue match {
-        case absIntValue: (VariableAccess | Constant) => absIntValue.toString
+        case absIntValue: (VariableAccess | Constant | StaticFieldAccess | InstanceFieldAccess) => absIntValue.toString
         case _ => s"($absIntValue)"
       }
     }

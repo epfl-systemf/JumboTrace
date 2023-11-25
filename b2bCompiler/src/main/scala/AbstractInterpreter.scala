@@ -18,6 +18,8 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
 
   private def augmentWithInterpretationData(code: Seq[RegularBytecodeInstr], localsTable: LocalsTable): Seq[BytecodeInstr] = {
 
+//    println("\nPROCESSING " ++ localsTable.methodUid) // TODO remove
+
     val absIntValueCreator = new AbsIntValue.Creator()
     import absIntValueCreator.*
 
@@ -25,8 +27,15 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
     val codeB = Seq.newBuilder[BytecodeInstr]
     val alreadySeenLabels = mutable.Set.empty[Label]
 
+    def varAccessFor(varIdx: Int, tpe: TypeSignature): AbsIntValue = {
+      localsTable.findLocal(varIdx, alreadySeenLabels)
+        .map(varInfo => VariableAccess(varInfo.name, varInfo.tpeSig))
+        .getOrElse(AutoGenVarAccess(tpe, varIdx))
+    }
+
     for (instr <- code) {
       codeB.addOne(instr)
+//      println("  " + instr) // TODO remove
       instr match {
 
         case LabelOccurenceB(label) =>
@@ -35,8 +44,13 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
         // second layer so that the compiler checks that all cases are covered
         case effectingBytecodeInstr: EffectingBytecodeInstr => {
 
-          // TODO this assertion does not hold: is it an issue?
-//          assert(!effectingBytecodeInstr.isInstanceOf[JumpInsn] || stack.isEmpty)
+          // TODO the assertion below does not hold: is it an issue?
+          /* Partial answer: it looks like the issue with this assertion on Fib could have been caused by 
+           * the presence of an exception on the stack.
+           * Still not sure if this assertion hold in any other case (probably not), but maybe it holds
+           * in enough cases so that we can use it...
+           */
+          //          assert(!effectingBytecodeInstr.isInstanceOf[JumpInsn] || stack.isEmpty)
 
           import org.objectweb.asm.Opcodes.*
           effectingBytecodeInstr match {
@@ -439,20 +453,15 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               stack.push(Array(LongT, length))
 
             case VarInsn(ILOAD, varIndex) =>
-              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
-              stack.push(VariableAccess(varName, IntT))
+              stack.push(varAccessFor(varIndex, IntT))
             case VarInsn(LLOAD, varIndex) =>
-              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
-              stack.push(VariableAccess(varName, LongT))
+              stack.push(varAccessFor(varIndex, LongT))
             case VarInsn(FLOAD, varIndex) =>
-              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
-              stack.push(VariableAccess(varName, FloatT))
+              stack.push(varAccessFor(varIndex, FloatT))
             case VarInsn(DLOAD, varIndex) =>
-              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
-              stack.push(VariableAccess(varName, DoubleT))
+              stack.push(varAccessFor(varIndex, DoubleT))
             case VarInsn(ALOAD, varIndex) =>
-              val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
-              stack.push(VariableAccess(varName, ObjectRefT))
+              stack.push(varAccessFor(varIndex, ObjectRefT))
             case VarInsn(ISTORE, varIndex) =>
               stack.pop(IntT)
             case VarInsn(LSTORE, varIndex) =>
@@ -495,7 +504,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               val sig = MethodSignature.parse(descriptor)
               val args = stack.popMultiple(sig.params)
               val receiver = stack.pop(ObjectRefT)
-              if (!sig.isVoidMethod){
+              if (!sig.isVoidMethod) {
                 stack.push(InvokeWithReceiver(owner, name, sig, receiver, args))
               }
             case MethodInsn(INVOKESPECIAL, owner, name, descriptor, isInterface) =>
@@ -508,7 +517,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case MethodInsn(INVOKESTATIC, owner, name, descriptor, isInterface) =>
               val sig = MethodSignature.parse(descriptor)
               val args = stack.popMultiple(sig.params)
-              if (!sig.isVoidMethod){
+              if (!sig.isVoidMethod) {
                 stack.push(InvokeWithoutReceiver(owner, name, sig, args))
               }
             case MethodInsn(INVOKEINTERFACE, owner, name, descriptor, isInterface) =>
@@ -523,7 +532,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               val sig = MethodSignature.parse(descriptor)
               val args = stack.popMultiple(sig.params)
               // FIXME "unknown", if possible to do better
-              if (!sig.isVoidMethod){
+              if (!sig.isVoidMethod) {
                 stack.push(InvokeWithoutReceiver("<unknown>", name, sig, args))
               }
 
@@ -583,6 +592,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case unexpected => throw new AssertionError(s"unexpected: $unexpected")
           }
           codeB.addOne(StackState(stack.currState))
+//          println("   Stack: " + stack.currState.mkString("<-[", " | ", "")) // TODO remove
         }
         case _ => ()
       }
@@ -652,18 +662,14 @@ object AbstractInterpreter {
      * Both `types` and the result are oriented as follows: stack bottom ... stack top
      */
     def popMultiple(types: Seq[TypeSignature]): Seq[AbsIntValue] = {
-      (for (tpe <- types.reverse) yield pop(tpe)).reverse
+      (for tpe <- types.reverse yield pop(tpe)).reverse
     }
   }
 
   private def typeCheck(expected: TypeSignature, actual: TypeSignature): Boolean = {
     (expected, actual) match
       case _ if expected == actual => true
-      case (BooleanT, ByteT) => true // may result from array access, as baload works on both boolean[] and byte[]
-      case (BooleanT, IntT) => true // for constants
-      case (ByteT, IntT) => true // for constants
-      case (CharT, IntT) => true // for constants
-      case (ShortT, IntT) => true // for constants
+      case (BooleanT | ByteT | IntT | ShortT | CharT, BooleanT | ByteT | IntT | ShortT | CharT) => true
       case _ => false
   }
 

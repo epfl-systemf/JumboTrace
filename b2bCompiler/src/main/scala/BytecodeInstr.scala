@@ -8,11 +8,12 @@ import org.objectweb.asm.Opcodes
 import OpcodesHelpers.opcodeName
 
 sealed trait BytecodeInstr {
-  def descr: String
+  override def toString: String = toStringImpl
+  protected def toStringImpl: String
 }
 
 sealed trait RegularBytecodeInstr extends BytecodeInstr {
-  
+
   def isMetadata: Boolean
 
   /**
@@ -42,27 +43,27 @@ final case class FrameB(
                          numStack: Int,
                          stack: Array[AnyRef]
                        ) extends MetadataBytecodeInstr {
-  override def descr: String = "frame"
+  override def toStringImpl: String = "frame"
 }
 
 final case class Insn(opcode: InsnOpcode) extends EffectingBytecodeInstr {
-  override def descr: String = opcodeName(opcode)
+  override def toStringImpl: String = opcodeName(opcode)
 }
 
 final case class IntInsn(opcode: IntInsnOpcode, operand: Int) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(opcode)} $operand"
+  override def toStringImpl: String = s"${opcodeName(opcode)} $operand"
 }
 
 final case class VarInsn(opcode: VarInsnOpcode, varIndex: Int) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(opcode)} $varIndex"
+  override def toStringImpl: String = s"${opcodeName(opcode)} $varIndex"
 }
 
 final case class TypeInsn(opcode: TypeInsnOpcode, tpe: String) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(opcode)} $tpe"
+  override def toStringImpl: String = s"${opcodeName(opcode)} $tpe"
 }
 
 final case class FieldInsn(opcode: FieldInsnOpcode, owner: String, name: String, descriptor: String) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(opcode)} $owner $name $descriptor"
+  override def toStringImpl: String = s"${opcodeName(opcode)} $owner $name $descriptor"
 }
 
 final case class MethodInsn(
@@ -72,7 +73,7 @@ final case class MethodInsn(
                              descriptor: String,
                              isInterface: Boolean
                            ) extends EffectingBytecodeInstr {
-  override def descr: String = {
+  override def toStringImpl: String = {
     val isInterfaceDescr = if isInterface then "(itf)" else ""
     s"${opcodeName(opcode)} $owner $name $descriptor $isInterfaceDescr"
   }
@@ -84,7 +85,7 @@ final case class InvokeDynamicInsn(
                                     bootstrapMethodHandle: Handle,
                                     bootstrapMethodArguments: Seq[Any]
                                   ) extends EffectingBytecodeInstr {
-  override def descr: String = {
+  override def toStringImpl: String = {
     s"${opcodeName(Opcodes.INVOKEDYNAMIC)} $name $descriptor handle:$bootstrapMethodHandle" ++ bootstrapMethodArguments.mkString("(", ",", ")")
   }
 
@@ -92,29 +93,36 @@ final case class InvokeDynamicInsn(
 }
 
 final case class JumpInsn(opcode: JumpInsnOpcode, label: Label) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(opcode)} $label"
+  override def toStringImpl: String = s"${opcodeName(opcode)} $label"
 }
 
 final case class LabelOccurenceB(label: Label) extends MetadataBytecodeInstr {
-  override def descr: String = s"label $label"
+  override def toStringImpl: String = s"label $label"
 
   override def opcode: Int = -1
 }
 
 final case class LdcInsn(value: Any) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(Opcodes.LDC)} $value"
+  override def toStringImpl: String = s"${opcodeName(Opcodes.LDC)} $formattedValue"
 
   override protected def opcode: Int = Opcodes.LDC
+
+  private def formattedValue: String = {
+    value match
+      case null => "null"
+      case str: String => s"\"$str\""
+      case _ => value.toString
+  }
 }
 
 final case class IincInsn(varIndex: Int, increment: Int) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(Opcodes.IINC)} $varIndex $increment"
+  override def toStringImpl: String = s"${opcodeName(Opcodes.IINC)} $varIndex $increment"
 
   override protected def opcode: Int = Opcodes.IINC
 }
 
 final case class TableSwitchInsn(min: Int, max: Int, dflt: Label, labels: Seq[Label]) extends EffectingBytecodeInstr {
-  override def descr: String = {
+  override def toStringImpl: String = {
     s"${opcodeName(Opcodes.TABLESWITCH)} $min $max $dflt " ++ labels.mkString("[", ",", "]")
   }
 
@@ -122,7 +130,7 @@ final case class TableSwitchInsn(min: Int, max: Int, dflt: Label, labels: Seq[La
 }
 
 final case class LookupSwitchInsn(dflt: Label, keys: Array[Int], labels: Array[Label]) extends EffectingBytecodeInstr {
-  override def descr: String = {
+  override def toStringImpl: String = {
     s"${opcodeName(Opcodes.LOOKUPSWITCH)} $dflt " ++ keys.mkString("[", ",", "]") ++ " " ++ labels.mkString("[", ",", "]")
   }
 
@@ -130,7 +138,7 @@ final case class LookupSwitchInsn(dflt: Label, keys: Array[Int], labels: Array[L
 }
 
 final case class MultiANewArrayInsn(descriptor: String, numDimensions: Int) extends EffectingBytecodeInstr {
-  override def descr: String = s"${opcodeName(Opcodes.MULTIANEWARRAY)} $descriptor $numDimensions"
+  override def toStringImpl: String = s"${opcodeName(Opcodes.MULTIANEWARRAY)} $descriptor $numDimensions"
 
   override protected def opcode: Int = Opcodes.MULTIANEWARRAY
 }
@@ -141,13 +149,13 @@ final case class InsnAnnotationB(
                                   descriptor: String,
                                   visible: Boolean
                                 ) extends MetadataBytecodeInstr {
-  override def descr: String = "insn-annotation"
+  override def toStringImpl: String = "insn-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class TryCatchBlockB(start: Label, end: Label, handler: Label, tpe: String) extends MetadataBytecodeInstr {
-  override def descr: String = s"try-catch start=$start end=$end handler=$handler $tpe"
+  override def toStringImpl: String = s"try-catch start=$start end=$end handler=$handler $tpe"
 
   override protected def opcode: Int = -1
 }
@@ -158,7 +166,7 @@ final case class TryCatchAnnotationB(
                                       descriptor: String,
                                       visible: Boolean
                                     ) extends MetadataBytecodeInstr {
-  override def descr: String = "try-catch-annot"
+  override def toStringImpl: String = "try-catch-annot"
 
   override protected def opcode: Int = -1
 }
@@ -171,7 +179,7 @@ final case class LocalVarB(
                             end: Label,
                             index: Int
                           ) extends MetadataBytecodeInstr {
-  override def descr: String = s"local $name $descriptor $signature [$start,$end] idx=$index"
+  override def toStringImpl: String = s"local $name $descriptor $signature [$start,$end] idx=$index"
 
   override protected def opcode: Int = -1
 }
@@ -185,37 +193,37 @@ final case class LocalVarAnnotB(
                                  descriptor: String,
                                  visible: Boolean
                                ) extends MetadataBytecodeInstr {
-  override def descr: String = s"local-var-annot"
+  override def toStringImpl: String = s"local-var-annot"
 
   override protected def opcode: Int = -1
 }
 
 final case class LineNumberB(line: Int, start: Label) extends MetadataBytecodeInstr {
-  override def descr: String = s"line $line $start"
+  override def toStringImpl: String = s"line $line $start"
 
   override protected def opcode: Int = -1
 }
 
 final case class MaxsB(maxStack: Int, maxLocals: Int) extends MetadataBytecodeInstr {
-  override def descr: String = s"maxs maxStack=$maxStack maxLocals=$maxLocals"
+  override def toStringImpl: String = s"maxs maxStack=$maxStack maxLocals=$maxLocals"
 
   override protected def opcode: Int = -1
 }
 
 final case class ParamB(name: String, access: Int) extends MetadataBytecodeInstr {
-  override def descr: String = s"param $name access=$access"
+  override def toStringImpl: String = s"param $name access=$access"
 
   override protected def opcode: Int = -1
 }
 
 final case class AnnotationDefaultB() extends MetadataBytecodeInstr {
-  override def descr: String = "annotation-default"
+  override def toStringImpl: String = "annotation-default"
 
   override protected def opcode: Int = -1
 }
 
 final case class AnnotationB(descriptor: String, visible: Boolean) extends MetadataBytecodeInstr {
-  override def descr: String = "annotation"
+  override def toStringImpl: String = "annotation"
 
   override protected def opcode: Int = -1
 }
@@ -226,47 +234,47 @@ final case class TypeAnnotB(
                              descriptor: String,
                              visible: Boolean
                            ) extends MetadataBytecodeInstr {
-  override def descr: String = "type-annotation"
+  override def toStringImpl: String = "type-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class AnnotableParameterCountB(parameterCount: Int, visible: Boolean) extends MetadataBytecodeInstr {
 
-  override def descr: String = "annotable-parameter-count"
+  override def toStringImpl: String = "annotable-parameter-count"
 
   override protected def opcode: Int = -1
 }
 
 final case class ParameterAnnotationB(parameter: Int, descriptor: String, visible: Boolean) extends MetadataBytecodeInstr {
 
-  override def descr: String = "parameter-annotation"
+  override def toStringImpl: String = "parameter-annotation"
 
   override protected def opcode: Int = -1
 }
 
 final case class AttributeB(attribute: Attribute) extends MetadataBytecodeInstr {
-  override def descr: String = "attribute"
+  override def toStringImpl: String = "attribute"
 
   override protected def opcode: Int = -1
 }
 
 final case class CodeB() extends MetadataBytecodeInstr {
-  override def descr: String = "code-start"
+  override def toStringImpl: String = "code-start"
 
   override protected def opcode: Int = -1
 }
 
 final case class EndB() extends MetadataBytecodeInstr {
-  override def descr: String = "code-end"
+  override def toStringImpl: String = "code-end"
 
   override protected def opcode: Int = -1
 }
 
 final case class StatementSeparator(startLine: Int) extends BytecodeInstr {
-  override def descr: String = s"---- new-stat ($startLine) ----"
+  override def toStringImpl: String = s"---- new-stat ($startLine) ----"
 }
 
 final case class StackState(stack: List[AbsIntValue]) extends BytecodeInstr {
-  override def descr: String = "stack: [" ++ stack.mkString(",")
+  override def toStringImpl: String = "stack: <-[ " ++ stack.mkString(" | ")
 }
