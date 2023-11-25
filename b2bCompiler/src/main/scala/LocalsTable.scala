@@ -6,7 +6,7 @@ import org.objectweb.asm.Label
 
 import LocalsTable.*
 
-final class LocalsTable(methodUid: MethodUid, vars: Map[Int, Seq[VarInfo]]) {
+final class LocalsTable(val methodUid: MethodUid, vars: Map[Int, Seq[VarInfo]]) {
 
   def findLocal(varIdx: Int, alreadySeenLabels: mutable.Set[Label]): VarInfo = {
     val matchingVars =

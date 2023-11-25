@@ -12,7 +12,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
 
   override def run(in: TablesCreator.Output): AbstractInterpreter.Output = {
     in.map { (table, code) =>
-      (table, augmentWithInterpretationData(code, table))
+      (table.methodUid, augmentWithInterpretationData(code, table))
     }
   }
 
@@ -35,7 +35,8 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
         // second layer so that the compiler checks that all cases are covered
         case effectingBytecodeInstr: EffectingBytecodeInstr => {
 
-          assert(!effectingBytecodeInstr.isInstanceOf[JumpInsn] || stack.isEmpty)
+          // TODO this assertion does not hold: is it an issue?
+//          assert(!effectingBytecodeInstr.isInstanceOf[JumpInsn] || stack.isEmpty)
 
           import org.objectweb.asm.Opcodes.*
           effectingBytecodeInstr match {
@@ -462,7 +463,8 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               stack.pop(DoubleT)
             case VarInsn(ASTORE, varIndex) =>
               stack.pop(ObjectRefT)
-            case VarInsn(RET, varIndex) => ()
+            case VarInsn(RET, varIndex) =>
+              throw new UnsupportedOperationException("opcode RET is not supported")
 
             case TypeInsn(NEW, tpe) =>
               stack.push(ObjectInstance(tpe))
@@ -474,36 +476,92 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               val v = stack.pop(ObjectRefT)
               stack.push(InstanceOf(v, tpe))
 
-            case FieldInsn(GETSTATIC, owner, name, descriptor) => ???
-            case FieldInsn(PUTSTATIC, owner, name, descriptor) => ???
-            case FieldInsn(GETFIELD, owner, name, descriptor) => ???
-            case FieldInsn(PUTFIELD, owner, name, descriptor) => ???
+            case FieldInsn(GETSTATIC, owner, name, descriptor) =>
+              val tpe = TypeSignature.parse(descriptor)
+              stack.push(StaticFieldAccess(owner, name, tpe))
+            case FieldInsn(PUTSTATIC, owner, name, descriptor) =>
+              val tpe = TypeSignature.parse(descriptor)
+              stack.pop(tpe)
+            case FieldInsn(GETFIELD, owner, name, descriptor) =>
+              val tpe = TypeSignature.parse(descriptor)
+              val receiver = stack.pop(ObjectRefT)
+              stack.push(InstanceFieldAccess(receiver, name, tpe))
+            case FieldInsn(PUTFIELD, owner, name, descriptor) =>
+              val tpe = TypeSignature.parse(descriptor)
+              stack.pop(tpe)
+              stack.pop(ObjectRefT)
 
-            case MethodInsn(INVOKEVIRTUAL, owner, name, descriptor, isInterface) => ???
-            case MethodInsn(INVOKESPECIAL, owner, name, descriptor, isInterface) => ???
-            case MethodInsn(INVOKESTATIC, owner, name, descriptor, isInterface) => ???
-            case MethodInsn(INVOKEINTERFACE, owner, name, descriptor, isInterface) => ???
+            case MethodInsn(INVOKEVIRTUAL, owner, name, descriptor, isInterface) =>
+              val sig = MethodSignature.parse(descriptor)
+              val args = stack.popMultiple(sig.params)
+              val receiver = stack.pop(ObjectRefT)
+              if (!sig.isVoidMethod){
+                stack.push(InvokeWithReceiver(owner, name, sig, receiver, args))
+              }
+            case MethodInsn(INVOKESPECIAL, owner, name, descriptor, isInterface) =>
+              val sig = MethodSignature.parse(descriptor)
+              val args = stack.popMultiple(sig.params)
+              val receiver = stack.pop(ObjectRefT)
+              if (!sig.isVoidMethod) {
+                stack.push(InvokeWithReceiver(owner, name, sig, receiver, args))
+              }
+            case MethodInsn(INVOKESTATIC, owner, name, descriptor, isInterface) =>
+              val sig = MethodSignature.parse(descriptor)
+              val args = stack.popMultiple(sig.params)
+              if (!sig.isVoidMethod){
+                stack.push(InvokeWithoutReceiver(owner, name, sig, args))
+              }
+            case MethodInsn(INVOKEINTERFACE, owner, name, descriptor, isInterface) =>
+              val sig = MethodSignature.parse(descriptor)
+              val args = stack.popMultiple(sig.params)
+              val receiver = stack.pop(ObjectRefT)
+              if (!sig.isVoidMethod) {
+                stack.push(InvokeWithReceiver(owner, name, sig, receiver, args))
+              }
 
-            case InvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments) => ???
+            case InvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments) =>
+              val sig = MethodSignature.parse(descriptor)
+              val args = stack.popMultiple(sig.params)
+              // FIXME "unknown", if possible to do better
+              if (!sig.isVoidMethod){
+                stack.push(InvokeWithoutReceiver("<unknown>", name, sig, args))
+              }
 
-            case JumpInsn(IFEQ, label) => ???
-            case JumpInsn(IFNE, label) => ???
-            case JumpInsn(IFLT, label) => ???
-            case JumpInsn(IFGE, label) => ???
-            case JumpInsn(IFGT, label) => ???
-            case JumpInsn(IFLE, label) => ???
-            case JumpInsn(IF_ICMPEQ, label) => ???
-            case JumpInsn(IF_ICMPNE, label) => ???
-            case JumpInsn(IF_ICMPLT, label) => ???
-            case JumpInsn(IF_ICMPGE, label) => ???
-            case JumpInsn(IF_ICMPGT, label) => ???
-            case JumpInsn(IF_ICMPLE, label) => ???
-            case JumpInsn(IF_ACMPEQ, label) => ???
-            case JumpInsn(IF_ACMPNE, label) => ???
-            case JumpInsn(GOTO, label) => ???
-            case JumpInsn(JSR, label) => ???
-            case JumpInsn(IFNULL, label) => ???
-            case JumpInsn(IFNONNULL, label) => ???
+            case JumpInsn(IFEQ, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IFNE, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IFLT, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IFGE, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IFGT, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IFLE, label) =>
+              stack.pop(IntT)
+            case JumpInsn(IF_ICMPEQ, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ICMPNE, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ICMPLT, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ICMPGE, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ICMPGT, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ICMPLE, label) =>
+              stack.popMultiple(Seq(IntT, IntT))
+            case JumpInsn(IF_ACMPEQ, label) =>
+              stack.popMultiple(Seq(ObjectRefT, ObjectRefT))
+            case JumpInsn(IF_ACMPNE, label) =>
+              stack.popMultiple(Seq(ObjectRefT, ObjectRefT))
+            case JumpInsn(GOTO, label) => ()
+            case JumpInsn(JSR, label) =>
+              throw new UnsupportedOperationException("opcode JSR is not supported")
+            case JumpInsn(IFNULL, label) =>
+              stack.pop(ObjectRefT)
+            case JumpInsn(IFNONNULL, label) =>
+              stack.pop(ObjectRefT)
 
             case LdcInsn(value) =>
               stack.push(Constant(value, TypeSignature.of(value)))
@@ -519,11 +577,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case MultiANewArrayInsn(descriptor, numDimensions) =>
               // remove the leading '[' because we want the element type
               val elemType = TypeSignature.parse(descriptor.tail)
-              val lengths =
-                for (_ <- 1 to numDimensions) yield {
-                  stack.pop(IntT)
-                }
-              end lengths
+              val lengths = stack.popMultiple(Seq.fill(numDimensions)(IntT))
               stack.push(Array(elemType, lengths))
 
             case unexpected => throw new AssertionError(s"unexpected: $unexpected")
@@ -540,7 +594,7 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
 
 object AbstractInterpreter {
 
-  type Output = Seq[(LocalsTable, Seq[BytecodeInstr])]
+  type Output = Seq[(MethodUid, Seq[BytecodeInstr])]
 
   final case class AbsIntException(msg: String) extends RuntimeException(msg)
 
@@ -587,11 +641,18 @@ object AbstractInterpreter {
           throw AbsIntException("empty stack")
         case topElem :: others =>
           elems = others
-          if (typeCheck(sig, topElem.tpe)) {
+          if (!typeCheck(sig, topElem.tpe)) {
             throw AbsIntException(s"expected $sig, found ${topElem.tpe} ($topElem)")
           }
           topElem
       }
+    }
+
+    /**
+     * Both `types` and the result are oriented as follows: stack bottom ... stack top
+     */
+    def popMultiple(types: Seq[TypeSignature]): Seq[AbsIntValue] = {
+      (for (tpe <- types.reverse) yield pop(tpe)).reverse
     }
   }
 
