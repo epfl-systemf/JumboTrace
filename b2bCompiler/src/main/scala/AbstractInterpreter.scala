@@ -42,35 +42,35 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
 
             case Insn(NOP) => ()
             case Insn(ACONST_NULL) =>
-              stack.push(Constant(null))
+              stack.push(Constant(null, ObjectRefT))
             case Insn(ICONST_M1) =>
-              stack.push(Constant(-1))
+              stack.push(Constant(-1, IntT))
             case Insn(ICONST_0) =>
-              stack.push(Constant(0))
+              stack.push(Constant(0, IntT))
             case Insn(ICONST_1) =>
-              stack.push(Constant(1))
+              stack.push(Constant(1, IntT))
             case Insn(ICONST_2) =>
-              stack.push(Constant(2))
+              stack.push(Constant(2, IntT))
             case Insn(ICONST_3) =>
-              stack.push(Constant(3))
+              stack.push(Constant(3, IntT))
             case Insn(ICONST_4) =>
-              stack.push(Constant(4))
+              stack.push(Constant(4, IntT))
             case Insn(ICONST_5) =>
-              stack.push(Constant(5))
+              stack.push(Constant(5, IntT))
             case Insn(LCONST_0) =>
-              stack.push(Constant(0.toLong))
+              stack.push(Constant(0.toLong, LongT))
             case Insn(LCONST_1) =>
-              stack.push(Constant(1.toLong))
+              stack.push(Constant(1.toLong, LongT))
             case Insn(FCONST_0) =>
-              stack.push(Constant(0f))
+              stack.push(Constant(0f, FloatT))
             case Insn(FCONST_1) =>
-              stack.push(Constant(1f))
+              stack.push(Constant(1f, FloatT))
             case Insn(FCONST_2) =>
-              stack.push(Constant(2f))
+              stack.push(Constant(2f, FloatT))
             case Insn(DCONST_0) =>
-              stack.push(Constant(0.0))
+              stack.push(Constant(0.0, DoubleT))
             case Insn(DCONST_1) =>
-              stack.push(Constant(1.0))
+              stack.push(Constant(1.0, DoubleT))
             case Insn(IALOAD) =>
               val idx = stack.pop(IntT)
               val arr = stack.pop(ObjectRefT)
@@ -143,14 +143,36 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               val e = stack.pop1()
               stack.push(e)
               stack.push(e)
-            case Insn(DUP_X1) => ???
-            case Insn(DUP_X2) => ???
+            case Insn(DUP_X1) =>
+              val v1 = stack.pop1()
+              val v2 = stack.pop1()
+              stack.push(v1)
+              stack.push(v2)
+              stack.push(v1)
+            case Insn(DUP_X2) =>
+              val v1 = stack.pop1()
+              val v2 = stack.pop1()
+              val v3 = stack.pop1()
+              stack.push(v1)
+              stack.push(v3)
+              stack.push(v2)
+              stack.push(v1)
             case Insn(DUP2) =>
               val e = stack.pop2()
               stack.push(e)
               stack.push(e)
-            case Insn(DUP2_X1) => ???
-            case Insn(DUP2_X2) => ???
+            case Insn(DUP2_X1) =>
+              val v12 = stack.pop2()
+              val v3 = stack.pop1()
+              stack.push(v12)
+              stack.push(v3)
+              stack.push(v12)
+            case Insn(DUP2_X2) =>
+              val v12 = stack.pop2()
+              val v34 = stack.pop2()
+              stack.push(v12)
+              stack.push(v34)
+              stack.push(v12)
             case Insn(SWAP) =>
               val v2 = stack.pop1()
               val v1 = stack.pop1()
@@ -272,12 +294,30 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               val shift = stack.pop(IntT)
               val v = stack.pop(LongT)
               stack.push(BinaryOperation(UnsignedShiftRight, v, shift, LongT))
-            case Insn(IAND) => ???
-            case Insn(LAND) => ???
-            case Insn(IOR) => ???
-            case Insn(LOR) => ???
-            case Insn(IXOR) => ???
-            case Insn(LXOR) => ???
+            case Insn(IAND) =>
+              val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
+              stack.push(BinaryOperation(BitwiseAnd, v1, v2, IntT))
+            case Insn(LAND) =>
+              val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
+              stack.push(BinaryOperation(BitwiseAnd, v1, v2, LongT))
+            case Insn(IOR) =>
+              val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
+              stack.push(BinaryOperation(BitwiseOr, v1, v2, IntT))
+            case Insn(LOR) =>
+              val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
+              stack.push(BinaryOperation(BitwiseOr, v1, v2, LongT))
+            case Insn(IXOR) =>
+              val v2 = stack.pop(IntT)
+              val v1 = stack.pop(IntT)
+              stack.push(BinaryOperation(BitwiseXor, v1, v2, IntT))
+            case Insn(LXOR) =>
+              val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
+              stack.push(BinaryOperation(BitwiseXor, v1, v2, LongT))
             case Insn(I2L) =>
               val v = stack.pop(IntT)
               stack.push(Converted(v, LongT))
@@ -323,11 +363,26 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(I2S) =>
               val v = stack.pop(IntT)
               stack.push(Converted(v, ShortT))
-            case Insn(LCMP) => ???
-            case Insn(FCMPL) => ???
-            case Insn(FCMPG) => ???
-            case Insn(DCMPL) => ???
-            case Insn(DCMPG) => ???
+            case Insn(LCMP) =>
+              val v2 = stack.pop(LongT)
+              val v1 = stack.pop(LongT)
+              stack.push(Comparison(v1, v2))
+            case Insn(FCMPL) =>
+              val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
+              stack.push(Comparison(v1, v2))
+            case Insn(FCMPG) =>
+              val v2 = stack.pop(FloatT)
+              val v1 = stack.pop(FloatT)
+              stack.push(Comparison(v1, v2))
+            case Insn(DCMPL) =>
+              val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
+              stack.push(Comparison(v1, v2))
+            case Insn(DCMPG) =>
+              val v2 = stack.pop(DoubleT)
+              val v1 = stack.pop(DoubleT)
+              stack.push(Comparison(v1, v2))
             case Insn(IRETURN) =>
               stack.pop(IntT)
             case Insn(LRETURN) =>
@@ -339,18 +394,48 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case Insn(ARETURN) =>
               stack.pop(ObjectRefT)
             case Insn(RETURN) => ()
-            case Insn(ARRAYLENGTH) => ???
+            case Insn(ARRAYLENGTH) =>
+              val arr = stack.pop(ObjectRefT)
+              stack.push(InstanceFieldAccess(arr, "length", IntT))
             case Insn(ATHROW) => {
               /* Leave it on the stack for the handler. Frame may have to be cleared, but it seems to not be an issue
               *  if we don't do it (will just keep unused values on the stack) */
               ()
             }
-            case Insn(MONITORENTER) => ???
-            case Insn(MONITOREXIT) => ???
+            case Insn(MONITORENTER) =>
+              stack.pop(ObjectRefT)
+            case Insn(MONITOREXIT) =>
+              stack.pop(ObjectRefT)
 
-            case IntInsn(BIPUSH, operand) => ???
-            case IntInsn(SIPUSH, operand) => ???
-            case IntInsn(NEWARRAY, operand) => ???
+            case IntInsn(BIPUSH, operand) =>
+              stack.push(Constant(operand, IntT))
+            case IntInsn(SIPUSH, operand) =>
+              stack.push(Constant(operand, IntT))
+
+            case IntInsn(NEWARRAY, T_BOOLEAN) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(BooleanT, length))
+            case IntInsn(NEWARRAY, T_CHAR) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(CharT, length))
+            case IntInsn(NEWARRAY, T_FLOAT) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(FloatT, length))
+            case IntInsn(NEWARRAY, T_DOUBLE) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(DoubleT, length))
+            case IntInsn(NEWARRAY, T_BYTE) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(ByteT, length))
+            case IntInsn(NEWARRAY, T_SHORT) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(ShortT, length))
+            case IntInsn(NEWARRAY, T_INT) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(IntT, length))
+            case IntInsn(NEWARRAY, T_LONG) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(LongT, length))
 
             case VarInsn(ILOAD, varIndex) =>
               val varName = localsTable.findLocal(varIndex, alreadySeenLabels).name
@@ -379,10 +464,15 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
               stack.pop(ObjectRefT)
             case VarInsn(RET, varIndex) => ()
 
-            case TypeInsn(NEW, tpe) => ???
-            case TypeInsn(ANEWARRAY, tpe) => ???
-            case TypeInsn(CHECKCAST, tpe) => ???
-            case TypeInsn(INSTANCEOF, tpe) => ???
+            case TypeInsn(NEW, tpe) =>
+              stack.push(ObjectInstance(tpe))
+            case TypeInsn(ANEWARRAY, tpe) =>
+              val length = stack.pop(IntT)
+              stack.push(Array(ObjectRefT, length))
+            case TypeInsn(CHECKCAST, tpe) => ()
+            case TypeInsn(INSTANCEOF, tpe) =>
+              val v = stack.pop(ObjectRefT)
+              stack.push(InstanceOf(v, tpe))
 
             case FieldInsn(GETSTATIC, owner, name, descriptor) => ???
             case FieldInsn(PUTSTATIC, owner, name, descriptor) => ???
@@ -415,15 +505,26 @@ final class AbstractInterpreter extends PipelineStage[TablesCreator.Output, Abst
             case JumpInsn(IFNULL, label) => ???
             case JumpInsn(IFNONNULL, label) => ???
 
-            case LdcInsn(value) => ???
+            case LdcInsn(value) =>
+              stack.push(Constant(value, TypeSignature.of(value)))
 
-            case IincInsn(varIndex, increment) => ???
+            case IincInsn(varIndex, increment) => ()
 
-            case TableSwitchInsn(min, max, dflt, labels) => ???
+            case TableSwitchInsn(min, max, dflt, labels) =>
+              stack.pop(IntT)
 
-            case LookupSwitchInsn(dflt, keys, labels) => ???
+            case LookupSwitchInsn(dflt, keys, labels) =>
+              stack.pop(IntT)
 
-            case MultiANewArrayInsn(descriptor, numDimensions) => ???
+            case MultiANewArrayInsn(descriptor, numDimensions) =>
+              // remove the leading '[' because we want the element type
+              val elemType = TypeSignature.parse(descriptor.tail)
+              val lengths =
+                for (_ <- 1 to numDimensions) yield {
+                  stack.pop(IntT)
+                }
+              end lengths
+              stack.push(Array(elemType, lengths))
 
             case unexpected => throw new AssertionError(s"unexpected: $unexpected")
           }

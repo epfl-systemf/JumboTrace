@@ -23,8 +23,7 @@ object AbsIntValue {
 
     private given Creator = this
 
-    final case class Constant(cst: Any) extends AbsIntValue {
-      override def tpe: TypeSignature = TypeSignature.of(cst)
+    final case class Constant(cst: Any, tpe: TypeSignature) extends AbsIntValue {
 
       override protected def toStringImpl: String = {
         cst match
@@ -32,6 +31,22 @@ object AbsIntValue {
           case str: String => s"\"$str\""
           case _ => cst.toString
       }
+    }
+    
+    final case class ObjectInstance(preciseTypeStr: String) extends AbsIntValue {
+      override def tpe: TypeSignature = ObjectRefT
+
+      override protected def toStringImpl: String = s"<$preciseTypeStr>"
+    }
+    
+    final case class Array(elemType: TypeSignature, lengths: Seq[AbsIntValue]) extends AbsIntValue {
+      override def tpe: TypeSignature = ObjectRefT
+
+      override protected def toStringImpl: String = elemType.toString ++ lengths.map("[" + _ + "]").mkString
+    }
+    
+    object Array {
+      def apply(elemType: TypeSignature, length: AbsIntValue): Array = Array(elemType, Seq(length))
     }
 
     final case class VariableAccess(name: String, tpe: TypeSignature) extends AbsIntValue {
@@ -71,6 +86,18 @@ object AbsIntValue {
     
     final case class ArrayAccess(array: AbsIntValue, idx: AbsIntValue, tpe: TypeSignature) extends AbsIntValue {
       override protected def toStringImpl: String = s"${p(array)}[$idx]"
+    }
+    
+    final case class Comparison(operand1: AbsIntValue, operand2: AbsIntValue) extends AbsIntValue {
+      override def tpe: TypeSignature = IntT
+
+      override protected def toStringImpl: String = s"cmp $operand1 $operand2"
+    }
+    
+    final case class InstanceOf(value: AbsIntValue, testedTypeStr: String) extends AbsIntValue {
+      override def tpe: TypeSignature = BooleanT
+
+      override protected def toStringImpl: String = s"$value instanceof $testedTypeStr"
     }
     
     final case class Converted(value: AbsIntValue, tpe: TypeSignature) extends AbsIntValue {

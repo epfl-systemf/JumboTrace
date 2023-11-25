@@ -19,5 +19,9 @@ enum BinaryOperator(symbol: String) {
   case ShiftRight extends BinaryOperator(">>")
   case UnsignedShiftRight extends BinaryOperator(">>>")
 
+  case BitwiseAnd extends BinaryOperator("&")
+  case BitwiseOr extends BinaryOperator("||")
+  case BitwiseXor extends BinaryOperator("^")
+
   override def toString: String = symbol
 }
