@@ -9,13 +9,13 @@ object Main {
     val pipeline =
       new BytecodeParser()
         .andThen(new TablesCreator())
-        .andThen(methodInfos => {
-          for ((table, _) <- methodInfos){
-            println(table)
+        .andThen(new AbsIntPreparator())
+        .andThen {
+          _.map { methodInfo =>
+            val (uid, code, _) = methodInfo
+            (uid, code)
           }
-          methodInfos
-        })
-        .andThen(new AbstractInterpreter())
+        }
         .andThen(new BytecodePrinter())
     end pipeline
     val bytes = Files.readAllBytes(Path.of(filepath))

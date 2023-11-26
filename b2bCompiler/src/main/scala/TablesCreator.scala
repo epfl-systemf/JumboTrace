@@ -4,10 +4,14 @@ final class TablesCreator extends PipelineStage[BytecodeParser.Output, TablesCre
 
   override def run(in: BytecodeParser.Output): TablesCreator.Output = {
     for ((methodUid, code) <- in) yield {
-      val tablesBuilder = LocalsTable.Builder(methodUid)
+      val tablesBuilder = MethodTable.Builder(methodUid)
       code.foreach {
         case LocalVarB(name, descriptor, signature, start, end, idx) =>
           tablesBuilder.recordVar(name, descriptor, start, end, idx)
+        case JumpInsn(opcode, label) =>
+          tablesBuilder.recordTargetLabel(label)
+        case TryCatchBlockB(start, end, handler, tpe) =>
+          tablesBuilder.recordTargetLabel(handler)
         case _ => ()
       }
       (tablesBuilder.built, code)
@@ -18,6 +22,6 @@ final class TablesCreator extends PipelineStage[BytecodeParser.Output, TablesCre
 
 object TablesCreator {
   
-  type Output = Seq[(LocalsTable, Seq[RegularBytecodeInstr])]
+  type Output = Seq[(MethodTable, Seq[RegularBytecodeInstr])]
 
 }

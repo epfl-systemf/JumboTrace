@@ -4,7 +4,7 @@ import AbsIntValue.Stamp
 
 import java.util.concurrent.atomic.AtomicLong
 
-sealed abstract class AbsIntValue(using creator: AbsIntValue.Creator) {
+sealed abstract class AbsIntValue(using creator: AbsIntValue.System) {
   val stamp: Stamp = creator.stampGen.incrementAndGet()
 
   def tpe: TypeSignature
@@ -18,10 +18,10 @@ object AbsIntValue {
 
   type Stamp = Long
 
-  final class Creator {
+  final class System {
     private[AbsIntValue] val stampGen = new AtomicLong(0)
 
-    private given Creator = this
+    private given System = this
 
     final case class Constant(cst: Any, tpe: TypeSignature) extends AbsIntValue {
 
@@ -87,6 +87,12 @@ object AbsIntValue {
     final case class BinaryOperation(operation: BinaryOperator, operand1: AbsIntValue,
                                      operand2: AbsIntValue, tpe: TypeSignature) extends AbsIntValue {
       override protected def toStringImpl: String = s"${p(operand1)} $operation ${p(operand2)}"
+    }
+
+    final case class TernaryOperation(cond: AbsIntValue, thenBr: AbsIntValue, elseBr: AbsIntValue) extends AbsIntValue {
+      override def tpe: TypeSignature = thenBr.tpe
+
+      override protected def toStringImpl: String = s"${p(cond)} ? ${p(thenBr)} : ${p(elseBr)}"
     }
 
     final case class ArrayAccess(array: AbsIntValue, idx: AbsIntValue, tpe: TypeSignature) extends AbsIntValue {

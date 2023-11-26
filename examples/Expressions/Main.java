@@ -12,5 +12,9 @@ public final class Main {
     static int f(int x, int y){
         return x*x*y + x/y + 1;
     }
+
+    static void danger(int x, int y, int z){
+        var cond = x < y;
+    }
     
 }

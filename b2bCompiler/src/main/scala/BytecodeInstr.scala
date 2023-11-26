@@ -1,5 +1,7 @@
 package b2bCompiler
 
+import scala.collection.mutable
+
 import org.objectweb.asm.{Attribute, Handle, Label, TypePath}
 import OpcodesTyping.*
 
@@ -9,6 +11,7 @@ import OpcodesHelpers.opcodeName
 
 sealed trait BytecodeInstr {
   override def toString: String = toStringImpl
+
   protected def toStringImpl: String
 }
 
@@ -26,6 +29,8 @@ sealed trait RegularBytecodeInstr extends BytecodeInstr {
     if op < 0 then None else Some(op)
   }
 }
+
+trait AdditionalBytecodeInstr extends BytecodeInstr
 
 sealed trait MetadataBytecodeInstr extends RegularBytecodeInstr {
   final override def isMetadata: Boolean = true
@@ -271,10 +276,9 @@ final case class EndB() extends MetadataBytecodeInstr {
   override protected def opcode: Int = -1
 }
 
-final case class StatementSeparator(startLine: Int) extends BytecodeInstr {
-  override def toStringImpl: String = s"---- new-stat ($startLine) ----"
-}
-
-final case class StackState(stack: List[AbsIntValue]) extends BytecodeInstr {
-  override def toStringImpl: String = "stack: <-[ " ++ stack.mkString(" | ")
+final case class BasicBlockStart(
+                                  varsMapping: Map[Int, VarInfo],
+                                  possibleStackStates: mutable.Set[(AbsIntValue, List[AbsIntValue])]  // first pair element is assumption
+                                ) extends AdditionalBytecodeInstr {
+  override protected def toStringImpl: String = "basic-block-start"
 }
