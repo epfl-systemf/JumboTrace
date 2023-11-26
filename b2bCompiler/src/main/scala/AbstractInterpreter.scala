@@ -8,20 +8,20 @@ import BinaryOperator.*
 
 import scala.collection.mutable
 
-// TODO start new paths at exception handlers
-
 final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, AbstractInterpreter.Output] {
 
   override def run(in: AbsIntPreparator.Output): AbstractInterpreter.Output = {
-    in.map { (methodUid, code, basicBlockMapping) =>
-      (methodUid, augmentWithInterpretationData(code, basicBlockMapping))
+    in.map { (methodTable, code, basicBlockMapping) =>
+      augmentWithInterpretationData(code, basicBlockMapping, methodTable)
+      (methodTable.methodUid, code)
     }
   }
 
   private def augmentWithInterpretationData(
                                              code: List[RegularBytecodeInstr | BasicBlockStart],
-                                             basicBlockMapping: Map[Label, List[RegularBytecodeInstr | BasicBlockStart]]
-                                           ): Seq[BytecodeInstr] = {
+                                             basicBlockMapping: Map[Label, List[RegularBytecodeInstr | BasicBlockStart]],
+                                             methodTable: MethodTable
+                                           ): Unit = {
 
     //    println("\nPROCESSING " ++ localsTable.methodUid) // TODO remove
 
@@ -39,8 +39,15 @@ final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, A
       }
     }
 
+    val codeWithoutleadingMetadata = code.dropWhile(!_.isInstanceOf[BasicBlockStart])
+    codeWithoutleadingMetadata.head
+      .asInstanceOf[BasicBlockStart]
+      .possibleStackStates
+      .addOne(Constant(0, BooleanT) -> List.empty)
     val workList = mutable.Queue.empty[List[RegularBytecodeInstr | BasicBlockStart]]
-    workList.enqueue(code)
+    workList.enqueue(codeWithoutleadingMetadata)
+
+    // TODO also enqueue exception handlers
 
     while (workList.nonEmpty) {
       var remainingInBB = workList.dequeue()
@@ -51,15 +58,19 @@ final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, A
         case _ => throw new AssertionError("unexpected: " + remainingInBB)
       }
 
+      def compareToZero(value: AbsIntValue, operator: BinaryOperator): AbsIntValue = {
+        BinaryOperation(operator, value, Constant(0, IntT), BooleanT)
+      }
+
       def jumpEndsBasicBlock(
                               cond: AbsIntValue,
-                              thenTargetLabel: Label,
-                              elseTarget: List[RegularBytecodeInstr | BasicBlockStart]
+                              thenTargetLabel: Label
                             ): Unit = {
+        val elseTarget = remainingInBB.tail
         remainingInBB = List.empty
         val thenTarget = basicBlockMapping.apply(thenTargetLabel)
         val thenState = (cond, stack.currState)
-        val elseState = (UnaryOperation(Neg, cond, BooleanT), stack.currState)
+        val elseState = (UnaryOperation(Not, cond, BooleanT), stack.currState)
         (thenTarget.head, elseTarget.head) match {
           case (thenHead: BasicBlockStart, elseHead: BasicBlockStart) =>
             if (!thenHead.possibleStackStates.contains(thenState)){
@@ -76,7 +87,8 @@ final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, A
       }
 
       def retEndsBasicBlock(): Unit = {
-        assert(stack.isEmpty)
+        // TODO reactivate assertion (maybe...)
+//        assert(stack.isEmpty)
         remainingInBB = List.empty
       }
 
@@ -580,40 +592,64 @@ final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, A
 
               case JumpInsn(IFEQ, label) =>
                 val v = stack.pop(IntT)
-                // TODO jumpEndsBasicBlock, here and in next cases
+                jumpEndsBasicBlock(compareToZero(v, Equals), label)
               case JumpInsn(IFNE, label) =>
-                stack.pop(IntT)
+                val v = stack.pop(IntT)
+                jumpEndsBasicBlock(compareToZero(v, NotEquals), label)
               case JumpInsn(IFLT, label) =>
-                stack.pop(IntT)
+                val v = stack.pop(IntT)
+                jumpEndsBasicBlock(compareToZero(v, LessThan), label)
               case JumpInsn(IFGE, label) =>
-                stack.pop(IntT)
+                val v = stack.pop(IntT)
+                jumpEndsBasicBlock(compareToZero(v, GreaterEq), label)
               case JumpInsn(IFGT, label) =>
-                stack.pop(IntT)
+                val v = stack.pop(IntT)
+                jumpEndsBasicBlock(compareToZero(v, GreaterThan), label)
               case JumpInsn(IFLE, label) =>
-                stack.pop(IntT)
+                val v = stack.pop(IntT)
+                jumpEndsBasicBlock(compareToZero(v, LessEq), label)
               case JumpInsn(IF_ICMPEQ, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(Equals, v1, v2, BooleanT), label)
               case JumpInsn(IF_ICMPNE, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(NotEquals, v1, v2, BooleanT), label)
               case JumpInsn(IF_ICMPLT, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(LessThan, v1, v2, BooleanT), label)
               case JumpInsn(IF_ICMPGE, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(GreaterEq, v1, v2, BooleanT), label)
               case JumpInsn(IF_ICMPGT, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(GreaterThan, v1, v2, BooleanT), label)
               case JumpInsn(IF_ICMPLE, label) =>
-                stack.popMultiple(Seq(IntT, IntT))
+                val v2 = stack.pop(IntT)
+                val v1 = stack.pop(IntT)
+                jumpEndsBasicBlock(BinaryOperation(LessEq, v1, v2, BooleanT), label)
               case JumpInsn(IF_ACMPEQ, label) =>
-                stack.popMultiple(Seq(ObjectRefT, ObjectRefT))
+                val v2 = stack.pop(ObjectRefT)
+                val v1 = stack.pop(ObjectRefT)
+                jumpEndsBasicBlock(BinaryOperation(Equals, v1, v2, BooleanT), label)
               case JumpInsn(IF_ACMPNE, label) =>
-                stack.popMultiple(Seq(ObjectRefT, ObjectRefT))
-              case JumpInsn(GOTO, label) => ()
+                val v2 = stack.pop(ObjectRefT)
+                val v1 = stack.pop(ObjectRefT)
+                jumpEndsBasicBlock(BinaryOperation(NotEquals, v1, v2, BooleanT), label)
+              case JumpInsn(GOTO, label) =>
+                jumpEndsBasicBlock(Constant(true, BooleanT), label)
               case JumpInsn(JSR, label) =>
                 throw new UnsupportedOperationException("opcode JSR is not supported")
               case JumpInsn(IFNULL, label) =>
-                stack.pop(ObjectRefT)
+                val v = stack.pop(ObjectRefT)
+                jumpEndsBasicBlock(BinaryOperation(Equals, v, Constant(null, ObjectRefT), BooleanT), label)
               case JumpInsn(IFNONNULL, label) =>
-                stack.pop(ObjectRefT)
+                val v = stack.pop(ObjectRefT)
+                jumpEndsBasicBlock(BinaryOperation(NotEquals, v, Constant(null, ObjectRefT), BooleanT), label)
 
               case LdcInsn(value) =>
                 stack.push(Constant(value, TypeSignature.of(value)))
@@ -638,13 +674,11 @@ final class AbstractInterpreter extends PipelineStage[AbsIntPreparator.Output, A
           case _ => ()
         }
 
-        remainingInBB = remainingInBB.tail
+        if (remainingInBB.nonEmpty){
+          remainingInBB = remainingInBB.tail
+        }
       }
-
     }
-
-    ???   // TODO
-
   }
 
   private def mergeStackStates(possibleStates: mutable.Set[(AbsIntValue, List[AbsIntValue])], absIntSystem: AbsIntValue.System): List[AbsIntValue] = {

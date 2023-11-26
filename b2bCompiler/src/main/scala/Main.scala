@@ -10,12 +10,11 @@ object Main {
       new BytecodeParser()
         .andThen(new TablesCreator())
         .andThen(new AbsIntPreparator())
-        .andThen {
-          _.map { methodInfo =>
-            val (uid, code, _) = methodInfo
-            (uid, code)
-          }
-        }
+//        .andThen { in =>
+//          println(in.head._2)
+//          in
+//        }
+        .andThen(new AbstractInterpreter())
         .andThen(new BytecodePrinter())
     end pipeline
     val bytes = Files.readAllBytes(Path.of(filepath))

@@ -14,6 +14,13 @@ enum BinaryOperator(symbol: String) {
   case Mul extends BinaryOperator("*")
   case Div extends BinaryOperator("/")
   case Mod extends BinaryOperator("%")
+  
+  case Equals extends BinaryOperator("==")
+  case NotEquals extends BinaryOperator("!=")
+  case LessThan extends BinaryOperator("<")
+  case GreaterThan extends BinaryOperator(">")
+  case LessEq extends BinaryOperator("<=")
+  case GreaterEq extends BinaryOperator(">=")
 
   case ShiftLeft extends BinaryOperator("<<")
   case ShiftRight extends BinaryOperator(">>")

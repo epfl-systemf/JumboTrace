@@ -280,5 +280,7 @@ final case class BasicBlockStart(
                                   varsMapping: Map[Int, VarInfo],
                                   possibleStackStates: mutable.Set[(AbsIntValue, List[AbsIntValue])]  // first pair element is assumption
                                 ) extends AdditionalBytecodeInstr {
-  override protected def toStringImpl: String = "basic-block-start"
+  override protected def toStringImpl: String = {
+    "new BB: " ++ possibleStackStates.map("<-[" + _ + "]").mkString(" or ")
+  }
 }

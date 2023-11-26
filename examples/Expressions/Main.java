@@ -14,7 +14,7 @@ public final class Main {
     }
 
     static void danger(int x, int y, int z){
-        var cond = x < y;
+        var a = (x < 0) ? y : z;
     }
     
 }
