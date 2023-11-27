@@ -1,0 +1,1 @@
+javac -cp .\target\classes -Xplugin:JumboTrace .\examples\Fibonacci\*.java

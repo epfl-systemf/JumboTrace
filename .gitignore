@@ -1,47 +1,39 @@
-# This .gitignore is taken from https://alvinalexander.com/source-code/scala/sample-gitignore-file-scala-sbt-intellij-eclipse/ (possibly updated)
-
-# bloop and metals
-.bloop
-.bsp
-.metals
-project/metals.sbt
-
-# vs code
-.vscode
-
-# scala 3
-.tasty
-
-# sbt
-project/project/
-project/target/
 target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# eclipse
-build/
-.classpath
-.project
-.settings
-.worksheet
-bin/
-.cache
-
-# intellij idea
-*.log
+### IntelliJ IDEA ###
+.idea
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
 *.iml
 *.ipr
-*.iws
-.idea
 
-# mac
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
 .DS_Store
-
-# other?
-.history
-.scala_dependencies
-.cache-main
-
-# general
-*.class
-
-/htmlReport
