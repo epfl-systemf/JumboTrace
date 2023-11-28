@@ -15,23 +15,18 @@ public final class TransformationListener implements TaskListener {
     @Override
     public void finished(TaskEvent e) {
         if (e.getKind() == TaskEvent.Kind.ANALYZE) {
-            var cu = (JCTree.JCCompilationUnit)e.getCompilationUnit();
-            var origTypeDecl = cu.defs;
-            var newDefs = List.<JCTree>nil();
-            for (var decl: origTypeDecl){
-                newDefs = newDefs.append(transformer.translate(decl));
-            }
-            cu.defs = newDefs;
+            var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+            transformer.translate(cu);
         }
     }
 
-//    @Override
-//    public void started(TaskEvent e) {
-//        if (e.getKind() == TaskEvent.Kind.GENERATE){
-//            var cu = e.getCompilationUnit();
-//            System.out.println(cu);
-//        }
-//    }
+    @Override
+    public void started(TaskEvent e) {
+        if (e.getKind() == TaskEvent.Kind.GENERATE) {
+            var cu = e.getCompilationUnit();
+            System.out.println(cu);
+        }
+    }
 
     //    private static class PrintVisitor extends TreeTranslator {
 //        @Override
@@ -345,5 +340,5 @@ public final class TransformationListener implements TaskListener {
 //            System.out.println(tree.getClass().getSimpleName() + ": " + tree + "\n\n");
 //        }
 //    }
-    
+
 }

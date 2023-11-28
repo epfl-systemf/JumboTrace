@@ -36,56 +36,56 @@ public final class HighLevelTreeMaker {
         idGenerator = new AtomicLong(0);
     }
 
-    public Symbol.PackageSymbol defaultUnnamedPackage(){
+    public Symbol.PackageSymbol defaultUnnamedPackage() {
         return new Symbol.PackageSymbol(n.fromString("unnamed package"), symtab.rootPackage);
     }
 
-    public Symbol.ClassSymbol jumbotraceClassSymbol(){
+    public Symbol.ClassSymbol jumbotraceClassSymbol() {
         // TODO modify this to account for the package containing ___JumboTrace___
         return classSymbol(n.fromString(JUMBOTRACE_CLASS_NAME), defaultUnnamedPackage());
     }
 
-    public Name nextId(String debugHint){
+    public Name nextId(String debugHint) {
         requireArgNonNull(debugHint);
         return n.fromString("$" + idGenerator.incrementAndGet() + "_" + debugHint);
     }
 
-    public Symbol.VarSymbol varSymbol(Name name, Type tpe, Symbol.MethodSymbol owner){
+    public Symbol.VarSymbol varSymbol(Name name, Type tpe, Symbol.ClassSymbol owner) {
         requireArgNonNull(name);
         requireArgNonNull(tpe);
         requireArgNonNull(owner);
         return new Symbol.VarSymbol(0, name, tpe, owner);
     }
 
-    public Symbol.MethodSymbol methodSymbol(Name name, Type tpe, Symbol.ClassSymbol owner){
+    public Symbol.MethodSymbol methodSymbol(Name name, Type tpe, Symbol.ClassSymbol owner) {
         requireArgNonNull(name);
         requireArgNonNull(tpe);
         requireArgNonNull(owner);
         return new Symbol.MethodSymbol(0, name, tpe, owner);
     }
 
-    public Symbol.ClassSymbol classSymbol(Name name, Symbol.PackageSymbol packageSymbol){
+    public Symbol.ClassSymbol classSymbol(Name name, Symbol.PackageSymbol packageSymbol) {
         requireArgNonNull(name);
         requireArgNonNull(packageSymbol);
         return new Symbol.ClassSymbol(0, name, packageSymbol);
     }
 
-    public Symbol.PackageSymbol packageSymbol(Name name, Symbol symbol){
+    public Symbol.PackageSymbol packageSymbol(Name name, Symbol symbol) {
         requireArgNonNull(name);
         requireArgNonNull(symbol);
         return new Symbol.PackageSymbol(name, symbol);
     }
 
-    public JCTree.JCExpression methodCallLogFunction(){
-        var logFunType = new Type.MethodType(List.nil(), new Type.JCVoidType(), List.nil(), jumbotraceClassSymbol());
+    public JCTree.JCExpression methodCallLogFunction() {
+        var logFunType = new Type.MethodType(List.nil(), symtab.objectType, List.nil(), jumbotraceClassSymbol());
         return select(
-                ident(jumbotraceClassSymbol(), symtab.classType),    // FIXME notype seems to have no symbol
+                ident(jumbotraceClassSymbol(), symtab.classType),
                 methodSymbol(n.fromString("methodcall"), logFunType, jumbotraceClassSymbol()),
                 logFunType
         );
     }
 
-    public JCTree.JCIdent ident(Symbol symbol, Type tpe){
+    public JCTree.JCIdent ident(Symbol symbol, Type tpe) {
         requireArgNonNull(symbol);
         requireArgNonNull(tpe);
         var ident = u.Ident(symbol);
@@ -94,14 +94,14 @@ public final class HighLevelTreeMaker {
         return ident;
     }
 
-    public JCTree.JCExpressionStatement exprStat(JCTree.JCExpression expr){
+    public JCTree.JCExpressionStatement exprStat(JCTree.JCExpression expr) {
         requireArgNonNull(expr);
         var exec = u.Exec(expr);
         exec.setType(Objects.requireNonNull(expr.type));
         return exec;
     }
 
-    public JCTree.JCVariableDecl varDecl(Symbol.VarSymbol symbol, JCTree.JCExpression init){
+    public JCTree.JCVariableDecl varDecl(Symbol.VarSymbol symbol, JCTree.JCExpression init) {
         requireArgNonNull(symbol);
         requireArgNonNull(init);
         var varDef = u.VarDef(u.Modifiers(0), symbol.name, u.Type(Objects.requireNonNull(init.type)), init);
@@ -110,14 +110,13 @@ public final class HighLevelTreeMaker {
         return varDef;
     }
 
-    public JCTree.JCMethodInvocation methodInvocation(JCTree.JCExpression callee, List<JCTree.JCExpression> args, Type retType){
+    public JCTree.JCMethodInvocation methodInvocation(JCTree.JCExpression callee, List<JCTree.JCExpression> args) {
         requireArgNonNull(callee);
         requireArgNonNull(args);
-        requireArgNonNull(retType);
-        return u.App(callee, args).setType(retType);
+        return u.App(callee, args);
     }
 
-    public JCTree.LetExpr letExpr(List<JCTree.JCStatement> stats, JCTree.JCExpression expr){
+    public JCTree.LetExpr letExpr(List<JCTree.JCStatement> stats, JCTree.JCExpression expr) {
         requireArgNonNull(stats);
         requireArgNonNull(expr);
         var letExpr = u.LetExpr(stats, expr);
@@ -125,7 +124,7 @@ public final class HighLevelTreeMaker {
         return letExpr;
     }
 
-    public JCTree.JCExpression select(JCTree.JCExpression selected, Symbol selector, Type tpe){
+    public JCTree.JCExpression select(JCTree.JCExpression selected, Symbol selector, Type tpe) {
         requireArgNonNull(selected);
         requireArgNonNull(selector);
         requireArgNonNull(tpe);
@@ -134,11 +133,10 @@ public final class HighLevelTreeMaker {
         return select;
     }
 
-    private <T> T requireArgNonNull(T t){
-        if (Objects.isNull(t)){
+    private void requireArgNonNull(Object t) {
+        if (Objects.isNull(t)) {
             throw new IllegalArgumentException("argument is null");
         }
-        return t;
     }
 
 }
