@@ -5,6 +5,8 @@ import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 
+import java.util.Objects;
+
 public final class TransformationListener implements TaskListener {
     private final Transformer transformer;
 
@@ -13,18 +15,20 @@ public final class TransformationListener implements TaskListener {
     }
 
     @Override
-    public void finished(TaskEvent e) {
-        if (e.getKind() == TaskEvent.Kind.ANALYZE) {
-            var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
-            transformer.translate(cu);
+    public void started(TaskEvent e) {
+        System.out.println("Started " + e.getKind().name() + " of " + (Objects.isNull(e.getSourceFile()) ? "" : e.getSourceFile().getName()));
+        if (e.getKind() == TaskEvent.Kind.GENERATE) {
+            var cu = e.getCompilationUnit();
+            System.out.println(cu);
         }
     }
 
     @Override
-    public void started(TaskEvent e) {
-        if (e.getKind() == TaskEvent.Kind.GENERATE) {
-            var cu = e.getCompilationUnit();
-            System.out.println(cu);
+    public void finished(TaskEvent e) {
+        System.out.println("Finished " + e.getKind().name() + " of " + (Objects.isNull(e.getSourceFile()) ? "" : e.getSourceFile().getName()));
+        if (e.getKind() == TaskEvent.Kind.ANALYZE) {
+            var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+            transformer.translate(cu);
         }
     }
 
