@@ -75,19 +75,18 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitApply(JCMethodInvocation invocation) {
         super.visitApply(invocation);
-        if (!currentMethod().name.toString().equals("<init>")) {
-            if (invocation.type.getTag() == TypeTag.VOID) {
-                throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
-            }
-            var instrPieces = makeInstrumentationPieces(invocation);
-            result = m.mk().LetExpr(
-                    instrPieces._1,
-                    m.mk().LetExpr(
-                            List.of(instrPieces._2),
-                            instrPieces._3
-                    ).setType(invocation.type)
-            ).setType(invocation.type);
+
+        if (invocation.type.getTag() == TypeTag.VOID) {
+            throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
+        var instrPieces = makeInstrumentationPieces(invocation);
+        result = m.mk().LetExpr(
+                instrPieces._1,
+                m.mk().LetExpr(
+                        List.of(instrPieces._2),
+                        instrPieces._3
+                ).setType(invocation.type)
+        ).setType(invocation.type);
     }
 
     @NotNull
