@@ -3,22 +3,27 @@ package com.epfl.systemf.jumbotrace.javacplugin;
 import com.sun.source.util.TaskEvent;
 import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.util.List;
-
-import java.util.Objects;
 
 public final class TransformationListener implements TaskListener {
-    private final Transformer transformer;
+    private final TreeMakingContainer treeMakingContainer;
+    private final Instrumentation instrumentation;
 
-    public TransformationListener(Transformer transformer) {
-        this.transformer = transformer;
+    public TransformationListener(TreeMakingContainer treeMakingContainer, Instrumentation instrumentation) {
+        this.treeMakingContainer = treeMakingContainer;
+        this.instrumentation = instrumentation;
     }
 
     @Override
     public void finished(TaskEvent e) {
         if (e.getKind() == TaskEvent.Kind.ANALYZE) {
             var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+            var transformer = new Transformer(
+                    cu.getSourceFile().getName(),
+                    treeMakingContainer,
+                    instrumentation
+            );
             transformer.translate(cu);
+//            cu.accept(new DebugPrintVisitor());
         }
     }
 

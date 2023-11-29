@@ -22,8 +22,7 @@ public class JumboTrace implements Plugin {
         var symtab = Symtab.instance(ctx);
         var treeMakingContainer = new TreeMakingContainer(TreeMaker.instance(ctx), names, symtab);
         var instrumentation = new Instrumentation(treeMakingContainer);
-        var transformer = new Transformer(treeMakingContainer, symtab, instrumentation);
-        task.addTaskListener(new TransformationListener(transformer));
+        task.addTaskListener(new TransformationListener(treeMakingContainer, instrumentation));
     }
 
 }

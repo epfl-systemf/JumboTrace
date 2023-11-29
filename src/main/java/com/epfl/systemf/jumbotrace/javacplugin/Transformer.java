@@ -2,28 +2,57 @@ package com.epfl.systemf.jumbotrace.javacplugin;
 
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symtab;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.*;
+import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
+import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
+import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
+import com.sun.tools.javac.tree.JCTree.JCStatement;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Deque;
+import java.util.LinkedList;
+
 public final class Transformer extends TreeTranslator {
+
+    private final String filename;
     private final TreeMakingContainer m;
     private final Instrumentation instrumentation;
 
-    private Symbol.MethodSymbol currentMethod;
+    private final Deque<Symbol.ClassSymbol> classesStack;
+    private final Deque<Symbol.MethodSymbol> methodsStack;
 
-    public Transformer(TreeMakingContainer m, Symtab symtab, Instrumentation instrumentation) {
+    public Transformer(String filename, TreeMakingContainer m, Instrumentation instrumentation) {
+        this.filename = filename;
         this.m = m;
         this.instrumentation = instrumentation;
+        classesStack = new LinkedList<>();
+        methodsStack = new LinkedList<>();
+    }
+
+    private Symbol.ClassSymbol currentClass() {
+        return classesStack.getFirst();
+    }
+
+    private Symbol.MethodSymbol currentMethod() {
+        return methodsStack.getFirst();
+    }
+
+    @Override
+    public void visitClassDef(JCTree.JCClassDecl tree) {
+        classesStack.addFirst(tree.sym);
+        super.visitClassDef(tree);
+        classesStack.removeFirst();
     }
 
     @Override
     public void visitMethodDef(JCMethodDecl tree) {
-        currentMethod = tree.sym;
+        methodsStack.addFirst(tree.sym);
         super.visitMethodDef(tree);
+        methodsStack.removeFirst();
     }
 
     @Override
@@ -47,7 +76,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitApply(JCMethodInvocation invocation) {
         super.visitApply(invocation);
-        if (!currentMethod.name.toString().equals("<init>")) {
+        if (!currentMethod().name.toString().equals("<init>")) {
             if (invocation.type.getTag() == TypeTag.VOID) {
                 throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
             }
@@ -71,14 +100,31 @@ public final class Transformer extends TreeTranslator {
         var argsDecls = List.<JCStatement>nil();
         var argsIds = List.<JCTree.JCExpression>nil();
         for (var arg : invocation.args) {
-            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod);
+            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
             argsIds = argsIds.append(m.mk().Ident(varSymbol));
             argsDecls = argsDecls.append(m.mk().VarDef(varSymbol, arg));
         }
-        // TODO actually pass arguments to logging method
-        var loggingStat = m.mk().Exec(instrumentation.logMethodCallInvocation(List.nil())).setType(m.st().voidType);
+        var clsAndMeth = definingClassAndMethodNamesOf(invocation.meth);
+        var logCall = instrumentation.logMethodCallInvocation(
+                clsAndMeth._1, clsAndMeth._2, (Type.MethodType) invocation.meth.type,
+                argsIds, filename, invocation.pos
+        );
+        var loggingStat = m.mk().Exec(logCall).setType(m.st().voidType);
         var newInvocation = m.mk().Apply(List.nil(), invocation.meth, argsIds).setType(invocation.type);
         return new Triple<>(argsDecls, loggingStat, newInvocation);
+    }
+
+    private Pair<String, String> definingClassAndMethodNamesOf(JCTree.JCExpression method) {
+        if (method instanceof JCTree.JCIdent ident) {
+            return new Pair<>(currentClass().toString(), ident.toString());
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
+            return new Pair<>(fieldAccess.selected.toString(), fieldAccess.name.toString());
+        } else {
+            throw new AssertionError("unexpected: " + method.getClass() + " at " + method.pos());
+        }
+    }
+
+    private record Pair<A, B>(A _1, B _2) {
     }
 
     private record Triple<A, B, C>(A _1, B _2, C _3) {
