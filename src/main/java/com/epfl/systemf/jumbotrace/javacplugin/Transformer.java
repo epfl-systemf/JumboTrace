@@ -30,7 +30,7 @@ public final class Transformer extends TreeTranslator {
     public void visitExec(JCExpressionStatement tree) {
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
          * Assumption: all such calls are wrapped in a JCExpressionStatement
-         * Solution: the special in this method
+         * Solution: special-case it (here)
          */
         if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             var instrPieces = makeInstrumentationPieces(invocation);
