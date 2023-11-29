@@ -11,7 +11,7 @@ public class Main {
 
          */
 
-        var graph = initGraph(new DirectedGraph());
+        var graph = Main.initGraph(new DirectedGraph());
         System.out.println(graph);
         graph.preOrder(1);
     }
