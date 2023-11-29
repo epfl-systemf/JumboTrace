@@ -11,14 +11,10 @@ public final class LetExpression extends JCTree.LetExpr {
     }
 
     @Override
-    public <R, D> R accept(TreeVisitor<R, D> v, D d) {
-        System.out.println("LetExpression visited by " + v + " with d=" + d);   // TODO remove
-        return v.visitOther(this, d);
-    }
-
-    @Override
     public void accept(Visitor v) {
-        System.out.println("LetExpression visited by " + v);    // TODO remove
-        super.accept(v);
+        for (var def: defs){
+            def.accept(v);
+        }
+        expr.accept(v);
     }
 }
