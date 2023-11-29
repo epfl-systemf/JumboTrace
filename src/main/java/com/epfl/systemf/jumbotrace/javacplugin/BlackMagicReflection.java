@@ -12,9 +12,9 @@ import java.util.Arrays;
 * by Alessandro Autiero
 */
 
-public final class DangerousBlackMagicReflection {
+public final class BlackMagicReflection {
 
-    private DangerousBlackMagicReflection(){
+    private BlackMagicReflection(){
         throw new UnsupportedOperationException();
     }
 
@@ -32,7 +32,7 @@ public final class DangerousBlackMagicReflection {
                     .filter(pack -> pack.startsWith("com.sun.tools.javac"))
                     .forEach(pack -> {
                         try {
-                            addOpensMethod.invoke(jdkCompilerModule, pack, DangerousBlackMagicReflection.class.getModule());
+                            addOpensMethod.invoke(jdkCompilerModule, pack, BlackMagicReflection.class.getModule());
                         } catch (IllegalAccessException | InvocationTargetException e) {
                             throw new RuntimeException(e);
                         }

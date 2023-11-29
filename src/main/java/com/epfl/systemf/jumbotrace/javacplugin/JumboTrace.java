@@ -16,7 +16,7 @@ public class JumboTrace implements Plugin {
 
     @Override
     public void init(JavacTask task, String... args) {
-        DangerousBlackMagicReflection.openJavacUnsafe();
+        BlackMagicReflection.openJavacUnsafe();
         var ctx = ((BasicJavacTask) task).getContext();
         var names = Names.instance(ctx);
         var symtab = Symtab.instance(ctx);
