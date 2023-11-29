@@ -19,7 +19,9 @@ public final class TransformationListener implements TaskListener {
         System.out.println("Started " + e.getKind().name() + " of " + (Objects.isNull(e.getSourceFile()) ? "" : e.getSourceFile().getName()));
         if (e.getKind() == TaskEvent.Kind.GENERATE) {
             var cu = e.getCompilationUnit();
-            System.out.println(cu);
+            if (cu.getSourceFile().getName().endsWith("Main.java")) {
+                System.out.println(cu);
+            }
         }
     }
 
