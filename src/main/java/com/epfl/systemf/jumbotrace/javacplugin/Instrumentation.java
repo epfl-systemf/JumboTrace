@@ -29,7 +29,7 @@ public final class Instrumentation {
                 List.nil(),
                 m.st().noModule
         );
-        var argsArray = m.mk().NewArray(m.mk().Type(m.st().objectType), List.of(m.mk().Literal(1)), args).setType(argsArrayType);
+        var argsArray = m.mk().NewArray(m.mk().Type(m.st().objectType), List.nil(), args).setType(argsArrayType);
         return m.mk().Apply(
                 List.nil(),
                 m.mk().Select(
