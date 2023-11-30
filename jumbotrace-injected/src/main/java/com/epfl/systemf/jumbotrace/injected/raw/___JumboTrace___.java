@@ -1,7 +1,6 @@
 package com.epfl.systemf.jumbotrace.injected.raw;
 
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
-import com.epfl.systemf.jumbotrace.injected.annot.Specialized;
 
 import java.util.Arrays;
 
