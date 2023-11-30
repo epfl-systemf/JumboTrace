@@ -59,7 +59,14 @@ public final class Transformer extends TreeTranslator {
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
          * Assumption: all such calls are wrapped in a JCExpressionStatement
          * Solution: special-case it (here)
+         * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
+        if (tree.expr instanceof JCMethodInvocation invocation
+                && currentMethod().name.toString().equals("<init>")
+                && invocation.meth.toString().equals("super")){
+            this.result = tree; // tree is unchanged
+            return;
+        }
         if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             var instrPieces = makeInstrumentationPieces(invocation);
             this.result = m.mk().Block(0,
@@ -75,7 +82,6 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitApply(JCMethodInvocation invocation) {
         super.visitApply(invocation);
-
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
@@ -108,15 +114,15 @@ public final class Transformer extends TreeTranslator {
                 argsIds, filename, invocation.pos
         );
         var loggingStat = m.mk().Exec(logCall).setType(m.st().voidType);
-        var newInvocation = m.mk().Apply(List.nil(), invocation.meth, argsIds).setType(invocation.type);
-        return new Triple<>(argsDecls, loggingStat, newInvocation);
+        invocation.args = argsIds;
+        return new Triple<>(argsDecls, loggingStat, invocation);
     }
 
     private Pair<String, String> definingClassAndMethodNamesOf(JCTree.JCExpression method) {
         if (method instanceof JCTree.JCIdent ident) {
             return new Pair<>(currentClass().toString(), ident.toString());
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
-            return new Pair<>(fieldAccess.selected.toString(), fieldAccess.name.toString());
+            return new Pair<>(fieldAccess.selected.type.tsym.toString(), fieldAccess.name.toString());
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " at " + method.pos());
         }
