@@ -1,4 +1,4 @@
-package com.epf.systemf.jumbotrace;
+package com.epfl.systemf.jumbotrace.injectedgen;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -29,17 +29,14 @@ public final class Transformer extends ModifierVisitor<Void> {
 
     private static final String RAW_PACKAGE_NAME = "raw";
     private static final String PROCESSED_PACKAGE_NAME = "processed";
+    private static final String IMPORT_TO_REMOVE = "com.epfl.systemf.jumbotrace.injected.annot.Specialize";
+    private static final String IMPORT_NAME_TO_ADD = "Specialized";
 
     @Override
     public Visitable visit(CompilationUnit n, Void arg) {
         super.visit(n, arg);
-        n.getPackageDeclaration().ifPresent(packageDeclaration -> {
-            var name = packageDeclaration.getName();
-            if (!name.getIdentifier().equals(RAW_PACKAGE_NAME)){
-                throw new AssertionError();
-            }
-            name.setIdentifier(PROCESSED_PACKAGE_NAME);
-        });
+        replacePackageName(n);
+        replaceAnnotationImport(n);
         return n;
     }
 
@@ -96,6 +93,26 @@ public final class Transformer extends ModifierVisitor<Void> {
             annotations.remove(found);
             return true;
         }
+    }
+
+    private static void replacePackageName(CompilationUnit n) {
+        n.getPackageDeclaration().ifPresent(packageDeclaration -> {
+            var name = packageDeclaration.getName();
+            if (!name.getIdentifier().equals(RAW_PACKAGE_NAME)){
+                throw new AssertionError();
+            }
+            name.setIdentifier(PROCESSED_PACKAGE_NAME);
+        });
+    }
+
+    private static void replaceAnnotationImport(CompilationUnit n) {
+        for (var imp: n.getImports()){
+            if (imp.getName().toString().equals(IMPORT_TO_REMOVE)){
+                imp.getName().setIdentifier(IMPORT_NAME_TO_ADD);
+                return;
+            }
+        }
+        throw new AssertionError("import to be replaced not found");
     }
 
 }

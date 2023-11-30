@@ -1,11 +1,10 @@
-package com.epf.systemf.jumbotrace;
+package com.epfl.systemf.jumbotrace.injectedgen;
 
 import com.github.javaparser.StaticJavaParser;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static com.github.javaparser.ParserConfiguration.*;
