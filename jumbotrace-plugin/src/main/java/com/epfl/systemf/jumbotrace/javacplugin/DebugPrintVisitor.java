@@ -15,13 +15,15 @@ public final class DebugPrintVisitor extends TreeTranslator {   // possibly exis
         if (!(tree instanceof JCTree.JCMethodInvocation methodInvocation)){  // TODO remove
             return;
         }
-        println("-- START ------------------------------------");
+//        println("-- START ------------------------------------");
         println(limitLength(tree.toString()));
-        println("-- INFOS --");
-        println(tree.getClass());
-//        printAllFields(tree);
-        println(Flags.asFlagSet(methodInvocation.meth.type.tsym.flags_field));
-        println("-- END --------------------------------------");
+//        println("-- METHOD INFOS --");
+        if (methodInvocation.meth instanceof JCTree.JCFieldAccess fldAccess){
+            System.out.println(fldAccess.selected.type.tsym.isDynamic());
+        }
+//        printAllFields(methodInvocation.meth);
+//        println("-- END --------------------------------------");
+        println("---------------------------------------------");
     }
 
     private void printAllFields(Object object) {

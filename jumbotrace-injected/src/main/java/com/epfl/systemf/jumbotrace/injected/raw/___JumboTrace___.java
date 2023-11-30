@@ -1,3 +1,8 @@
+package com.epfl.systemf.jumbotrace.injected.raw;
+
+import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
+import com.epfl.systemf.jumbotrace.injected.annot.Specialized;
+
 import java.util.Arrays;
 
 public class ___JumboTrace___ {
@@ -12,6 +17,7 @@ public class ___JumboTrace___ {
         loggingEnabled = false;
     }
 
+
     public static void methodCall(String className, String methodName, String methodSig, Object[] args, String filename, int position){
         if (loggingEnabled){
             disableLogging();
@@ -24,4 +30,14 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize Object methodRet(String methodName, @Specialize Object retvalue, String filename, int position){
+        if (loggingEnabled){
+            disableLogging();
+            System.out.println(methodName + " RETURNS " + retvalue + " at " + filename + ":" + position);
+            enableLogging();
+        }
+        return retvalue;
+    }
+
 }
+
