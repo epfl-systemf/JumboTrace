@@ -17,8 +17,9 @@ public final class Instrumentation {
 
     public Instrumentation(TreeMakingContainer m) {
         this.m = m;
-        m.st().defineClass(m.n().fromString(JUMBOTRACE_CLASS_NAME), m.st().rootPackage);
-        jumbotraceClassSymbol = new Symbol.ClassSymbol(0, m.n().fromString(JUMBOTRACE_CLASS_NAME), Type.noType, m.st().rootPackage);
+        var jumbotracePackage = makeCompositePackageSymbol("com", "epfl", "systemf", "jumbotrace", "injected", "processed");
+        m.st().defineClass(m.n().fromString(JUMBOTRACE_CLASS_NAME), jumbotracePackage);
+        jumbotraceClassSymbol = new Symbol.ClassSymbol(0, m.n().fromString(JUMBOTRACE_CLASS_NAME), Type.noType, jumbotracePackage);
         jumbotraceClassSymbol.type = new Type.ClassType(Type.noType, List.nil(), jumbotraceClassSymbol);
     }
 
@@ -85,6 +86,14 @@ public final class Instrumentation {
         } else {
             return m.mk().TypeCast(returnValue.type, apply);
         }
+    }
+
+    private Symbol.PackageSymbol makeCompositePackageSymbol(String... parts){
+        var curr = m.st().rootPackage;
+        for (var part: parts){
+            curr = new Symbol.PackageSymbol(m.n().fromString(part), curr);
+        }
+        return curr;
     }
 
 }
