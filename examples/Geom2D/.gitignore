@@ -1,7 +1,0 @@
-
-.metals/
-.vscode/
-jumbotracer-transformed/
-
-*.tasty
-*.class
