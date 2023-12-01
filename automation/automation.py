@@ -26,7 +26,7 @@ def cmd(command: str, msg: str):
 def compile_example(example_name: str):
     compile_plugin()
     compile_injected()
-    copy_injection_to_examples(example_name)
+    copy_injection_to_example(example_name)
     cmd(
         f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace {examples_dir}/{example_name}/*.java",
         f"compiling example {example_name}"
@@ -71,7 +71,7 @@ def compile_injected():
     )
 
 
-def copy_injection_to_examples(example_name: str):
+def copy_injection_to_example(example_name: str):
     example_dir = f"{examples_dir}/{example_name}"
     src = f"{injected_dir}/target/classes/com"
     dst = f"{examples_dir}/{example_dir}/com"
