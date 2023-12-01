@@ -41,14 +41,14 @@ public class ___JumboTrace___ {
         }
     }
 
-    public static @Specialize Object methodRet(String methodName, @Specialize Object retvalue,
+    public static @Specialize Object methodRet(String methodName, @Specialize Object retValue,
                                                String filename, int startPosition, int endPosition){
         if (loggingEnabled){
             disableLogging();
-            log(methodName, " RETURNS '", retvalue, "' at ", filename, " [", startPosition, ",", endPosition, "]");
+            log(methodName, " RETURNS '", retValue, "' at ", filename, " [", startPosition, ",", endPosition, "]");
             enableLogging();
         }
-        return retvalue;
+        return retValue;
     }
 
     public static void methodRetVoid(String methodName, String filename, int startPosition, int endPosition){

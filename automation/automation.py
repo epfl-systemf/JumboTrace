@@ -1,8 +1,8 @@
 import os
-import sys
 import shutil
-from typing import List, Final
+import sys
 
+from typing import List, Final
 from termcolor import colored
 
 examples_dir: Final[str] = "../examples"
