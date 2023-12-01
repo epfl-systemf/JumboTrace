@@ -10,6 +10,7 @@ public final class Instrumentation {
 
     private static final String LOG_METHOD_CALL_METH_NAME = "methodCall";
     private static final String LOG_METHOD_RET_METH_NAME = "methodRet";
+    private static final String LOG_METHOD_RET_VOID_METH_NAME = "methodRetVoid";
 
     private final TreeMakingContainer m;
 
@@ -92,6 +93,33 @@ public final class Instrumentation {
         } else {
             return m.mk().TypeCast(returnValue.type, apply);
         }
+    }
+
+    public JCTree.JCExpression logMethodReturnVoid(String methodName, String filename, int startPos, int endPos){
+        var loggingMethodType = new Type.MethodType(
+                List.of(m.st().stringType, m.st().stringType, m.st().intType, m.st().intType),
+                m.st().voidType,
+                List.nil(),
+                jumbotraceClassSymbol
+        );
+        return m.mk().Apply(
+                List.nil(),
+                m.mk().Select(
+                        m.mk().Ident(jumbotraceClassSymbol),
+                        new Symbol.MethodSymbol(
+                                Flags.PUBLIC | Flags.STATIC,
+                                m.n().fromString(LOG_METHOD_RET_VOID_METH_NAME),
+                                loggingMethodType,
+                                jumbotraceClassSymbol
+                        )
+                ),
+                List.of(
+                        m.mk().Literal(methodName),
+                        m.mk().Literal(filename),
+                        m.mk().Literal(startPos),
+                        m.mk().Literal(endPos)
+                )
+        ).setType(m.st().voidType);
     }
 
     private Symbol.PackageSymbol makeCompositePackageSymbol(String... parts){

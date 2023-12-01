@@ -51,5 +51,13 @@ public class ___JumboTrace___ {
         return retvalue;
     }
 
+    public static void methodRetVoid(String methodName, String filename, int startPosition, int endPosition){
+        if (loggingEnabled){
+            disableLogging();
+            log(methodName, " RETURNS void at ", filename, " [", startPosition, ",", endPosition, "]");
+            enableLogging();
+        }
+    }
+
 }
 

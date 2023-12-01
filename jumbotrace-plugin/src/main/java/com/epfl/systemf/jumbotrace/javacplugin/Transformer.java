@@ -77,6 +77,12 @@ public final class Transformer extends TreeTranslator {
                     instrPieces._1
                             .append(instrPieces._2)
                             .append(m.mk().Exec(instrPieces._3))
+                            .append(m.mk().Exec(instrumentation.logMethodReturnVoid(
+                                    definingClassAndMethodNamesOf(invocation.meth)._2,
+                                    filename,
+                                    invocation.pos,
+                                    invocation.getEndPosition(endPosTable)
+                            )))
             );
         } else {
             super.visitExec(tree);
