@@ -64,7 +64,6 @@ public final class Transformer extends TreeTranslator {
          * Solution: special-case it (here)
          * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
-        // TODO log void return
         if (tree.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.toString().equals("<init>")
                 && invocation.meth.toString().equals("super")){
