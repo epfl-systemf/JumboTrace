@@ -44,8 +44,12 @@ public final class Transformer extends ModifierVisitor<Void> {
     public Visitable visit(ClassOrInterfaceDeclaration classOrInterfaceDecl, Void arg) {
         super.visit(classOrInterfaceDecl, arg);
         var newMembersList = new NodeList<BodyDeclaration<?>>();
-        for (var member: classOrInterfaceDecl.getMembers()){
-            if (member instanceof MethodDeclaration methodDeclaration && checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations())) {
+        for (var member : classOrInterfaceDecl.getMembers()) {
+            if (member instanceof MethodDeclaration methodDeclaration && (
+                    checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations()) ||
+                            methodDeclaration.getParameters().stream()
+                                    .anyMatch(param -> param.isAnnotationPresent(TARGET_ANNOTATION_NAME)))
+            ) {
                 newMembersList.addAll(replicate(methodDeclaration));
             } else {
                 newMembersList.add(member);
@@ -57,18 +61,18 @@ public final class Transformer extends ModifierVisitor<Void> {
 
     private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration) {
         var specializedMethods = new LinkedList<MethodDeclaration>();
-        for (var type: TOPMOST_TYPES){
+        for (var type : TOPMOST_TYPES) {
             specializedMethods.add(copyWithType(methodDeclaration, type));
         }
         return specializedMethods;
     }
 
-    private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type){
+    private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type) {
         var copy = methodDeclaration.clone();
         copy.setType(type);
         copy.getParameters().forEach(parameter -> {
             var mustReplicate = checkAndDeleteTargetAnnotation(parameter.getAnnotations());
-            if (mustReplicate){
+            if (mustReplicate) {
                 parameter.setType(type);
             }
         });
@@ -79,7 +83,7 @@ public final class Transformer extends ModifierVisitor<Void> {
         return copy;
     }
 
-    private boolean checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations){
+    private boolean checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations) {
         AnnotationExpr found = null;
         for (var annot : annotations) {
             if (annot.getName().getIdentifier().equals(Transformer.TARGET_ANNOTATION_NAME)) {
@@ -87,7 +91,7 @@ public final class Transformer extends ModifierVisitor<Void> {
                 break;
             }
         }
-        if (found == null){
+        if (found == null) {
             return false;
         } else {
             annotations.remove(found);
@@ -98,7 +102,7 @@ public final class Transformer extends ModifierVisitor<Void> {
     private static void replacePackageName(CompilationUnit n) {
         n.getPackageDeclaration().ifPresent(packageDeclaration -> {
             var name = packageDeclaration.getName();
-            if (!name.getIdentifier().equals(RAW_PACKAGE_NAME)){
+            if (!name.getIdentifier().equals(RAW_PACKAGE_NAME)) {
                 throw new AssertionError();
             }
             name.setIdentifier(PROCESSED_PACKAGE_NAME);
@@ -106,8 +110,8 @@ public final class Transformer extends ModifierVisitor<Void> {
     }
 
     private static void replaceAnnotationImport(CompilationUnit n) {
-        for (var imp: n.getImports()){
-            if (imp.getName().toString().equals(IMPORT_TO_REMOVE)){
+        for (var imp : n.getImports()) {
+            if (imp.getName().toString().equals(IMPORT_TO_REMOVE)) {
                 imp.getName().setIdentifier(IMPORT_NAME_TO_ADD);
                 return;
             }

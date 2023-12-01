@@ -6,6 +6,20 @@ import java.util.Arrays;
 
 public class ___JumboTrace___ {
 
+    private static final String YELLOW_CODE = "\u001B[33m";
+    private static final String COLOR_RESET_CALL = "\u001B[0m";
+
+    private static void log(Object... objects){
+        StringBuilder sb = new StringBuilder();
+        sb.append(YELLOW_CODE);
+        sb.append("jbt> ");
+        for (var obj: objects){
+            sb.append(obj);
+        }
+        sb.append(COLOR_RESET_CALL);
+        System.out.println(sb);
+    }
+
     private static boolean loggingEnabled = true;
 
     private static void enableLogging(){
@@ -17,22 +31,21 @@ public class ___JumboTrace___ {
     }
 
 
-    public static void methodCall(String className, String methodName, String methodSig, Object[] args, String filename, int position){
+    public static void methodCall(String className, String methodName, String methodSig, Object[] args,
+                                  String filename, int startPosition, int endPosition){
         if (loggingEnabled){
             disableLogging();
-            System.out.println(
-                    "CALL: " + className + "." + methodName + methodSig +
-                            " args=" + Arrays.toString(args) +
-                            " at " + filename + ":" + position
-            );
+            log("CALL: ", className, ".", methodName, methodSig, " args=", Arrays.toString(args),
+                    " at ", filename, "[", startPosition, ",", endPosition, "]");
             enableLogging();
         }
     }
 
-    public static @Specialize Object methodRet(String methodName, @Specialize Object retvalue, String filename, int position){
+    public static @Specialize Object methodRet(String methodName, @Specialize Object retvalue,
+                                               String filename, int startPosition, int endPosition){
         if (loggingEnabled){
             disableLogging();
-            System.out.println(methodName + " RETURNS " + retvalue + " at " + filename + ":" + position);
+            log(methodName, " RETURNS '", retvalue, "' at ", filename, " [", startPosition, ",", endPosition, "]");
             enableLogging();
         }
         return retvalue;

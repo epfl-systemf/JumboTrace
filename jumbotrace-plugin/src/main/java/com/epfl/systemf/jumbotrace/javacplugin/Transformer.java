@@ -1,9 +1,9 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
+import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
@@ -21,14 +21,16 @@ public final class Transformer extends TreeTranslator {
     private final String filename;
     private final TreeMakingContainer m;
     private final Instrumentation instrumentation;
+    private final EndPosTable endPosTable;
 
     private final Deque<Symbol.ClassSymbol> classesStack;
     private final Deque<Symbol.MethodSymbol> methodsStack;
 
-    public Transformer(String filename, TreeMakingContainer m, Instrumentation instrumentation) {
+    public Transformer(String filename, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
         this.filename = filename;
         this.m = m;
         this.instrumentation = instrumentation;
+        this.endPosTable = endPosTable;
         classesStack = new LinkedList<>();
         methodsStack = new LinkedList<>();
     }
@@ -96,7 +98,8 @@ public final class Transformer extends TreeTranslator {
                                 definingClassAndMethodNamesOf(invocation.meth)._2,
                                 instrPieces._3,
                                 filename,
-                                invocation.pos
+                                invocation.pos,
+                                invocation.getEndPosition(endPosTable)
                         )
                 ).setType(invocation.type)
         ).setType(invocation.type);
@@ -119,7 +122,7 @@ public final class Transformer extends TreeTranslator {
         var clsAndMeth = definingClassAndMethodNamesOf(invocation.meth);
         var logCall = instrumentation.logMethodCallInvocation(
                 clsAndMeth._1, clsAndMeth._2, (Type.MethodType) invocation.meth.type,
-                argsIds, filename, invocation.pos
+                argsIds, filename, invocation.pos, invocation.getEndPosition(endPosTable)
         );
         var loggingStat = m.mk().Exec(logCall).setType(m.st().voidType);
         invocation.args = argsIds;

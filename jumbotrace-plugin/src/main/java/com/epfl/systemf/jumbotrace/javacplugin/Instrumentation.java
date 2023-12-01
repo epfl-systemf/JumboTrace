@@ -23,11 +23,14 @@ public final class Instrumentation {
         jumbotraceClassSymbol.type = new Type.ClassType(Type.noType, List.nil(), jumbotraceClassSymbol);
     }
 
-    public JCTree.JCExpression logMethodCallInvocation(String className, String methodName, Type.MethodType methodSig,
-                                                             List<JCTree.JCExpression> args, String filename, int pos) {
+    public JCTree.JCExpression logMethodCallInvocation(
+            String className, String methodName, Type.MethodType methodSig, List<JCTree.JCExpression> args,
+            String filename, int startPos, int endPos
+    ) {
         var argsArrayType = new Type.ArrayType(m.st().objectType, m.st().arrayClass);
         var loggingMethodType = new Type.MethodType(
-                List.of(m.st().stringType, m.st().stringType, m.st().stringType, argsArrayType, m.st().stringType, m.st().intType),
+                List.of(m.st().stringType, m.st().stringType, m.st().stringType, argsArrayType,
+                        m.st().stringType, m.st().intType, m.st().intType),
                 m.st().voidType,
                 List.nil(),
                 jumbotraceClassSymbol
@@ -50,15 +53,17 @@ public final class Instrumentation {
                         m.mk().Literal(methodSig.toString()),
                         argsArray,
                         m.mk().Literal(filename),
-                        m.mk().Literal(pos)
+                        m.mk().Literal(startPos),
+                        m.mk().Literal(endPos)
                 )
         ).setType(m.st().voidType);
     }
 
-    public JCTree.JCExpression logMethodReturnValue(String methodName, JCTree.JCExpression returnValue, String filename, int pos) {
+    public JCTree.JCExpression logMethodReturnValue(String methodName, JCTree.JCExpression returnValue,
+                                                    String filename, int startPos, int endPos) {
         var type = returnValue.type.isPrimitive() ? returnValue.type : m.st().objectType;
         var loggingMethodType = new Type.MethodType(
-                List.of(m.st().stringType, type, m.st().stringType, m.st().intType),
+                List.of(m.st().stringType, type, m.st().stringType, m.st().intType, m.st().intType),
                 type,
                 List.nil(),
                 jumbotraceClassSymbol
@@ -78,7 +83,8 @@ public final class Instrumentation {
                         m.mk().Literal(methodName),
                         returnValue,
                         m.mk().Literal(filename),
-                        m.mk().Literal(pos)
+                        m.mk().Literal(startPos),
+                        m.mk().Literal(endPos)
                 )
         ).setType(type);
         if (returnValue.type.isPrimitive()){

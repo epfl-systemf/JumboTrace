@@ -17,10 +17,12 @@ public final class TransformationListener implements TaskListener {
     public void finished(TaskEvent e) {
         if (e.getKind() == TaskEvent.Kind.ANALYZE) {
             var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
+            var endPosTable = cu.endPositions;
             var transformer = new Transformer(
                     cu.getSourceFile().getName(),
                     treeMakingContainer,
-                    instrumentation
+                    instrumentation,
+                    endPosTable
             );
             transformer.translate(cu);
 //            cu.accept(new DebugPrintVisitor());
