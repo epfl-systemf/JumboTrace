@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>jumbotrace-injectedgen</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.0.2</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -21,5 +21,28 @@
             <version>3.25.6</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.epfl.systemf.jumbotrace.injectedgen.Main</mainClass>
+                    <arguments>
+                        <argument>___JumboTrace___.java</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
