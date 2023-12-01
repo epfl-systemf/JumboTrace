@@ -12,6 +12,7 @@ public class ___JumboTrace___ {
     private static void log(Object... objects){
         StringBuilder sb = new StringBuilder();
         sb.append(YELLOW_CODE);
+        sb.append(" ".repeat(indent));
         sb.append("jbt> ");
         for (var obj: objects){
             sb.append(obj);
@@ -21,6 +22,7 @@ public class ___JumboTrace___ {
     }
 
     private static boolean loggingEnabled = true;
+    private static int indent = 0;
 
     private static void enableLogging(){
         loggingEnabled = true;
@@ -37,6 +39,7 @@ public class ___JumboTrace___ {
             disableLogging();
             log("CALL: ", className, ".", methodName, methodSig, " args=", Arrays.toString(args),
                     " at ", filename, "[", startPosition, ",", endPosition, "]");
+            indent += 1;
             enableLogging();
         }
     }
@@ -45,6 +48,7 @@ public class ___JumboTrace___ {
                                                String filename, int startPosition, int endPosition){
         if (loggingEnabled){
             disableLogging();
+            indent -= 1;
             log(methodName, " RETURNS '", retValue, "' at ", filename, " [", startPosition, ",", endPosition, "]");
             enableLogging();
         }
@@ -54,6 +58,7 @@ public class ___JumboTrace___ {
     public static void methodRetVoid(String methodName, String filename, int startPosition, int endPosition){
         if (loggingEnabled){
             disableLogging();
+            indent -= 1;
             log(methodName, " RETURNS void at ", filename, " [", startPosition, ",", endPosition, "]");
             enableLogging();
         }
