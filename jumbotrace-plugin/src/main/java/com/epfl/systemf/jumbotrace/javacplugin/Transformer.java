@@ -94,6 +94,7 @@ public final class Transformer extends TreeTranslator {
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
+        // TODO cu.getLineMap().getLineNumber(invocation.meth.pos) to retrieve positions
         var instrPieces = makeInstrumentationPieces(invocation);
         result = m.mk().LetExpr(
                 instrPieces._1,
