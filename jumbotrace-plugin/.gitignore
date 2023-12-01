@@ -5,6 +5,10 @@ target/
 
 ### IntelliJ IDEA ###
 .idea
+*.log
+*.iml
+*.ipr
+*.iws
 
 ### Eclipse ###
 .apt_generated
