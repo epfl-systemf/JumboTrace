@@ -84,19 +84,17 @@ public final class Transformer extends ModifierVisitor<Void> {
     }
 
     private boolean checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations) {
-        AnnotationExpr found = null;
         for (var annot : annotations) {
-            if (annot.getName().getIdentifier().equals(Transformer.TARGET_ANNOTATION_NAME)) {
-                found = annot;
-                break;
+            switch (annot.getName().getIdentifier()){
+                case Transformer.MODIFIED_METH_ANNOTATION_NAME ->
+                        throw new AssertionError(Transformer.MODIFIED_METH_ANNOTATION_NAME + " should not be used in input files");
+                case Transformer.TARGET_ANNOTATION_NAME -> {
+                    annotations.remove(annot);
+                    return true;
+                }
             }
         }
-        if (found == null) {
-            return false;
-        } else {
-            annotations.remove(found);
-            return true;
-        }
+        return false;
     }
 
     private static void replacePackageName(CompilationUnit n) {
