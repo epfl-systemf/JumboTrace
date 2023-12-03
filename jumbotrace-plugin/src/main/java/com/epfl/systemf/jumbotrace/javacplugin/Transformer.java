@@ -173,7 +173,7 @@ public final class Transformer extends TreeTranslator {
             JCStatement,         // call to logging method
             JCMethodInvocation   // call to initial method
             > makeInstrumentationPieces(JCMethodInvocation invocation) {
-        // TODO also log receiver, if possible; try using invocation.meth.type.getReceiverType()
+        // TODO also log receiver, if possible; try using invocation.meth.type.getReceiverType() -- EDIT always returns null
         var argsDecls = List.<JCStatement>nil();
         var argsIds = List.<JCTree.JCExpression>nil();
         for (var arg : invocation.args) {
