@@ -88,7 +88,7 @@ public final class Transformer extends TreeTranslator {
         methodsStack.addFirst(method.sym);
         super.visitMethodDef(method);
         var lineMap = cu.getLineMap();
-        method.getBody().stats = method.getBody().stats.prepend(m.mk().Exec(
+        method.getBody().stats = method.getBody().stats.prepend(mk().Exec(
                 instrumentation.logMethodEnter(
                         method.sym.owner.name.toString(),
                         method.name.toString(),
@@ -119,11 +119,11 @@ public final class Transformer extends TreeTranslator {
             var instrPieces = makeInstrumentationPieces(invocation);
             var lineMap = cu.getLineMap();
             var endPosition = invocation.getEndPosition(endPosTable);
-            this.result = m.mk().Block(0,
+            this.result = mk().Block(0,
                     instrPieces._1
                             .append(instrPieces._2)
-                            .append(m.mk().Exec(instrPieces._3))
-                            .append(m.mk().Exec(instrumentation.logMethodReturnVoid(
+                            .append(mk().Exec(instrPieces._3))
+                            .append(mk().Exec(instrumentation.logMethodReturnVoid(
                                     definingClassAndMethodNamesOf(invocation.meth)._2,
                                     currentFilename(),
                                     lineMap.getLineNumber(invocation.meth.pos),
@@ -146,9 +146,9 @@ public final class Transformer extends TreeTranslator {
         var instrPieces = makeInstrumentationPieces(invocation);
         var lineMap = cu.getLineMap();
         var endPosition = invocation.getEndPosition(endPosTable);
-        result = m.mk().LetExpr(
+        result = mk().LetExpr(
                 instrPieces._1,
-                m.mk().LetExpr(
+                mk().LetExpr(
                         List.of(instrPieces._2),
                         instrumentation.logMethodReturnValue(
                                 definingClassAndMethodNamesOf(invocation.meth)._2,
@@ -178,8 +178,8 @@ public final class Transformer extends TreeTranslator {
         var argsIds = List.<JCTree.JCExpression>nil();
         for (var arg : invocation.args) {
             var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
-            argsIds = argsIds.append(m.mk().Ident(varSymbol));
-            argsDecls = argsDecls.append(m.mk().VarDef(varSymbol, arg));
+            argsIds = argsIds.append(mk().Ident(varSymbol));
+            argsDecls = argsDecls.append(mk().VarDef(varSymbol, arg));
         }
         var lineMap = cu.getLineMap();
         var endPosition = invocation.getEndPosition(endPosTable);
@@ -194,7 +194,7 @@ public final class Transformer extends TreeTranslator {
                 lineMap.getLineNumber(endPosition),
                 lineMap.getColumnNumber(endPosition)
         );
-        var loggingStat = m.mk().Exec(logCall).setType(m.st().voidType);
+        var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = argsIds;
         return new Triple<>(argsDecls, loggingStat, invocation);
     }
