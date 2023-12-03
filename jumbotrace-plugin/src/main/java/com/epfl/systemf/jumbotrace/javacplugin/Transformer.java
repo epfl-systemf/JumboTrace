@@ -111,6 +111,7 @@ public final class Transformer extends TreeTranslator {
         if (tree.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.contentEquals("<init>")
                 && invocation.meth.toString().equals("super")) {
+            // TODO maybe try to still save the information when control-flow enters a superclass constructor
             this.result = tree; // tree is unchanged
             return;
         }
