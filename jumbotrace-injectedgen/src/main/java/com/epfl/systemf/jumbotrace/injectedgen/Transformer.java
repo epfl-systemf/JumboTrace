@@ -1,16 +1,19 @@
 package com.epfl.systemf.jumbotrace.injectedgen;
 
-import com.github.javaparser.Range;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.comments.Comment;
+import com.github.javaparser.ast.comments.LineComment;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.ast.visitor.GenericVisitor;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
 import com.github.javaparser.ast.visitor.Visitable;
+import com.github.javaparser.ast.visitor.VoidVisitor;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -51,7 +54,8 @@ public final class Transformer extends ModifierVisitor<Void> {
                             methodDeclaration.getParameters().stream()
                                     .anyMatch(param -> param.isAnnotationPresent(TARGET_ANNOTATION_NAME)))
             ) {
-                newMembersList.addAll(replicate(methodDeclaration));
+                var replicated = replicate(methodDeclaration);
+                newMembersList.addAll(replicated);
             } else {
                 newMembersList.add(member);
             }
@@ -62,9 +66,11 @@ public final class Transformer extends ModifierVisitor<Void> {
 
     private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration) {
         var specializedMethods = new LinkedList<MethodDeclaration>();
+        specializedMethods.add(new CommentMethodDeclaration("<editor-fold desc=\"" + methodDeclaration.getName().getIdentifier() + "\">"));
         for (var type : TOPMOST_TYPES) {
             specializedMethods.add(copyWithType(methodDeclaration, type));
         }
+        specializedMethods.add(new CommentMethodDeclaration("</editor-fold>"));
         return specializedMethods;
     }
 
@@ -125,6 +131,21 @@ public final class Transformer extends ModifierVisitor<Void> {
             }
         }
         throw new AssertionError("import to be replaced not found");
+    }
+
+    // Hack: "adapter" to insert a comment inside a list of method declarations
+    // Use with care
+    private static final class CommentMethodDeclaration extends MethodDeclaration {
+        private final Comment comment;
+
+        CommentMethodDeclaration(String comment){
+            this.comment = new LineComment(comment);
+        }
+
+        @Override
+        public <A> void accept(VoidVisitor<A> v, A arg) {
+            comment.accept(v, arg);
+        }
     }
 
 }
