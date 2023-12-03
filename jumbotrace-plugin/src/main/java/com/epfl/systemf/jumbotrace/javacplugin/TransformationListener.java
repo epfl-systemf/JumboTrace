@@ -19,7 +19,7 @@ public final class TransformationListener implements TaskListener {
             var cu = (JCTree.JCCompilationUnit) e.getCompilationUnit();
             var endPosTable = cu.endPositions;
             var transformer = new Transformer(
-                    cu.getSourceFile().getName(),
+                    cu,
                     treeMakingContainer,
                     instrumentation,
                     endPosTable

@@ -11,6 +11,7 @@ import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.tree.JCTree.JCStatement;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Deque;
@@ -18,7 +19,7 @@ import java.util.LinkedList;
 
 public final class Transformer extends TreeTranslator {
 
-    private final String filename;
+    private final JCTree.JCCompilationUnit cu;
     private final TreeMakingContainer m;
     private final Instrumentation instrumentation;
     private final EndPosTable endPosTable;
@@ -26,8 +27,8 @@ public final class Transformer extends TreeTranslator {
     private final Deque<Symbol.ClassSymbol> classesStack;
     private final Deque<Symbol.MethodSymbol> methodsStack;
 
-    public Transformer(String filename, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
-        this.filename = filename;
+    public Transformer(JCTree.JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
+        this.cu = cu;
         this.m = m;
         this.instrumentation = instrumentation;
         this.endPosTable = endPosTable;
@@ -41,6 +42,10 @@ public final class Transformer extends TreeTranslator {
 
     private Symbol.MethodSymbol currentMethod() {
         return methodsStack.getFirst();
+    }
+
+    private String filename() {
+        return cu.getSourceFile().getName();
     }
 
     @Override
@@ -66,21 +71,25 @@ public final class Transformer extends TreeTranslator {
          */
         if (tree.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.toString().equals("<init>")
-                && invocation.meth.toString().equals("super")){
+                && invocation.meth.toString().equals("super")) {
             this.result = tree; // tree is unchanged
             return;
         }
         if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             var instrPieces = makeInstrumentationPieces(invocation);
+            var lineMap = cu.getLineMap();
+            var endPosition = invocation.getEndPosition(endPosTable);
             this.result = m.mk().Block(0,
                     instrPieces._1
                             .append(instrPieces._2)
                             .append(m.mk().Exec(instrPieces._3))
                             .append(m.mk().Exec(instrumentation.logMethodReturnVoid(
                                     definingClassAndMethodNamesOf(invocation.meth)._2,
-                                    filename,
-                                    invocation.pos,
-                                    invocation.getEndPosition(endPosTable)
+                                    filename(),
+                                    lineMap.getLineNumber(invocation.meth.pos),
+                                    lineMap.getColumnNumber(invocation.meth.pos),
+                                    lineMap.getLineNumber(endPosition),
+                                    lineMap.getColumnNumber(endPosition)
                             )))
             );
         } else {
@@ -94,8 +103,9 @@ public final class Transformer extends TreeTranslator {
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
-        // TODO cu.getLineMap().getLineNumber(invocation.meth.pos) to retrieve positions
         var instrPieces = makeInstrumentationPieces(invocation);
+        var lineMap = cu.getLineMap();
+        var endPosition = invocation.getEndPosition(endPosTable);
         result = m.mk().LetExpr(
                 instrPieces._1,
                 m.mk().LetExpr(
@@ -103,9 +113,11 @@ public final class Transformer extends TreeTranslator {
                         instrumentation.logMethodReturnValue(
                                 definingClassAndMethodNamesOf(invocation.meth)._2,
                                 instrPieces._3,
-                                filename,
-                                invocation.pos,
-                                invocation.getEndPosition(endPosTable)
+                                filename(),
+                                lineMap.getLineNumber(invocation.meth.pos),
+                                lineMap.getColumnNumber(invocation.meth.pos),
+                                lineMap.getLineNumber(endPosition),
+                                lineMap.getColumnNumber(endPosition)
                         )
                 ).setType(invocation.type)
         ).setType(invocation.type);
@@ -125,10 +137,18 @@ public final class Transformer extends TreeTranslator {
             argsIds = argsIds.append(m.mk().Ident(varSymbol));
             argsDecls = argsDecls.append(m.mk().VarDef(varSymbol, arg));
         }
+        var lineMap = cu.getLineMap();
+        var endPosition = invocation.getEndPosition(endPosTable);
         var clsAndMeth = definingClassAndMethodNamesOf(invocation.meth);
         var logCall = instrumentation.logMethodCallInvocation(
-                clsAndMeth._1, clsAndMeth._2, (Type.MethodType) invocation.meth.type,
-                argsIds, filename, invocation.pos, invocation.getEndPosition(endPosTable)
+                clsAndMeth._1,
+                clsAndMeth._2,
+                (Type.MethodType) invocation.meth.type,
+                argsIds, filename(),
+                lineMap.getLineNumber(invocation.meth.pos),
+                lineMap.getColumnNumber(invocation.meth.pos),
+                lineMap.getLineNumber(endPosition),
+                lineMap.getColumnNumber(endPosition)
         );
         var loggingStat = m.mk().Exec(logCall).setType(m.st().voidType);
         invocation.args = argsIds;

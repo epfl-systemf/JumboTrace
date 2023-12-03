@@ -26,12 +26,12 @@ public final class Instrumentation {
 
     public JCTree.JCExpression logMethodCallInvocation(
             String className, String methodName, Type.MethodType methodSig, List<JCTree.JCExpression> args,
-            String filename, int startPos, int endPos
+            String filename, int startLine, int startCol, int endLine, int endCol
     ) {
         var argsArrayType = new Type.ArrayType(m.st().objectType, m.st().arrayClass);
         var loggingMethodType = new Type.MethodType(
                 List.of(m.st().stringType, m.st().stringType, m.st().stringType, argsArrayType,
-                        m.st().stringType, m.st().intType, m.st().intType),
+                        m.st().stringType, m.st().intType, m.st().intType, m.st().intType, m.st().intType),
                 m.st().voidType,
                 List.nil(),
                 jumbotraceClassSymbol
@@ -54,17 +54,19 @@ public final class Instrumentation {
                         m.mk().Literal(methodSig.toString()),
                         argsArray,
                         m.mk().Literal(filename),
-                        m.mk().Literal(startPos),
-                        m.mk().Literal(endPos)
+                        m.mk().Literal(startLine),
+                        m.mk().Literal(startCol),
+                        m.mk().Literal(endLine),
+                        m.mk().Literal(endCol)
                 )
         ).setType(m.st().voidType);
     }
 
     public JCTree.JCExpression logMethodReturnValue(String methodName, JCTree.JCExpression returnValue,
-                                                    String filename, int startPos, int endPos) {
+                                                    String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = returnValue.type.isPrimitive() ? returnValue.type : m.st().objectType;
         var loggingMethodType = new Type.MethodType(
-                List.of(m.st().stringType, type, m.st().stringType, m.st().intType, m.st().intType),
+                List.of(m.st().stringType, type, m.st().stringType, m.st().intType, m.st().intType, m.st().intType, m.st().intType),
                 type,
                 List.nil(),
                 jumbotraceClassSymbol
@@ -84,8 +86,10 @@ public final class Instrumentation {
                         m.mk().Literal(methodName),
                         returnValue,
                         m.mk().Literal(filename),
-                        m.mk().Literal(startPos),
-                        m.mk().Literal(endPos)
+                        m.mk().Literal(startLine),
+                        m.mk().Literal(startCol),
+                        m.mk().Literal(endLine),
+                        m.mk().Literal(endCol)
                 )
         ).setType(type);
         if (returnValue.type.isPrimitive()){
@@ -95,9 +99,10 @@ public final class Instrumentation {
         }
     }
 
-    public JCTree.JCExpression logMethodReturnVoid(String methodName, String filename, int startPos, int endPos){
+    public JCTree.JCExpression logMethodReturnVoid(String methodName, String filename, int startLine,
+                                                   int startCol, int endLine, int endCol){
         var loggingMethodType = new Type.MethodType(
-                List.of(m.st().stringType, m.st().stringType, m.st().intType, m.st().intType),
+                List.of(m.st().stringType, m.st().stringType, m.st().intType, m.st().intType, m.st().intType, m.st().intType),
                 m.st().voidType,
                 List.nil(),
                 jumbotraceClassSymbol
@@ -116,8 +121,10 @@ public final class Instrumentation {
                 List.of(
                         m.mk().Literal(methodName),
                         m.mk().Literal(filename),
-                        m.mk().Literal(startPos),
-                        m.mk().Literal(endPos)
+                        m.mk().Literal(startLine),
+                        m.mk().Literal(startCol),
+                        m.mk().Literal(endLine),
+                        m.mk().Literal(endCol)
                 )
         ).setType(m.st().voidType);
     }
