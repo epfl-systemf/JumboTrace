@@ -1,6 +1,8 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
-import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.List;
 
@@ -92,7 +94,7 @@ public final class Instrumentation {
                         m.mk().Literal(endCol)
                 )
         ).setType(type);
-        if (returnValue.type.isPrimitive()){
+        if (returnValue.type.isPrimitive()) {
             return apply;
         } else {
             return m.mk().TypeCast(returnValue.type, apply);
@@ -100,7 +102,7 @@ public final class Instrumentation {
     }
 
     public JCTree.JCExpression logMethodReturnVoid(String methodName, String filename, int startLine,
-                                                   int startCol, int endLine, int endCol){
+                                                   int startCol, int endLine, int endCol) {
         var loggingMethodType = new Type.MethodType(
                 List.of(m.st().stringType, m.st().stringType, m.st().intType, m.st().intType, m.st().intType, m.st().intType),
                 m.st().voidType,
@@ -129,9 +131,9 @@ public final class Instrumentation {
         ).setType(m.st().voidType);
     }
 
-    private Symbol.PackageSymbol makeCompositePackageSymbol(String... parts){
+    private Symbol.PackageSymbol makeCompositePackageSymbol(String... parts) {
         var curr = m.st().rootPackage;
-        for (var part: parts){
+        for (var part : parts) {
             curr = new Symbol.PackageSymbol(m.n().fromString(part), curr);
         }
         return curr;

@@ -11,7 +11,6 @@ import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.tree.JCTree.JCStatement;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Deque;
