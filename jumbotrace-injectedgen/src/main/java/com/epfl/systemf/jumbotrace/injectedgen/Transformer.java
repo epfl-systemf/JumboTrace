@@ -1,5 +1,6 @@
 package com.epfl.systemf.jumbotrace.injectedgen;
 
+import com.github.javaparser.Range;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
@@ -84,17 +85,26 @@ public final class Transformer extends ModifierVisitor<Void> {
     }
 
     private boolean checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations) {
+        AnnotationExpr found = null;
         for (var annot : annotations) {
             switch (annot.getName().getIdentifier()){
                 case Transformer.MODIFIED_METH_ANNOTATION_NAME ->
-                        throw new AssertionError(Transformer.MODIFIED_METH_ANNOTATION_NAME + " should not be used in input files");
+                        throw new AssertionError( "\"@" + Transformer.MODIFIED_METH_ANNOTATION_NAME + "\" should not be used in input files");
                 case Transformer.TARGET_ANNOTATION_NAME -> {
-                    annotations.remove(annot);
-                    return true;
+                    if (found == null) {
+                        found = annot;
+                    } else {
+                        throw new AssertionError("\"@" + Transformer.TARGET_ANNOTATION_NAME + "\" should not be repeated");
+                    }
                 }
             }
         }
-        return false;
+        if (found == null) {
+            return false;
+        } else {
+            annotations.remove(found);
+            return true;
+        }
     }
 
     private static void replacePackageName(CompilationUnit n) {
