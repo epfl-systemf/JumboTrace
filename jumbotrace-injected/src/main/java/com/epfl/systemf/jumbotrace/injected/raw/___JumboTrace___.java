@@ -38,8 +38,16 @@ public class ___JumboTrace___ {
         if (loggingEnabled){
             disableLogging();
             log("CALL: ", className, ".", methodName, methodSig, " args=", Arrays.toString(args),
-                    " at ", formatPosition(filename, startLine, startCol, endLine, endCol));
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             indent += 1;
+            enableLogging();
+        }
+    }
+
+    public static void methodEnter(String className, String methodName, String methodSig, String filename, int line, int col){
+        if (loggingEnabled){
+            disableLogging();
+            log("ENTER: ", className, ".", methodName, methodSig, " at ", formatPosition(filename, line, col));
             enableLogging();
         }
     }
@@ -49,7 +57,7 @@ public class ___JumboTrace___ {
         if (loggingEnabled){
             disableLogging();
             indent -= 1;
-            log(methodName, " RETURNS '", retValue, "' at ", formatPosition(filename, startLine, startCol, endLine, endCol));
+            log(methodName, " RETURNS '", retValue, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
         return retValue;
@@ -59,13 +67,17 @@ public class ___JumboTrace___ {
         if (loggingEnabled){
             disableLogging();
             indent -= 1;
-            log(methodName, " RETURNS void at ", formatPosition(filename, startLine, startCol, endLine, endCol));
+            log(methodName, " RETURNS void at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }
 
-    private static String formatPosition(String filename, int startLine, int startCol, int endLine, int endCol){
+    private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol){
         return String.format("%s [%d:%d;%d:%d]", filename, startLine, startCol, endLine, endCol);
+    }
+
+    private static String formatPosition(String filename, int line, int col){
+        return String.format("%s:%d:%d", filename, line, col);
     }
 
 }
