@@ -1,7 +1,10 @@
 
+# Intellij
 .idea
 *.log
 *.iml
 *.ipr
 *.iws
 
+# javac error reports
+*.args
