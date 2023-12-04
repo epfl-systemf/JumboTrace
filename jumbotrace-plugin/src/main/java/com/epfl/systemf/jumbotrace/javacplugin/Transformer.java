@@ -1,6 +1,5 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
-import com.sun.source.tree.LineMap;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -219,7 +218,6 @@ public final class Transformer extends TreeTranslator {
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
-        var endPosition = newClass.getEndPosition(endPosTable);
         // in practice not a static call, but passing it the receiver is useless and would probably lead to issues (not initialized)
         var startLine = lineMap.getLineNumber(newClass.pos);
         var startCol = lineMap.getColumnNumber(newClass.pos);
