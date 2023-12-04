@@ -11,12 +11,19 @@ injected_dir: Final[str] = "../jumbotrace-injected"
 injectedgen_dir: Final[str] = "../jumbotrace-injectedgen"
 
 
-def log(msg: str):
-    print(colored("[automation] " + msg, "magenta"))
+def log(colored_str: str, uncolored_str: str = ""):
+    print(colored("[automation] " + colored_str, "magenta") + uncolored_str)
+
+
+def limit_str_length(s: str, max_len: int) -> str:
+    if len(s) <= max_len:
+        return s
+    else:
+        return s[:max_len] + "..."
 
 
 def cmd(command: str, msg: str):
-    log(msg)
+    log(f"{msg} > ", limit_str_length(command, 150))
     ret_code = os.system(command)
     if ret_code != 0:
         print(colored(" !!! AUTOMATION: FAILED !!!", "red"), file=sys.stderr)
@@ -38,6 +45,27 @@ def run_example(example_name: str, main_class_name: str = "Main"):
     cmd(
         f"java -cp {examples_dir}/{example_name} {main_class_name}",
         f"running example {example_name} (mainclass=\'{main_class_name}\')"
+    )
+
+
+def compile_example_project(example_name: str):
+    all_java_files = find_all_java_files(f"{examples_dir}/{example_name}/src")
+    compile_plugin()
+    compile_injected()
+    copy_injection_to_example(f"{example_name}/target/classes")
+    cmd(
+        f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace {" ".join(all_java_files)}",
+        f"compiling example {example_name}"
+    )
+
+
+def run_example_project(example_name: str):
+    main_class = read_config_file(examples_dir + "/" + example_name)
+    log(f"read main class from config file: {main_class}")
+    compile_example_project(example_name)
+    cmd(
+        f"java -cp target/classes {main_class}",
+        f"running example {example_name}"
     )
 
 
@@ -79,6 +107,20 @@ def copy_injection_to_example(example_name: str):
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
+def read_config_file(directory: str):
+    with open(f"{directory}/jumbotrace.config", mode="r") as f:
+        return f.read().strip()
+
+
+def find_all_java_files(directory: str) -> List[str]:
+    java_files = []
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".java"):
+                java_files.append(root + "/" + file)
+    return java_files
+
+
 def main(args: List[str]):
     if len(args) == 0:
         print("No argument given to automation script. Exiting", file=sys.stderr)
@@ -90,6 +132,10 @@ def main(args: List[str]):
             run_example(ex)
         case ["run", "example", ex, maincl]:
             run_example(ex, maincl)
+        case ["compile", "exproj", ex]:
+            compile_example_project(ex)
+        case ["run", "exproj", ex]:
+            run_example_project(ex)
         case ["compile", "plugin"]:
             compile_plugin()
         case ["compile", "injectedgen"]:
