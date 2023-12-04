@@ -1,9 +1,7 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Symtab;
-import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.code.TypeTag;
+import com.sun.source.tree.LineMap;
+import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
@@ -11,6 +9,7 @@ import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Names;
+import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
@@ -63,16 +62,27 @@ public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Context accessors">
 
+    private String currentFilename() {
+        return cu.getSourceFile().getName();
+    }
+
     private Symbol.ClassSymbol currentClass() {
         return classesStack.getFirst();
     }
 
     private Symbol.MethodSymbol currentMethod() {
-        return methodsStack.getFirst();
+        return isInsideMethod() ?
+                methodsStack.getFirst() :
+                new Symbol.MethodSymbol(
+                        Flags.PUBLIC | Flags.STATIC,
+                        n().clinit,
+                        new Type.MethodType(List.nil(), st().voidType, List.nil(), currentClass().type.tsym),
+                        currentClass()
+                );
     }
 
-    private String currentFilename() {
-        return cu.getSourceFile().getName();
+    private boolean isInsideMethod() {
+        return !methodsStack.isEmpty();
     }
 
     //</editor-fold>
@@ -84,6 +94,19 @@ public final class Transformer extends TreeTranslator {
         classesStack.addFirst(tree.sym);
         super.visitClassDef(tree);
         classesStack.removeFirst();
+    }
+
+    @Override
+    public void visitVarDef(JCVariableDecl varDecl) {
+        if (!Flags.isEnum(varDecl.sym)) {
+            super.visitVarDef(varDecl);
+        } else {
+            /* Do not log the call to the constructor inside an enum case
+             * This crashes the lowering phase, which is expecting an NewClass and not a LetExpr
+             */
+            // TODO try to find a solution
+            this.result = varDecl;
+        }
     }
 
     @Override
@@ -170,8 +193,8 @@ public final class Transformer extends TreeTranslator {
                         currentFilename(),
                         lineMap.getLineNumber(invocation.meth.pos),
                         lineMap.getColumnNumber(invocation.meth.pos),
-                        lineMap.getLineNumber(endPosition),
-                        lineMap.getColumnNumber(endPosition)
+                        safeGetEndLine(invocation),
+                        safeGetEndCol(invocation)
                 ) :
                 instrumentation.logNonStaticMethodCall(
                         classNameOf(invocation.meth),
@@ -182,8 +205,8 @@ public final class Transformer extends TreeTranslator {
                         currentFilename(),
                         lineMap.getLineNumber(invocation.meth.pos),
                         lineMap.getColumnNumber(invocation.meth.pos),
-                        lineMap.getLineNumber(endPosition),
-                        lineMap.getColumnNumber(endPosition)
+                        safeGetEndLine(invocation),
+                        safeGetEndCol(invocation)
                 );
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = (receiver == null) ? argsIds : argsIds.tail;
@@ -199,8 +222,8 @@ public final class Transformer extends TreeTranslator {
         // in practice not a static call, but passing it the receiver is useless and would probably lead to issues (not initialized)
         var startLine = lineMap.getLineNumber(newClass.pos);
         var startCol = lineMap.getColumnNumber(newClass.pos);
-        var endLine = lineMap.getLineNumber(endPosition);
-        var endCol = lineMap.getColumnNumber(endPosition);
+        var endLine = safeGetEndLine(newClass);
+        var endCol = safeGetEndCol(newClass);
         var logCall = instrumentation.logStaticMethodCall(
                 newClass.clazz.toString(),
                 CONSTRUCTOR_NAME,
@@ -226,7 +249,6 @@ public final class Transformer extends TreeTranslator {
 
     private JCExpression makeLet(JCExpression invocation, String methodName, CallInstrumentationPieces instrPieces) {
         var lineMap = cu.getLineMap();
-        var endPosition = invocation.getEndPosition(endPosTable);
         return mk().LetExpr(
                 instrPieces.argsLocalsDefs,
                 mk().LetExpr(
@@ -237,15 +259,14 @@ public final class Transformer extends TreeTranslator {
                                 currentFilename(),
                                 lineMap.getLineNumber(invocation.pos),
                                 lineMap.getColumnNumber(invocation.pos),
-                                lineMap.getLineNumber(endPosition),
-                                lineMap.getColumnNumber(endPosition)
+                                safeGetEndLine(invocation),
+                                safeGetEndCol(invocation)
                         )
                 ).setType(invocation.type)
         ).setType(invocation.type);
     }
 
     private JCBlock makeBlock(JCExpression call, String methodName, CallInstrumentationPieces instrPieces) {
-        var endPosition = call.getEndPosition(endPosTable);
         var lineMap = cu.getLineMap();
         return mk().Block(0,
                 instrPieces.argsLocalsDefs
@@ -256,8 +277,8 @@ public final class Transformer extends TreeTranslator {
                                 currentFilename(),
                                 lineMap.getLineNumber(call.pos),
                                 lineMap.getColumnNumber(call.pos),
-                                lineMap.getLineNumber(endPosition),
-                                lineMap.getColumnNumber(endPosition)
+                                safeGetEndLine(call),
+                                safeGetEndCol(call)
                         )))
         );
     }
@@ -301,6 +322,18 @@ public final class Transformer extends TreeTranslator {
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
         }
+    }
+
+    private int safeGetEndLine(JCTree tree){
+        var lineMap = cu.getLineMap();
+        var endPos = tree.getEndPosition(endPosTable);
+        return endPos == Position.NOPOS ? Position.NOPOS : lineMap.getLineNumber(endPos);
+    }
+
+    private int safeGetEndCol(JCTree tree){
+        var lineMap = cu.getLineMap();
+        var endPos = tree.getEndPosition(endPosTable);
+        return endPos == Position.NOPOS ? Position.NOPOS : lineMap.getColumnNumber(endPos);
     }
 
     //</editor-fold>
