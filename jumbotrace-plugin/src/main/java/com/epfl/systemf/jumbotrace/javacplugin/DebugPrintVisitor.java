@@ -12,18 +12,11 @@ public final class DebugPrintVisitor extends TreeTranslator {   // possibly exis
     private static final PrintStream s = System.out;
 
     private void log(JCTree tree) {
-        if (!(tree instanceof JCTree.JCMethodInvocation methodInvocation)){  // TODO remove
-            return;
+        if (tree instanceof JCTree.JCNewClass newClass){
+            System.out.println(newClass);
+            printAllFields(newClass);
+            println("---------------------------------------------");
         }
-//        println("-- START ------------------------------------");
-        println(limitLength(tree.toString()));
-//        println("-- METHOD INFOS --");
-        if (methodInvocation.meth instanceof JCTree.JCFieldAccess fldAccess){
-            System.out.println(fldAccess.selected.type.tsym.isDynamic());
-        }
-//        printAllFields(methodInvocation.meth);
-//        println("-- END --------------------------------------");
-        println("---------------------------------------------");
     }
 
     private void printAllFields(Object object) {

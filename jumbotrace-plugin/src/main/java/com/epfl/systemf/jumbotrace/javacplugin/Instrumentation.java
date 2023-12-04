@@ -7,7 +7,6 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Names;
-import org.jetbrains.annotations.Nullable;
 
 import static com.sun.tools.javac.tree.JCTree.JCExpression;
 
@@ -175,6 +174,8 @@ public final class Instrumentation {
                 )
         ).setType(st().voidType);
     }
+
+    // TODO also save class name for returns (and void returns)
 
     public JCExpression logMethodReturnValue(String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {

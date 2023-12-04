@@ -6,21 +6,23 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
-import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
-import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
-import com.sun.tools.javac.tree.JCTree.JCStatement;
+import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Names;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
 import java.util.LinkedList;
 
 public final class Transformer extends TreeTranslator {
+
+    //<editor-fold desc="Constants">
+
+    private static final String CONSTRUCTOR_NAME = "<init>";
+
+    //</editor-fold>
 
     //<editor-fold desc="Fields and constructors">
 
@@ -104,35 +106,27 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitExec(JCExpressionStatement tree) {
+        // TODO check that this comment is up to date
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
          * Assumption: all such calls are wrapped in a JCExpressionStatement
          * Solution: special-case it (here)
          * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
         if (tree.expr instanceof JCMethodInvocation invocation
-                && currentMethod().name.contentEquals("<init>")
+                && currentMethod().name.contentEquals(CONSTRUCTOR_NAME)
                 && invocation.meth.toString().equals("super")) {
             // TODO maybe try to still save the information when control-flow enters a superclass constructor
-            this.result = tree; // tree is unchanged
-            return;
-        }
-        if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
-            var instrPieces = makeInstrumentationPieces(invocation);
-            var lineMap = cu.getLineMap();
-            var endPosition = invocation.getEndPosition(endPosTable);
-            this.result = mk().Block(0,
-                    instrPieces._1
-                            .append(instrPieces._2)
-                            .append(mk().Exec(instrPieces._3))
-                            .append(mk().Exec(instrumentation.logMethodReturnVoid(
-                                    methodNameOf(invocation.meth),
-                                    currentFilename(),
-                                    lineMap.getLineNumber(invocation.meth.pos),
-                                    lineMap.getColumnNumber(invocation.meth.pos),
-                                    lineMap.getLineNumber(endPosition),
-                                    lineMap.getColumnNumber(endPosition)
-                            )))
-            );
+            super.visitApply(invocation);
+            this.result = tree;
+        } else if (tree.expr instanceof JCNewClass newClass) {
+            super.visitNewClass(newClass);
+            var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
+            this.result = makeBlock(newClass, CONSTRUCTOR_NAME, instrPieces);
+        } else if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
+            super.visitApply(invocation);
+            invocation.args = translate(invocation.args);   // replaces call to super method
+            var instrPieces = makeMethodCallInstrumentationPieces(invocation);
+            this.result = makeBlock(invocation, methodNameOf(invocation.meth), instrPieces);
         } else {
             super.visitExec(tree);
         }
@@ -144,45 +138,27 @@ public final class Transformer extends TreeTranslator {
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
-        var instrPieces = makeInstrumentationPieces(invocation);
-        var lineMap = cu.getLineMap();
-        var endPosition = invocation.getEndPosition(endPosTable);
-        result = mk().LetExpr(
-                instrPieces._1,
-                mk().LetExpr(
-                        List.of(instrPieces._2),
-                        instrumentation.logMethodReturnValue(
-                                methodNameOf(invocation.meth),
-                                instrPieces._3,
-                                currentFilename(),
-                                lineMap.getLineNumber(invocation.meth.pos),
-                                lineMap.getColumnNumber(invocation.meth.pos),
-                                lineMap.getLineNumber(endPosition),
-                                lineMap.getColumnNumber(endPosition)
-                        )
-                ).setType(invocation.type)
-        ).setType(invocation.type);
+        var instrPieces = makeMethodCallInstrumentationPieces(invocation);
+        this.result = makeLet(invocation, methodNameOf(invocation.meth), instrPieces);
+    }
+
+    @Override
+    public void visitNewClass(JCNewClass newClass) {
+        super.visitNewClass(newClass);
+        var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
+        this.result = makeLet(newClass, CONSTRUCTOR_NAME, instrPieces);
     }
 
     //</editor-fold>
 
     //<editor-fold desc="Visitor helpers">
 
-    @NotNull
-    private Triple<
-            List<JCStatement>,   // definitions of locals for args
-            JCStatement,         // call to logging method
-            JCMethodInvocation   // call to initial method
-            > makeInstrumentationPieces(JCMethodInvocation invocation) {
+    private CallInstrumentationPieces makeMethodCallInstrumentationPieces(JCMethodInvocation invocation) {
         var receiver = getReceiver(invocation.meth);
-        var argsDecls = List.<JCStatement>nil();
-        var argsIds = List.<JCTree.JCExpression>nil();
         var allArgs = (receiver == null) ? invocation.args : invocation.args.prepend(receiver);
-        for (var arg : allArgs) {
-            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
-            argsIds = argsIds.append(mk().Ident(varSymbol));
-            argsDecls = argsDecls.append(mk().VarDef(varSymbol, arg));
-        }
+        var precomputation = makeArgsPrecomputations(allArgs);
+        var argsDecls = precomputation._1;
+        var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
         var endPosition = invocation.getEndPosition(endPosTable);
         var logCall = (receiver == null) ?
@@ -211,10 +187,93 @@ public final class Transformer extends TreeTranslator {
                 );
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = (receiver == null) ? argsIds : argsIds.tail;
-        return new Triple<>(argsDecls, loggingStat, invocation);
+        return new CallInstrumentationPieces(argsDecls, loggingStat, invocation);
     }
 
-    private String classNameOf(JCTree.JCExpression method) {
+    private CallInstrumentationPieces makeConstructorCallInstrumentationPieces(JCNewClass newClass) {
+        var precomputation = makeArgsPrecomputations(newClass.args);
+        var argsDecls = precomputation._1;
+        var argsIds = precomputation._2;
+        var lineMap = cu.getLineMap();
+        var endPosition = newClass.getEndPosition(endPosTable);
+        // in practice not a static call, but passing it the receiver is useless and would probably lead to issues (not initialized)
+        var startLine = lineMap.getLineNumber(newClass.pos);
+        var startCol = lineMap.getColumnNumber(newClass.pos);
+        var endLine = lineMap.getLineNumber(endPosition);
+        var endCol = lineMap.getColumnNumber(endPosition);
+        var logCall = instrumentation.logStaticMethodCall(
+                newClass.clazz.toString(),
+                CONSTRUCTOR_NAME,
+                (Type.MethodType) newClass.constructorType,
+                argsIds,
+                currentFilename(),
+                startLine,
+                startCol,
+                endLine,
+                endCol
+        );
+        var loggingStat = mk().Exec(logCall).setType(st().voidType);
+        newClass.args = argsIds;
+        return new CallInstrumentationPieces(argsDecls, loggingStat, newClass);
+    }
+
+    private record CallInstrumentationPieces(
+            List<JCStatement> argsLocalsDefs,
+            JCStatement logMethodCall,
+            JCExpression initialMethodInvocation
+    ) {
+    }
+
+    private JCExpression makeLet(JCExpression invocation, String methodName, CallInstrumentationPieces instrPieces) {
+        var lineMap = cu.getLineMap();
+        var endPosition = invocation.getEndPosition(endPosTable);
+        return mk().LetExpr(
+                instrPieces.argsLocalsDefs,
+                mk().LetExpr(
+                        List.of(instrPieces.logMethodCall),
+                        instrumentation.logMethodReturnValue(
+                                methodName,
+                                instrPieces.initialMethodInvocation,
+                                currentFilename(),
+                                lineMap.getLineNumber(invocation.pos),
+                                lineMap.getColumnNumber(invocation.pos),
+                                lineMap.getLineNumber(endPosition),
+                                lineMap.getColumnNumber(endPosition)
+                        )
+                ).setType(invocation.type)
+        ).setType(invocation.type);
+    }
+
+    private JCBlock makeBlock(JCExpression call, String methodName, CallInstrumentationPieces instrPieces) {
+        var endPosition = call.getEndPosition(endPosTable);
+        var lineMap = cu.getLineMap();
+        return mk().Block(0,
+                instrPieces.argsLocalsDefs
+                        .append(instrPieces.logMethodCall)
+                        .append(mk().Exec(call))
+                        .append(mk().Exec(instrumentation.logMethodReturnVoid(
+                                methodName,
+                                currentFilename(),
+                                lineMap.getLineNumber(call.pos),
+                                lineMap.getColumnNumber(call.pos),
+                                lineMap.getLineNumber(endPosition),
+                                lineMap.getColumnNumber(endPosition)
+                        )))
+        );
+    }
+
+    private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(List<JCExpression> args) {
+        var argsDecls = List.<JCStatement>nil();
+        var argsIds = List.<JCExpression>nil();
+        for (var arg : args) {
+            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
+            argsIds = argsIds.append(mk().Ident(varSymbol));
+            argsDecls = argsDecls.append(mk().VarDef(varSymbol, arg));
+        }
+        return new Pair<>(argsDecls, argsIds);
+    }
+
+    private String classNameOf(JCExpression method) {
         if (method instanceof JCTree.JCIdent) {
             return currentClass().toString();
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
@@ -224,7 +283,7 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
-    private String methodNameOf(JCTree.JCExpression method) {
+    private String methodNameOf(JCExpression method) {
         if (method instanceof JCTree.JCIdent ident) {
             return ident.toString();
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
@@ -234,7 +293,7 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
-    private @Nullable JCTree.JCExpression getReceiver(JCTree.JCExpression method) {
+    private @Nullable JCExpression getReceiver(JCExpression method) {
         if (method instanceof JCTree.JCIdent ident) {
             return ident.sym.isStatic() ? null : mk().Ident(n()._this).setType(currentClass().type);
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
