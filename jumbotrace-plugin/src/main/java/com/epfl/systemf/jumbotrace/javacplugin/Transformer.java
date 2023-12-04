@@ -174,54 +174,68 @@ public final class Transformer extends TreeTranslator {
             JCStatement,         // call to logging method
             JCMethodInvocation   // call to initial method
             > makeInstrumentationPieces(JCMethodInvocation invocation) {
+        var receiver = getReceiver(invocation.meth);
         var argsDecls = List.<JCStatement>nil();
         var argsIds = List.<JCTree.JCExpression>nil();
-        for (var arg : invocation.args) {
+        var allArgs = (receiver == null) ? invocation.args : invocation.args.prepend(receiver);
+        for (var arg : allArgs) {
             var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
             argsIds = argsIds.append(mk().Ident(varSymbol));
             argsDecls = argsDecls.append(mk().VarDef(varSymbol, arg));
         }
         var lineMap = cu.getLineMap();
         var endPosition = invocation.getEndPosition(endPosTable);
-        var logCall = instrumentation.logMethodCall(
-                classNameOf(invocation.meth),
-                methodNameOf(invocation.meth),
-                (Type.MethodType) invocation.meth.type,
-                getReceiver(invocation.meth),
-                argsIds,
-                currentFilename(),
-                lineMap.getLineNumber(invocation.meth.pos),
-                lineMap.getColumnNumber(invocation.meth.pos),
-                lineMap.getLineNumber(endPosition),
-                lineMap.getColumnNumber(endPosition)
-        );
+        var logCall = (receiver == null) ?
+                instrumentation.logStaticMethodCall(
+                        classNameOf(invocation.meth),
+                        methodNameOf(invocation.meth),
+                        (Type.MethodType) invocation.meth.type,
+                        argsIds,
+                        currentFilename(),
+                        lineMap.getLineNumber(invocation.meth.pos),
+                        lineMap.getColumnNumber(invocation.meth.pos),
+                        lineMap.getLineNumber(endPosition),
+                        lineMap.getColumnNumber(endPosition)
+                ) :
+                instrumentation.logNonStaticMethodCall(
+                        classNameOf(invocation.meth),
+                        methodNameOf(invocation.meth),
+                        (Type.MethodType) invocation.meth.type,
+                        argsIds.head,
+                        argsIds.tail,
+                        currentFilename(),
+                        lineMap.getLineNumber(invocation.meth.pos),
+                        lineMap.getColumnNumber(invocation.meth.pos),
+                        lineMap.getLineNumber(endPosition),
+                        lineMap.getColumnNumber(endPosition)
+                );
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
-        invocation.args = argsIds;
+        invocation.args = (receiver == null) ? argsIds : argsIds.tail;
         return new Triple<>(argsDecls, loggingStat, invocation);
     }
 
-    private String classNameOf(JCTree.JCExpression method){
-        if (method instanceof JCTree.JCIdent){
+    private String classNameOf(JCTree.JCExpression method) {
+        if (method instanceof JCTree.JCIdent) {
             return currentClass().toString();
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess){
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
             return fieldAccess.selected.type.tsym.toString();
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
         }
     }
 
-    private String methodNameOf(JCTree.JCExpression method){
-        if (method instanceof JCTree.JCIdent ident){
+    private String methodNameOf(JCTree.JCExpression method) {
+        if (method instanceof JCTree.JCIdent ident) {
             return ident.toString();
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess){
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
             return fieldAccess.name.toString();
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
         }
     }
 
-    private @Nullable JCTree.JCExpression getReceiver(JCTree.JCExpression method){
-        if (method instanceof JCTree.JCIdent ident){
+    private @Nullable JCTree.JCExpression getReceiver(JCTree.JCExpression method) {
+        if (method instanceof JCTree.JCIdent ident) {
             return ident.sym.isStatic() ? null : mk().Ident(n()._this).setType(currentClass().type);
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
             return fieldAccess.sym.isStatic() ? null : fieldAccess.selected;

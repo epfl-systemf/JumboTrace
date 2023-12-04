@@ -117,15 +117,6 @@ public final class Instrumentation {
 
     //<editor-fold desc="Logger methods">
 
-    public JCExpression logMethodCall(
-            String className, String methodName, Type.MethodType methodSig, @Nullable JCExpression receiver, List<JCExpression> args,
-            String filename, int startLine, int startCol, int endLine, int endCol
-    ) {
-        return (receiver == null) ?
-                logStaticMethodCall(className, methodName, methodSig, args, filename, startLine, startCol, endLine, endCol)
-                : logNonStaticMethodCall(className, methodName, methodSig, receiver, args, filename, startLine, startCol, endLine, endCol);
-    }
-
     public JCExpression logStaticMethodCall(
             String className, String methodName, Type.MethodType methodSig, List<JCExpression> args,
             String filename, int startLine, int startCol, int endLine, int endCol
