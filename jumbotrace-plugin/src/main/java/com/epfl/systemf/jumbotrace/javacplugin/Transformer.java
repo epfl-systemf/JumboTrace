@@ -147,7 +147,6 @@ public final class Transformer extends TreeTranslator {
             this.result = makeBlock(newClass, CONSTRUCTOR_NAME, instrPieces);
         } else if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             super.visitApply(invocation);
-            invocation.args = translate(invocation.args);   // replaces call to super method
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
             this.result = makeBlock(invocation, methodNameOf(invocation.meth), instrPieces);
         } else {
@@ -179,11 +178,13 @@ public final class Transformer extends TreeTranslator {
     private CallInstrumentationPieces makeMethodCallInstrumentationPieces(JCMethodInvocation invocation) {
         var receiver = getReceiver(invocation.meth);
         var allArgs = (receiver == null) ? invocation.args : invocation.args.prepend(receiver);
-        var precomputation = makeArgsPrecomputations(allArgs);
+        var allArgTypes = (receiver == null) ?
+                invocation.meth.type.asMethodType().argtypes :
+                invocation.meth.type.asMethodType().argtypes.prepend(receiver.type);
+        var precomputation = makeArgsPrecomputations(allArgs, allArgTypes);
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
-        var endPosition = invocation.getEndPosition(endPosTable);
         var logCall = (receiver == null) ?
                 instrumentation.logStaticMethodCall(
                         classNameOf(invocation.meth),
@@ -214,7 +215,7 @@ public final class Transformer extends TreeTranslator {
     }
 
     private CallInstrumentationPieces makeConstructorCallInstrumentationPieces(JCNewClass newClass) {
-        var precomputation = makeArgsPrecomputations(newClass.args);
+        var precomputation = makeArgsPrecomputations(newClass.args, newClass.constructorType.getParameterTypes());
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
@@ -283,15 +284,32 @@ public final class Transformer extends TreeTranslator {
         );
     }
 
-    private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(List<JCExpression> args) {
+    private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(List<JCExpression> args, List<Type> argTypes) {
+        Assertions.checkPrecondition(args.length() >= argTypes.length(),
+                String.format("unexpected list lengths: %d, %d", args.length(), argTypes.length()));
+        var isVararg = args.length() > argTypes.length();
+        if (isVararg){
+            argTypes = expandVararg(argTypes, args.length());
+        }
+        Assertions.checkAssertion(args.length() == argTypes.length(), "length mismatch");
         var argsDecls = List.<JCStatement>nil();
         var argsIds = List.<JCExpression>nil();
-        for (var arg : args) {
-            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), arg.type, currentMethod());
+        for (; args.nonEmpty(); args = args.tail, argTypes = argTypes.tail) {
+            var varSymbol = new Symbol.VarSymbol(0, m.nextId("arg"), argTypes.head, currentMethod());
             argsIds = argsIds.append(mk().Ident(varSymbol));
-            argsDecls = argsDecls.append(mk().VarDef(varSymbol, arg));
+            argsDecls = argsDecls.append(mk().VarDef(varSymbol, args.head));
         }
         return new Pair<>(argsDecls, argsIds);
+    }
+
+    private List<Type> expandVararg(List<Type> types, int totalLength){
+        Assertions.checkAssertion(types.length() <= totalLength, "unexpected lengths");
+        var varArgType = ((Type.ArrayType) types.last()).getComponentType();
+        types = types.reverse().tail.reverse(); // drop last
+        for (var i = types.length(); i < totalLength; i++){
+            types = types.append(varArgType);
+        }
+        return types;
     }
 
     private String classNameOf(JCExpression method) {
