@@ -4,6 +4,7 @@ import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
 
 import java.util.Arrays;
 
+@SuppressWarnings("unused")
 public class ___JumboTrace___ {
 
     private static final String YELLOW_CODE = "\u001B[33m";
@@ -33,11 +34,22 @@ public class ___JumboTrace___ {
     }
 
 
-    public static void methodCall(String className, String methodName, String methodSig, Object[] args,
-                                  String filename, int startLine, int startCol, int endLine, int endCol){
+    public static void staticMethodCall(String className, String methodName, String methodSig, Object[] args,
+                                        String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
             log("CALL: ", className, ".", methodName, methodSig, " args=", Arrays.toString(args),
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            indent += 1;
+            enableLogging();
+        }
+    }
+
+    public static void nonStaticMethodCall(String className, String methodName, String methodSig, Object receiver, Object[] args,
+                                           String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("CALL: ", className, ".", methodName, methodSig, " receiver='", receiver, "' args=", Arrays.toString(args),
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             indent += 1;
             enableLogging();

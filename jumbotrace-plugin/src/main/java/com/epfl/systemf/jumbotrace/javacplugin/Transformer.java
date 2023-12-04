@@ -15,6 +15,7 @@ import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Names;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
 import java.util.LinkedList;
@@ -124,7 +125,7 @@ public final class Transformer extends TreeTranslator {
                             .append(instrPieces._2)
                             .append(mk().Exec(instrPieces._3))
                             .append(mk().Exec(instrumentation.logMethodReturnVoid(
-                                    definingClassAndMethodNamesOf(invocation.meth)._2,
+                                    methodNameOf(invocation.meth),
                                     currentFilename(),
                                     lineMap.getLineNumber(invocation.meth.pos),
                                     lineMap.getColumnNumber(invocation.meth.pos),
@@ -151,7 +152,7 @@ public final class Transformer extends TreeTranslator {
                 mk().LetExpr(
                         List.of(instrPieces._2),
                         instrumentation.logMethodReturnValue(
-                                definingClassAndMethodNamesOf(invocation.meth)._2,
+                                methodNameOf(invocation.meth),
                                 instrPieces._3,
                                 currentFilename(),
                                 lineMap.getLineNumber(invocation.meth.pos),
@@ -173,7 +174,6 @@ public final class Transformer extends TreeTranslator {
             JCStatement,         // call to logging method
             JCMethodInvocation   // call to initial method
             > makeInstrumentationPieces(JCMethodInvocation invocation) {
-        // TODO also log receiver, if possible; try using invocation.meth.type.getReceiverType() -- EDIT always returns null
         var argsDecls = List.<JCStatement>nil();
         var argsIds = List.<JCTree.JCExpression>nil();
         for (var arg : invocation.args) {
@@ -183,12 +183,13 @@ public final class Transformer extends TreeTranslator {
         }
         var lineMap = cu.getLineMap();
         var endPosition = invocation.getEndPosition(endPosTable);
-        var clsAndMeth = definingClassAndMethodNamesOf(invocation.meth);
         var logCall = instrumentation.logMethodCall(
-                clsAndMeth._1,
-                clsAndMeth._2,
+                classNameOf(invocation.meth),
+                methodNameOf(invocation.meth),
                 (Type.MethodType) invocation.meth.type,
-                argsIds, currentFilename(),
+                getReceiver(invocation.meth),
+                argsIds,
+                currentFilename(),
                 lineMap.getLineNumber(invocation.meth.pos),
                 lineMap.getColumnNumber(invocation.meth.pos),
                 lineMap.getLineNumber(endPosition),
@@ -199,13 +200,33 @@ public final class Transformer extends TreeTranslator {
         return new Triple<>(argsDecls, loggingStat, invocation);
     }
 
-    private Pair<String, String> definingClassAndMethodNamesOf(JCTree.JCExpression method) {
-        if (method instanceof JCTree.JCIdent ident) {
-            return new Pair<>(currentClass().toString(), ident.toString());
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
-            return new Pair<>(fieldAccess.selected.type.tsym.toString(), fieldAccess.name.toString());
+    private String classNameOf(JCTree.JCExpression method){
+        if (method instanceof JCTree.JCIdent){
+            return currentClass().toString();
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess){
+            return fieldAccess.selected.type.tsym.toString();
         } else {
-            throw new AssertionError("unexpected: " + method.getClass() + " at " + method.pos());
+            throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
+        }
+    }
+
+    private String methodNameOf(JCTree.JCExpression method){
+        if (method instanceof JCTree.JCIdent ident){
+            return ident.toString();
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess){
+            return fieldAccess.name.toString();
+        } else {
+            throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
+        }
+    }
+
+    private @Nullable JCTree.JCExpression getReceiver(JCTree.JCExpression method){
+        if (method instanceof JCTree.JCIdent ident){
+            return ident.sym.isStatic() ? null : mk().Ident(n()._this).setType(currentClass().type);
+        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
+            return fieldAccess.sym.isStatic() ? null : fieldAccess.selected;
+        } else {
+            throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
         }
     }
 
