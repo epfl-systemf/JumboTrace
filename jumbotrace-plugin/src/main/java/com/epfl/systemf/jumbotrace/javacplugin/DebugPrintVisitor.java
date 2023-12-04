@@ -1,6 +1,5 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
-import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeTranslator;
 
@@ -8,6 +7,7 @@ import java.io.PrintStream;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("unused")
 public final class DebugPrintVisitor extends TreeTranslator {   // possibly exists better than TreeTranslator for this purpose
     private static final PrintStream s = System.out;
 
