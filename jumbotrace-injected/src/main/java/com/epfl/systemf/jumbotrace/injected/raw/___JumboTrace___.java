@@ -12,8 +12,8 @@ public class ___JumboTrace___ {
     private static void log(Object... objects){
         StringBuilder sb = new StringBuilder();
         sb.append(YELLOW_CODE);
+        sb.append("[jbt] ");
         sb.append(" ".repeat(indent));
-        sb.append("jbt> ");
         for (var obj: objects){
             sb.append(obj);
         }
