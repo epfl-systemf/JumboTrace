@@ -12,7 +12,9 @@ import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.Locale;
 
 public final class Transformer extends TreeTranslator {
 
@@ -31,6 +33,11 @@ public final class Transformer extends TreeTranslator {
 
     private final Deque<Symbol.ClassSymbol> classesStack;
     private final Deque<Symbol.MethodSymbol> methodsStack;
+    private final Deque<JCTree> continueTargetsStack;
+    private final Deque<JCTree> breakTargetsStack;
+
+    // JLS guarantees that no two labels with the same name are present in the same scope
+    private final LinkedHashMap<String, JCTree> labeledStats;
 
     public Transformer(JCTree.JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
         this.cu = cu;
@@ -39,6 +46,9 @@ public final class Transformer extends TreeTranslator {
         this.endPosTable = endPosTable;
         classesStack = new LinkedList<>();
         methodsStack = new LinkedList<>();
+        continueTargetsStack = new LinkedList<>();
+        breakTargetsStack = new LinkedList<>();
+        labeledStats = new LinkedHashMap<>();
     }
 
     //</editor-fold>
@@ -78,6 +88,14 @@ public final class Transformer extends TreeTranslator {
                         new Type.MethodType(List.nil(), st().voidType, List.nil(), currentClass().type.tsym),
                         currentClass()
                 );
+    }
+
+    private JCTree currentDefaultBreakTarget() {
+        return breakTargetsStack.getFirst();
+    }
+
+    private JCTree currentDefaultContinueStack() {
+        return continueTargetsStack.getFirst();
     }
 
     private boolean isInsideMethod() {
@@ -185,32 +203,53 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitDoLoop(JCDoWhileLoop tree) {
+        breakTargetsStack.addFirst(tree);
+        continueTargetsStack.addFirst(tree);
         super.visitDoLoop(tree);  // TODO
+        breakTargetsStack.removeFirst();
+        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitWhileLoop(JCWhileLoop tree) {
+        breakTargetsStack.addFirst(tree);
+        continueTargetsStack.addFirst(tree);
         super.visitWhileLoop(tree);  // TODO
+        breakTargetsStack.removeFirst();
+        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitForLoop(JCForLoop tree) {
+        breakTargetsStack.addFirst(tree);
+        continueTargetsStack.addFirst(tree);
         super.visitForLoop(tree);  // TODO
+        breakTargetsStack.removeFirst();
+        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitForeachLoop(JCEnhancedForLoop tree) {
+        breakTargetsStack.addFirst(tree);
+        continueTargetsStack.addFirst(tree);
         super.visitForeachLoop(tree);  // TODO
+        breakTargetsStack.removeFirst();
+        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitLabelled(JCLabeledStatement labeledStat) {
-        super.visitLabelled(labeledStat);  // TODO
+        var labelId = labeledStat.label.toString();
+        labeledStats.put(labelId, labeledStat.body);
+        super.visitLabelled(labeledStat);
+        labeledStats.remove(labelId);
     }
 
     @Override
     public void visitSwitch(JCSwitch tree) {
+        breakTargetsStack.addFirst(tree);
         super.visitSwitch(tree);  // TODO
+        breakTargetsStack.removeFirst();
     }
 
     @Override
@@ -249,8 +288,27 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitBreak(JCBreak tree) {
-        super.visitBreak(tree);  // TODO
+    public void visitBreak(JCBreak breakStat) {
+        super.visitBreak(breakStat);
+        var target = breakStat.target == null ?
+                currentDefaultBreakTarget() :
+                breakStat.target;
+        var targetDescr = target.getTag().toString().toLowerCase();
+        var lineMap = cu.getLineMap();
+        this.result = mk().Block(0, List.of(
+                        mk().Exec(instrumentation.logBreak(
+                                targetDescr,
+                                lineMap.getLineNumber(target.pos),
+                                lineMap.getColumnNumber(target.pos),
+                                currentFilename(),
+                                lineMap.getLineNumber(breakStat.pos),
+                                lineMap.getColumnNumber(breakStat.pos),
+                                safeGetEndLine(breakStat),
+                                safeGetEndCol(breakStat)
+                        )),
+                        breakStat
+                )
+        );
     }
 
     @Override
@@ -259,8 +317,26 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitContinue(JCContinue tree) {
-        super.visitContinue(tree);  // TODO
+    public void visitContinue(JCContinue continueStat) {
+        super.visitContinue(continueStat);  // TODO
+        var target = continueStat.target == null ?
+                currentDefaultContinueStack() :
+                continueStat.target;
+        var targetDescr = target.getTag().toString().toLowerCase();
+        var lineMap = cu.getLineMap();
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logContinue(
+                        targetDescr,
+                        lineMap.getLineNumber(target.pos),
+                        lineMap.getColumnNumber(target.pos),
+                        currentFilename(),
+                        lineMap.getLineNumber(continueStat.pos),
+                        lineMap.getColumnNumber(continueStat.pos),
+                        safeGetEndLine(continueStat),
+                        safeGetEndCol(continueStat)
+                )),
+                continueStat
+        ));
     }
 
     @Override

@@ -248,6 +248,76 @@ public final class Instrumentation {
 
     //</editor-fold>
 
+    //<editor-fold desc="break and continue">
+
+    private LogMethodSig breakLogger(){
+        return new LogMethodSig(
+                "breakStat",
+                new Type.MethodType(
+                        List.of(
+                                st().stringType, st().intType, st().intType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType
+                        ),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logBreak(String targetDescr, int targetLine, int targetCol,
+                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(breakLogger()),
+                List.of(
+                        mk().Literal(targetDescr),
+                        mk().Literal(targetLine),
+                        mk().Literal(targetCol),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig continueLogger(){
+        return new LogMethodSig(
+                "continueStat",
+                new Type.MethodType(
+                        List.of(
+                                st().stringType, st().intType, st().intType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType
+                        ),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logContinue(String targetDescr, int targetLine, int targetCol,
+                                    String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(continueLogger()),
+                List.of(
+                        mk().Literal(targetDescr),
+                        mk().Literal(targetLine),
+                        mk().Literal(targetCol),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    //</editor-fold>
+
     //<editor-fold desc="Utils">
 
     private JCExpression makeSelectFromMethodSig(LogMethodSig sig) {
