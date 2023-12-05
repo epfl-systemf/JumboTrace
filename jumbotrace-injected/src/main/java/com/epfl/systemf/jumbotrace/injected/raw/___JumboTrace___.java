@@ -2,6 +2,7 @@ package com.epfl.systemf.jumbotrace.injected.raw;
 
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
 
+import java.nio.file.Paths;
 import java.util.Arrays;
 
 @SuppressWarnings("unused")
@@ -88,14 +89,18 @@ public class ___JumboTrace___ {
 
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol){
         if (endLine == NO_POS){
-            return formatPosition(filename, startLine, startCol);
+            return formatPosition(simplifyFilename(filename), startLine, startCol);
         } else {
-            return String.format("%s [%d:%d,%d:%d]", filename, startLine, startCol, endLine, endCol);
+            return String.format("%s [%d:%d,%d:%d]", simplifyFilename(filename), startLine, startCol, endLine, endCol);
         }
     }
 
     private static String formatPosition(String filename, int line, int col){
-        return String.format("%s:%d:%d", filename, line, col);
+        return String.format("%s:%d:%d", simplifyFilename(filename), line, col);
+    }
+
+    private static String simplifyFilename(String filename){
+        return Paths.get(filename).getFileName().toString();
     }
 
 }
