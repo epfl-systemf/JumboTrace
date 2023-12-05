@@ -119,6 +119,8 @@ public final class Transformer extends TreeTranslator {
                     instrumentation.logMethodEnter(
                             method.sym.owner.name.toString(),
                             method.name.toString(),
+                            // FIXME method.type is null in some cases
+                            // (apparently when there is a second class on the same file)
                             method.type.asMethodType(),
                             currentFilename(),
                             lineMap.getLineNumber(method.pos),
