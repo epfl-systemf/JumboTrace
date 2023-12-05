@@ -67,22 +67,22 @@ public class ___JumboTrace___ {
         }
     }
 
-    public static @Specialize Object methodRet(String methodName, @Specialize Object retValue,
+    public static @Specialize Object methodRet(String className, String methodName, @Specialize Object retValue,
                                                String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
             indent -= 1;
-            log(methodName, " RETURNS '", retValue, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            log(className, ".", methodName, " RETURNS '", retValue, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
         return retValue;
     }
 
-    public static void methodRetVoid(String methodName, String filename, int startLine, int startCol, int endLine, int endCol){
+    public static void methodRetVoid(String className, String methodName, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
             indent -= 1;
-            log(methodName, " RETURNS void at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            log(className, ".", methodName, " RETURNS void at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }

@@ -146,11 +146,11 @@ public final class Transformer extends TreeTranslator {
         } else if (tree.expr instanceof JCNewClass newClass) {
             newClass.args = translate(newClass.args);
             var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
-            this.result = makeBlock(newClass, CONSTRUCTOR_NAME, instrPieces);
+            this.result = makeBlock(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
         } else if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             invocation.args = translate(invocation.args);
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
-            this.result = makeBlock(invocation, methodNameOf(invocation.meth), instrPieces);
+            this.result = makeBlock(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
         } else {
             super.visitExec(tree);
         }
@@ -171,14 +171,14 @@ public final class Transformer extends TreeTranslator {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
         var instrPieces = makeMethodCallInstrumentationPieces(invocation);
-        this.result = makeLet(invocation, methodNameOf(invocation.meth), instrPieces);
+        this.result = makeLet(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
     }
 
     @Override
     public void visitNewClass(JCNewClass newClass) {
         super.visitNewClass(newClass);
         var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
-        this.result = makeLet(newClass, CONSTRUCTOR_NAME, instrPieces);
+        this.result = makeLet(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
     }
 
     //</editor-fold>
@@ -257,13 +257,14 @@ public final class Transformer extends TreeTranslator {
     ) {
     }
 
-    private JCExpression makeLet(JCExpression invocation, String methodName, CallInstrumentationPieces instrPieces) {
+    private JCExpression makeLet(JCExpression invocation, String className, String methodName, CallInstrumentationPieces instrPieces) {
         var lineMap = cu.getLineMap();
         return mk().LetExpr(
                 instrPieces.argsLocalsDefs,
                 mk().LetExpr(
                         List.of(instrPieces.logMethodCall),
                         instrumentation.logMethodReturnValue(
+                                className,
                                 methodName,
                                 instrPieces.initialMethodInvocation,
                                 currentFilename(),
@@ -276,13 +277,14 @@ public final class Transformer extends TreeTranslator {
         ).setType(invocation.type);
     }
 
-    private JCBlock makeBlock(JCExpression call, String methodName, CallInstrumentationPieces instrPieces) {
+    private JCBlock makeBlock(JCExpression call, String className, String methodName, CallInstrumentationPieces instrPieces) {
         var lineMap = cu.getLineMap();
         return mk().Block(0,
                 instrPieces.argsLocalsDefs
                         .append(instrPieces.logMethodCall)
                         .append(mk().Exec(call))
                         .append(mk().Exec(instrumentation.logMethodReturnVoid(
+                                className,
                                 methodName,
                                 currentFilename(),
                                 lineMap.getLineNumber(call.pos),

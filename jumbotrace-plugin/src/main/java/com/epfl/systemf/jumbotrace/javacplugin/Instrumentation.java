@@ -92,7 +92,8 @@ public final class Instrumentation {
         return new LogMethodSig(
                 "methodRet",
                 new Type.MethodType(
-                        List.of(st().stringType, specializedType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        List.of(st().stringType, st().stringType, specializedType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
                         specializedType,
                         List.nil(),
                         jumbotraceClassSymbol
@@ -104,7 +105,8 @@ public final class Instrumentation {
         return new LogMethodSig(
                 "methodRetVoid",
                 new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        List.of(st().stringType, st().stringType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
                         st().voidType,
                         List.nil(),
                         jumbotraceClassSymbol
@@ -175,15 +177,14 @@ public final class Instrumentation {
         ).setType(st().voidType);
     }
 
-    // TODO also save class name for returns (and void returns)
-
-    public JCExpression logMethodReturnValue(String methodName, JCExpression returnValue,
+    public JCExpression logMethodReturnValue(String className, String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = returnValue.type.isPrimitive() ? returnValue.type : st().objectType;
         var apply = mk().Apply(
                 List.nil(),
                 makeSelectFromMethodName(methodRetLogger(type)),
                 List.of(
+                        mk().Literal(className),
                         mk().Literal(methodName),
                         returnValue,
                         mk().Literal(filename),
@@ -200,12 +201,13 @@ public final class Instrumentation {
         }
     }
 
-    public JCExpression logMethodReturnVoid(String methodName, String filename, int startLine,
+    public JCExpression logMethodReturnVoid(String className, String methodName, String filename, int startLine,
                                             int startCol, int endLine, int endCol) {
         return mk().Apply(
                 List.nil(),
                 makeSelectFromMethodName(methodRetVoidLogger()),
                 List.of(
+                        mk().Literal(className),
                         mk().Literal(methodName),
                         mk().Literal(filename),
                         mk().Literal(startLine),
