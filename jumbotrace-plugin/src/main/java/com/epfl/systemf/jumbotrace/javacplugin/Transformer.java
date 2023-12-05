@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.Locale;
+import java.util.function.Supplier;
 
 public final class Transformer extends TreeTranslator {
 
@@ -36,9 +36,6 @@ public final class Transformer extends TreeTranslator {
     private final Deque<JCTree> continueTargetsStack;
     private final Deque<JCTree> breakTargetsStack;
 
-    // JLS guarantees that no two labels with the same name are present in the same scope
-    private final LinkedHashMap<String, JCTree> labeledStats;
-
     public Transformer(JCTree.JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
         this.cu = cu;
         this.m = m;
@@ -48,7 +45,6 @@ public final class Transformer extends TreeTranslator {
         methodsStack = new LinkedList<>();
         continueTargetsStack = new LinkedList<>();
         breakTargetsStack = new LinkedList<>();
-        labeledStats = new LinkedHashMap<>();
     }
 
     //</editor-fold>
@@ -238,14 +234,6 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitLabelled(JCLabeledStatement labeledStat) {
-        var labelId = labeledStat.label.toString();
-        labeledStats.put(labelId, labeledStat.body);
-        super.visitLabelled(labeledStat);
-        labeledStats.remove(labelId);
-    }
-
-    @Override
     public void visitSwitch(JCSwitch tree) {
         breakTargetsStack.addFirst(tree);
         super.visitSwitch(tree);  // TODO
@@ -290,9 +278,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitBreak(JCBreak breakStat) {
         super.visitBreak(breakStat);
-        var target = breakStat.target == null ?
-                currentDefaultBreakTarget() :
-                breakStat.target;
+        var target = resolveJumpTarget(breakStat.target, this::currentDefaultBreakTarget);
         var targetDescr = target.getTag().toString().toLowerCase();
         var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
@@ -319,9 +305,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitContinue(JCContinue continueStat) {
         super.visitContinue(continueStat);  // TODO
-        var target = continueStat.target == null ?
-                currentDefaultContinueStack() :
-                continueStat.target;
+        var target = resolveJumpTarget(continueStat.target, this::currentDefaultContinueStack);
         var targetDescr = target.getTag().toString().toLowerCase();
         var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
@@ -440,6 +424,16 @@ public final class Transformer extends TreeTranslator {
     //</editor-fold>
 
     //<editor-fold desc="Visitor helpers">
+
+    private JCTree resolveJumpTarget(JCTree rawTarget, Supplier<JCTree> defaultGen){
+        if (rawTarget == null){
+            return defaultGen.get();
+        } else if (rawTarget instanceof JCLabeledStatement labeledStatement){
+            return labeledStatement.body;
+        } else {
+            return rawTarget;
+        }
+    }
 
     private CallInstrumentationPieces makeMethodCallInstrumentationPieces(JCMethodInvocation invocation) {
         var receiver = getReceiver(invocation.meth);
