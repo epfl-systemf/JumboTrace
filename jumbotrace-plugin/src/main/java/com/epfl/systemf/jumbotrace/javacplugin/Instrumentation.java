@@ -50,7 +50,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Logger signatures">
+    //<editor-fold desc="Method calls and enters">
 
     private Type methodCallLoggerArgsArrayType() {
         return new Type.ArrayType(st().objectType, st().arrayClass);
@@ -66,65 +66,13 @@ public final class Instrumentation {
         ));
     }
 
-    private LogMethodSig nonStaticMethodCallLogger() {
-        return new LogMethodSig("nonStaticMethodCall", new Type.MethodType(
-                List.of(st().stringType, st().stringType, st().stringType, st().objectType, methodCallLoggerArgsArrayType(),
-                        st().stringType, st().intType, st().intType, st().intType, st().intType),
-                st().voidType,
-                List.nil(),
-                jumbotraceClassSymbol
-        ));
-    }
-
-    private LogMethodSig methodEnterLogger() {
-        return new LogMethodSig(
-                "methodEnter",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().stringType, st().stringType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
-    private LogMethodSig methodRetLogger(Type specializedType) {
-        return new LogMethodSig(
-                "methodRet",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, specializedType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
-    private LogMethodSig methodRetVoidLogger() {
-        return new LogMethodSig(
-                "methodRetVoid",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
-    //</editor-fold>
-
-    //<editor-fold desc="Logger methods">
-
     public JCExpression logStaticMethodCall(
             String className, String methodName, Type.MethodType methodSig, List<JCExpression> args,
             String filename, int startLine, int startCol, int endLine, int endCol
     ) {
         return mk().Apply(
                 List.nil(),
-                makeSelectFromMethodName(staticMethodCallLogger()),
+                makeSelectFromMethodSig(staticMethodCallLogger()),
                 List.of(
                         mk().Literal(className),
                         mk().Literal(methodName),
@@ -139,13 +87,23 @@ public final class Instrumentation {
         ).setType(st().voidType);
     }
 
+    private LogMethodSig nonStaticMethodCallLogger() {
+        return new LogMethodSig("nonStaticMethodCall", new Type.MethodType(
+                List.of(st().stringType, st().stringType, st().stringType, st().objectType, methodCallLoggerArgsArrayType(),
+                        st().stringType, st().intType, st().intType, st().intType, st().intType),
+                st().voidType,
+                List.nil(),
+                jumbotraceClassSymbol
+        ));
+    }
+
     public JCExpression logNonStaticMethodCall(
             String className, String methodName, Type.MethodType methodSig, JCExpression receiver, List<JCExpression> args,
             String filename, int startLine, int startCol, int endLine, int endCol
     ) {
         return mk().Apply(
                 List.nil(),
-                makeSelectFromMethodName(nonStaticMethodCallLogger()),
+                makeSelectFromMethodSig(nonStaticMethodCallLogger()),
                 List.of(
                         mk().Literal(className),
                         mk().Literal(methodName),
@@ -161,11 +119,23 @@ public final class Instrumentation {
         ).setType(st().voidType);
     }
 
+    private LogMethodSig methodEnterLogger() {
+        return new LogMethodSig(
+                "methodEnter",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, st().stringType, st().stringType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
     public JCExpression logMethodEnter(String className, String methodName, Type.MethodType methodSig,
                                        String filename, int line, int col) {
         return mk().Apply(
                 List.nil(),
-                makeSelectFromMethodName(methodEnterLogger()),
+                makeSelectFromMethodSig(methodEnterLogger()),
                 List.of(
                         mk().Literal(className),
                         mk().Literal(methodName),
@@ -177,12 +147,29 @@ public final class Instrumentation {
         ).setType(st().voidType);
     }
 
+    //</editor-fold>
+
+    //<editor-fold desc="Method returns">
+
+    private LogMethodSig methodRetLogger(Type specializedType) {
+        return new LogMethodSig(
+                "methodRet",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, specializedType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        specializedType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
     public JCExpression logMethodReturnValue(String className, String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = returnValue.type.isPrimitive() ? returnValue.type : st().objectType;
         var apply = mk().Apply(
                 List.nil(),
-                makeSelectFromMethodName(methodRetLogger(type)),
+                makeSelectFromMethodSig(methodRetLogger(type)),
                 List.of(
                         mk().Literal(className),
                         mk().Literal(methodName),
@@ -201,13 +188,54 @@ public final class Instrumentation {
         }
     }
 
+    private LogMethodSig methodRetVoidLogger() {
+        return new LogMethodSig(
+                "methodRetVoid",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
     public JCExpression logMethodReturnVoid(String className, String methodName, String filename, int startLine,
                                             int startCol, int endLine, int endCol) {
         return mk().Apply(
                 List.nil(),
-                makeSelectFromMethodName(methodRetVoidLogger()),
+                makeSelectFromMethodSig(methodRetVoidLogger()),
                 List.of(
                         mk().Literal(className),
+                        mk().Literal(methodName),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig returnStatLogger() {
+        return new LogMethodSig(
+                "returnStat",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logReturnStat(String methodName, String filename, int startLine,
+                                       int startCol, int endLine, int endCol) {
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(returnStatLogger()),
+                List.of(
                         mk().Literal(methodName),
                         mk().Literal(filename),
                         mk().Literal(startLine),
@@ -222,7 +250,7 @@ public final class Instrumentation {
 
     //<editor-fold desc="Utils">
 
-    private JCExpression makeSelectFromMethodName(LogMethodSig sig) {
+    private JCExpression makeSelectFromMethodSig(LogMethodSig sig) {
         return mk().Select(
                 mk().Ident(jumbotraceClassSymbol),
                 new Symbol.MethodSymbol(

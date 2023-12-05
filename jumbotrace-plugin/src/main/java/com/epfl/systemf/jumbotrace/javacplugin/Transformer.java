@@ -183,6 +183,184 @@ public final class Transformer extends TreeTranslator {
         this.result = makeLet(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
     }
 
+    @Override
+    public void visitDoLoop(JCDoWhileLoop tree) {
+        super.visitDoLoop(tree);  // TODO
+    }
+
+    @Override
+    public void visitWhileLoop(JCWhileLoop tree) {
+        super.visitWhileLoop(tree);  // TODO
+    }
+
+    @Override
+    public void visitForLoop(JCForLoop tree) {
+        super.visitForLoop(tree);  // TODO
+    }
+
+    @Override
+    public void visitForeachLoop(JCEnhancedForLoop tree) {
+        super.visitForeachLoop(tree);  // TODO
+    }
+
+    @Override
+    public void visitLabelled(JCLabeledStatement labeledStat) {
+        super.visitLabelled(labeledStat);  // TODO
+    }
+
+    @Override
+    public void visitSwitch(JCSwitch tree) {
+        super.visitSwitch(tree);  // TODO
+    }
+
+    @Override
+    public void visitCase(JCCase tree) {
+        super.visitCase(tree);  // TODO
+    }
+
+    @Override
+    public void visitSwitchExpression(JCSwitchExpression tree) {
+        super.visitSwitchExpression(tree);  // TODO
+    }
+
+    @Override
+    public void visitSynchronized(JCSynchronized tree) {
+        super.visitSynchronized(tree);  // TODO
+    }
+
+    @Override
+    public void visitTry(JCTry tree) {
+        super.visitTry(tree);  // TODO
+    }
+
+    @Override
+    public void visitCatch(JCCatch tree) {
+        super.visitCatch(tree);  // TODO
+    }
+
+    @Override
+    public void visitConditional(JCConditional tree) {
+        super.visitConditional(tree);  // TODO
+    }
+
+    @Override
+    public void visitIf(JCIf tree) {
+        super.visitIf(tree);  // TODO
+    }
+
+    @Override
+    public void visitBreak(JCBreak tree) {
+        super.visitBreak(tree);  // TODO
+    }
+
+    @Override
+    public void visitYield(JCYield tree) {
+        super.visitYield(tree);  // TODO
+    }
+
+    @Override
+    public void visitContinue(JCContinue tree) {
+        super.visitContinue(tree);  // TODO
+    }
+
+    @Override
+    public void visitReturn(JCReturn returnStat) {
+        super.visitReturn(returnStat);
+        var lineMap = cu.getLineMap();
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logReturnStat(
+                        currentMethod().name.toString(),
+                        currentFilename(),
+                        lineMap.getLineNumber(returnStat.pos),
+                        lineMap.getColumnNumber(returnStat.pos),
+                        safeGetEndLine(returnStat),
+                        safeGetEndCol(returnStat)
+                )),
+                returnStat
+        ));
+    }
+
+    @Override
+    public void visitThrow(JCThrow tree) {
+        super.visitThrow(tree);  // TODO
+    }
+
+    @Override
+    public void visitAssert(JCAssert tree) {
+        super.visitAssert(tree);  // TODO
+    }
+
+    @Override
+    public void visitNewArray(JCNewArray tree) {
+        super.visitNewArray(tree);  // TODO
+    }
+
+    @Override
+    public void visitAssign(JCAssign tree) {
+        super.visitAssign(tree);  // TODO
+    }
+
+    @Override
+    public void visitAssignop(JCAssignOp tree) {
+        super.visitAssignop(tree);  // TODO
+    }
+
+    @Override
+    public void visitUnary(JCUnary tree) {
+        super.visitUnary(tree);  // TODO
+    }
+
+    @Override
+    public void visitBinary(JCBinary tree) {
+        super.visitBinary(tree);  // TODO
+    }
+
+    @Override
+    public void visitTypeCast(JCTypeCast tree) {
+        super.visitTypeCast(tree);  // TODO
+    }
+
+    @Override
+    public void visitTypeTest(JCInstanceOf tree) {
+        super.visitTypeTest(tree);  // TODO
+    }
+
+    @Override
+    public void visitBindingPattern(JCBindingPattern tree) {
+        super.visitBindingPattern(tree);  // TODO
+    }
+
+    @Override
+    public void visitDefaultCaseLabel(JCDefaultCaseLabel tree) {
+        super.visitDefaultCaseLabel(tree);  // TODO
+    }
+
+    @Override
+    public void visitGuardPattern(JCGuardPattern tree) {
+        super.visitGuardPattern(tree);  // TODO
+    }
+
+    @Override
+    public void visitIndexed(JCArrayAccess tree) {
+        super.visitIndexed(tree);  // TODO
+    }
+
+    @Override
+    public void visitSelect(JCFieldAccess tree) {
+        super.visitSelect(tree);  // TODO
+    }
+
+    @Override
+    public void visitReference(JCMemberReference tree) {
+        // things like Foo::bar
+        super.visitReference(tree);  // TODO
+    }
+
+    @Override
+    public void visitIdent(JCIdent tree) {
+        super.visitIdent(tree);  // TODO
+    }
+
     //</editor-fold>
 
     //<editor-fold desc="Visitor helpers">
