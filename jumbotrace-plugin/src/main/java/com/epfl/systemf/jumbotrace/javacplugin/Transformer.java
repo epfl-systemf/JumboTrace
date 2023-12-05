@@ -119,7 +119,7 @@ public final class Transformer extends TreeTranslator {
                     instrumentation.logMethodEnter(
                             method.sym.owner.name.toString(),
                             method.name.toString(),
-                            (Type.MethodType) method.type,
+                            method.type.asMethodType(),
                             currentFilename(),
                             lineMap.getLineNumber(method.pos),
                             lineMap.getColumnNumber(method.pos)
@@ -199,7 +199,7 @@ public final class Transformer extends TreeTranslator {
                 instrumentation.logStaticMethodCall(
                         classNameOf(invocation.meth),
                         methodNameOf(invocation.meth),
-                        (Type.MethodType) invocation.meth.type,
+                        invocation.meth.type.asMethodType(),
                         argsIds,
                         currentFilename(),
                         lineMap.getLineNumber(invocation.meth.pos),
@@ -210,7 +210,7 @@ public final class Transformer extends TreeTranslator {
                 instrumentation.logNonStaticMethodCall(
                         classNameOf(invocation.meth),
                         methodNameOf(invocation.meth),
-                        (Type.MethodType) invocation.meth.type,
+                        invocation.meth.type.asMethodType(),
                         argsIds.head,
                         argsIds.tail,
                         currentFilename(),
@@ -237,7 +237,7 @@ public final class Transformer extends TreeTranslator {
         var logCall = instrumentation.logStaticMethodCall(
                 newClass.clazz.toString(),
                 CONSTRUCTOR_NAME,
-                (Type.MethodType) newClass.constructorType,
+                newClass.constructorType.asMethodType(),
                 argsIds,
                 currentFilename(),
                 startLine,
