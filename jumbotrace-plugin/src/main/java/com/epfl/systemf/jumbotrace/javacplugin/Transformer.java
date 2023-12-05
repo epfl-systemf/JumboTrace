@@ -114,7 +114,7 @@ public final class Transformer extends TreeTranslator {
         super.visitMethodDef(method);
         var lineMap = cu.getLineMap();
         var body = method.getBody();
-        if (body != null){
+        if (body != null) {
             body.stats = body.stats.prepend(mk().Exec(
                     instrumentation.logMethodEnter(
                             method.sym.owner.name.toString(),
@@ -158,7 +158,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitLambda(JCLambda lambda) {
-        if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID){
+        if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID) {
             lambda.body = mk().Exec(bodyExpr);
         }
         super.visitLambda(lambda);
@@ -191,7 +191,7 @@ public final class Transformer extends TreeTranslator {
         var allArgTypes = (receiver == null) ?
                 invocation.meth.type.asMethodType().argtypes :
                 invocation.meth.type.asMethodType().argtypes.prepend(receiver.type);
-        var precomputation = makeArgsPrecomputations(allArgs, allArgTypes);
+        var precomputation = makeArgsPrecomputations(allArgs, allArgTypes, invocation.varargsElement);
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
@@ -225,7 +225,7 @@ public final class Transformer extends TreeTranslator {
     }
 
     private CallInstrumentationPieces makeConstructorCallInstrumentationPieces(JCNewClass newClass) {
-        var precomputation = makeArgsPrecomputations(newClass.args, newClass.constructorType.getParameterTypes());
+        var precomputation = makeArgsPrecomputations(newClass.args, newClass.constructorType.getParameterTypes(), newClass.varargsElement);
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
         var lineMap = cu.getLineMap();
@@ -293,12 +293,11 @@ public final class Transformer extends TreeTranslator {
         );
     }
 
-    private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(List<JCExpression> args, List<Type> argTypes) {
-        Assertions.checkPrecondition(args.length() >= argTypes.length(),
-                String.format("unexpected list lengths: %d, %d", args.length(), argTypes.length()));
-        var isVararg = args.length() > argTypes.length();
-        if (isVararg){
-            argTypes = expandVararg(argTypes, args.length());
+    private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(
+            List<JCExpression> args, List<Type> argTypes, @Nullable Type varargsType
+    ) {
+        if (varargsType != null) {
+            argTypes = expandVararg(argTypes, args.length(), varargsType);
         }
         Assertions.checkAssertion(args.length() == argTypes.length(), "length mismatch");
         var argsDecls = List.<JCStatement>nil();
@@ -311,12 +310,12 @@ public final class Transformer extends TreeTranslator {
         return new Pair<>(argsDecls, argsIds);
     }
 
-    private List<Type> expandVararg(List<Type> types, int totalLength){
+    private List<Type> expandVararg(List<Type> types, int totalLength, Type varargsType) {
+        Assertions.checkPrecondition(varargsType != null, "must not be null");
         Assertions.checkAssertion(types.length() <= totalLength, "unexpected lengths");
-        var varArgType = ((Type.ArrayType) types.last()).getComponentType();
         types = types.reverse().tail.reverse(); // drop last
-        for (var i = types.length(); i < totalLength; i++){
-            types = types.append(varArgType);
+        for (var i = types.length(); i < totalLength; i++) {
+            types = types.append(varargsType);
         }
         return types;
     }
@@ -354,13 +353,13 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
-    private int safeGetEndLine(JCTree tree){
+    private int safeGetEndLine(JCTree tree) {
         var lineMap = cu.getLineMap();
         var endPos = tree.getEndPosition(endPosTable);
         return endPos == Position.NOPOS ? Position.NOPOS : lineMap.getLineNumber(endPos);
     }
 
-    private int safeGetEndCol(JCTree tree){
+    private int safeGetEndCol(JCTree tree) {
         var lineMap = cu.getLineMap();
         var endPos = tree.getEndPosition(endPosTable);
         return endPos == Position.NOPOS ? Position.NOPOS : lineMap.getColumnNumber(endPos);

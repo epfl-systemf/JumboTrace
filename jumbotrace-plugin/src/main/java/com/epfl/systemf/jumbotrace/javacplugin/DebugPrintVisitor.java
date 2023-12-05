@@ -12,9 +12,9 @@ public final class DebugPrintVisitor extends TreeTranslator {   // possibly exis
     private static final PrintStream s = System.out;
 
     private void log(JCTree tree) {
-        if (tree instanceof JCTree.JCNewClass newClass){
-            System.out.println(newClass);
-            printAllFields(newClass);
+        if (tree instanceof JCTree.JCMethodInvocation invocation){
+            System.out.println(invocation);
+            printAllFields(invocation);
             println("---------------------------------------------");
         }
     }
