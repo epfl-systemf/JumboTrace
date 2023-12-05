@@ -10,18 +10,19 @@ public class ___JumboTrace___ {
 
     private static final int NO_POS = -1;
 
-    private static final String YELLOW_CODE = "\u001B[33m";
-    private static final String COLOR_RESET_CALL = "\u001B[0m";
+    private static final String COLOR_YELLOW_CODE = "\u001B[33m";
+    private static final String COLOR_RED_CODE = "\u001B[31m";
+    private static final String COLOR_RESET_CODE = "\u001B[0m";
 
     private static void log(Object... objects){
         StringBuilder sb = new StringBuilder();
-        sb.append(YELLOW_CODE);
+        sb.append(COLOR_YELLOW_CODE);
         sb.append("[jbt] ");
         sb.append(" ".repeat(indent));
         for (var obj: objects){
             sb.append(obj);
         }
-        sb.append(COLOR_RESET_CALL);
+        sb.append(COLOR_RESET_CODE);
         System.out.println(sb);
     }
 
