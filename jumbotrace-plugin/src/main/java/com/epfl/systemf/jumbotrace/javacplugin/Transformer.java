@@ -12,7 +12,6 @@ import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.function.Supplier;
 
