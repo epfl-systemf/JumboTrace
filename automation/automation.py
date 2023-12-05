@@ -54,17 +54,18 @@ def compile_example_project(example_name: str):
     compile_injected()
     copy_injection_to_example(f"{example_name}/target/classes")
     cmd(
-        f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace {" ".join(all_java_files)}",
+        f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace -d {examples_dir}/{example_name}/target/classes {" ".join(all_java_files)}",
         f"compiling example {example_name}"
     )
 
 
 def run_example_project(example_name: str):
-    main_class = read_config_file(examples_dir + "/" + example_name)
+    main_class, args = read_config_file(examples_dir + "/" + example_name)
     log(f"read main class from config file: {main_class}")
+    log(f"read args from config file: {args}")
     compile_example_project(example_name)
     cmd(
-        f"java -cp target/classes {main_class}",
+        f"java -cp {examples_dir}/{example_name}/target/classes {main_class} \"{args}\"",
         f"running example {example_name}"
     )
 
@@ -109,7 +110,14 @@ def copy_injection_to_example(example_name: str):
 
 def read_config_file(directory: str):
     with open(f"{directory}/jumbotrace.config", mode="r") as f:
-        return f.read().strip()
+        lines = f.read().split('\n')
+        lines = [line.strip() for line in lines if len(line.strip()) > 0]
+        assert len(lines) == 2
+        k1, v1 = lines[0].split("=", maxsplit=1)
+        k2, v2 = lines[1].split("=", maxsplit=1)
+        assert k1 == "mainclass"
+        assert k2 == "args"
+        return v1, v2
 
 
 def find_all_java_files(directory: str) -> List[str]:
