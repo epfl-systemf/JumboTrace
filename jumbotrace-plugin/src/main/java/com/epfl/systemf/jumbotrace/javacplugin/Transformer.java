@@ -101,7 +101,7 @@ public final class Transformer extends TreeTranslator {
             super.visitVarDef(varDecl);
         } else {
             /* Do not log the call to the constructor inside an enum case
-             * This crashes the lowering phase, which is expecting an NewClass and not a LetExpr
+             * This crashes the lowering phase, which is expecting an NewClass, not a LetExpr
              */
             // TODO try to find a solution
             this.result = varDecl;
@@ -113,16 +113,19 @@ public final class Transformer extends TreeTranslator {
         methodsStack.addFirst(method.sym);
         super.visitMethodDef(method);
         var lineMap = cu.getLineMap();
-        method.getBody().stats = method.getBody().stats.prepend(mk().Exec(
-                instrumentation.logMethodEnter(
-                        method.sym.owner.name.toString(),
-                        method.name.toString(),
-                        (Type.MethodType) method.type,
-                        currentFilename(),
-                        lineMap.getLineNumber(method.pos),
-                        lineMap.getColumnNumber(method.pos)
-                )
-        ));
+        var body = method.getBody();
+        if (body != null){
+            body.stats = body.stats.prepend(mk().Exec(
+                    instrumentation.logMethodEnter(
+                            method.sym.owner.name.toString(),
+                            method.name.toString(),
+                            (Type.MethodType) method.type,
+                            currentFilename(),
+                            lineMap.getLineNumber(method.pos),
+                            lineMap.getColumnNumber(method.pos)
+                    )
+            ));
+        }
         methodsStack.removeFirst();
     }
 
@@ -130,7 +133,7 @@ public final class Transformer extends TreeTranslator {
     public void visitExec(JCExpressionStatement tree) {
         // TODO check that this comment is up to date
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
-         * Assumption: all such calls are wrapped in a JCExpressionStatement
+         * Assumption: all such calls are wrapped in a JCExpressionStatement or a lambda
          * Solution: special-case it (here)
          * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
@@ -138,19 +141,27 @@ public final class Transformer extends TreeTranslator {
                 && currentMethod().name.contentEquals(CONSTRUCTOR_NAME)
                 && invocation.meth.toString().equals("super")) {
             // TODO maybe try to still save the information when control-flow enters a superclass constructor
-            super.visitApply(invocation);
+            invocation.args = translate(invocation.args);
             this.result = tree;
         } else if (tree.expr instanceof JCNewClass newClass) {
-            super.visitNewClass(newClass);
+            newClass.args = translate(newClass.args);
             var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
             this.result = makeBlock(newClass, CONSTRUCTOR_NAME, instrPieces);
         } else if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
-            super.visitApply(invocation);
+            invocation.args = translate(invocation.args);
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
             this.result = makeBlock(invocation, methodNameOf(invocation.meth), instrPieces);
         } else {
             super.visitExec(tree);
         }
+    }
+
+    @Override
+    public void visitLambda(JCLambda lambda) {
+        if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID){
+            lambda.body = mk().Exec(bodyExpr);
+        }
+        super.visitLambda(lambda);
     }
 
     @Override
@@ -332,7 +343,10 @@ public final class Transformer extends TreeTranslator {
 
     private @Nullable JCExpression getReceiver(JCExpression method) {
         if (method instanceof JCTree.JCIdent ident) {
-            return ident.sym.isStatic() ? null : mk().Ident(n()._this).setType(currentClass().type);
+            return ident.sym.isStatic() ?
+                    null :
+                    mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))
+                            .setType(currentClass().type);
         } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
             return fieldAccess.sym.isStatic() ? null : fieldAccess.selected;
         } else {
