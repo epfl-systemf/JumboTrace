@@ -195,8 +195,43 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitDoLoop(JCDoWhileLoop tree) {
-        super.visitDoLoop(tree);  // TODO
+    public void visitDoLoop(JCDoWhileLoop doWhileLoop) {
+        final var loopType = "do-while";    // TODO test program that uses a do-while
+        super.visitDoLoop(doWhileLoop);
+        var lineMap = cu.getLineMap();
+        var filename = currentFilename();
+        doWhileLoop.cond = instrumentation.logLoopCondition(
+                doWhileLoop.cond,
+                loopType,
+                filename,
+                lineMap.getLineNumber(doWhileLoop.cond.pos),
+                lineMap.getColumnNumber(doWhileLoop.cond.pos),
+                safeGetEndLine(doWhileLoop.cond),
+                safeGetEndCol(doWhileLoop.cond)
+        );
+        var loopStartLine = lineMap.getLineNumber(doWhileLoop.pos);
+        var loopStartCol = lineMap.getColumnNumber(doWhileLoop.pos);
+        var loopEndLine = safeGetEndLine(doWhileLoop);
+        var loopEndCol = safeGetEndCol(doWhileLoop);
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logLoopEnter(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                )),
+                doWhileLoop,
+                mk().Exec(instrumentation.logLoopExit(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                ))
+        ));
     }
 
     @Override
