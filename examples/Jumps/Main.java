@@ -56,6 +56,7 @@ public class Main {
     }
 
     // switch expr
+    @SuppressWarnings("all")
     static boolean isFrenchSoundingName(String s) {
         return switch (s) {
             case "Adelaide", "Berenice", "Charles" -> true;
