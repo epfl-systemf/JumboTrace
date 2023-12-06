@@ -5,7 +5,6 @@ import com.sun.source.util.TaskListener;
 import com.sun.tools.javac.tree.JCTree;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 
 public final class TransformationListener implements TaskListener {
