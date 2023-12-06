@@ -10,6 +10,8 @@ import com.sun.tools.javac.util.Names;
 
 import static com.sun.tools.javac.tree.JCTree.JCExpression;
 
+// TODO implicit return event at the end of void methods
+
 public final class Instrumentation {
 
     //<editor-fold desc="Constants">
@@ -242,6 +244,31 @@ public final class Instrumentation {
                         mk().Literal(startCol),
                         mk().Literal(endLine),
                         mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig implicitReturnLogger(){
+        return new LogMethodSig(
+                "implicitReturn",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logImplicitReturn(String methodName, String filename, int line, int col){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(implicitReturnLogger()),
+                List.of(
+                        mk().Literal(methodName),
+                        mk().Literal(filename),
+                        mk().Literal(line),
+                        mk().Literal(col)
                 )
         ).setType(st().voidType);
     }

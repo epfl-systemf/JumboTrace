@@ -96,6 +96,14 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static void implicitReturn(String methodName, String filename, int line, int col){
+        if (loggingEnabled){
+            disableLogging();
+            log(methodName, " EXITS at ", formatPosition(filename, line, col));
+            enableLogging();
+        }
+    }
+
     public static void breakStat(String targetDescr, int targetLine, int targetCol,
                                  String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {

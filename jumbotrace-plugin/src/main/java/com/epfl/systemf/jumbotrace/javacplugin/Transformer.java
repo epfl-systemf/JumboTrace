@@ -127,6 +127,16 @@ public final class Transformer extends TreeTranslator {
                             lineMap.getColumnNumber(method.pos)
                     )
             ));
+            if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID){
+                body.stats = body.stats.append(mk().Exec(
+                        instrumentation.logImplicitReturn(
+                                method.name.toString(),
+                                currentFilename(),
+                                safeGetEndLine(method),
+                                safeGetEndCol(method)
+                        )
+                ));
+            }
         }
         methodsStack.removeFirst();
     }
