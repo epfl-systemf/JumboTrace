@@ -30,15 +30,19 @@ public final class TransformationListener implements TaskListener {
             );
             transformer.translate(cu);
 //            cu.accept(new DebugPrintVisitor());
-            for (var df: cu.defs){
-                if (df instanceof JCTree.JCClassDecl decl){
-                    try {
-                        var strWriter = new StringWriter();
-                        new LetSupportingPrintVisitor(strWriter, true).printUnit(cu, decl);
-                        System.out.println(strWriter);
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
+//            print(cu);
+        }
+    }
+
+    private void print(JCTree.JCCompilationUnit cu){
+        for (var df: cu.defs){
+            if (df instanceof JCTree.JCClassDecl decl){
+                try {
+                    var strWriter = new StringWriter();
+                    new LetSupportingPrintVisitor(strWriter, true).printUnit(cu, decl);
+                    System.out.println(strWriter);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
                 }
             }
         }
