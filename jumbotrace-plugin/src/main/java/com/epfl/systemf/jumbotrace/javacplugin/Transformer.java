@@ -273,9 +273,10 @@ public final class Transformer extends TreeTranslator {
         var targetDescr = target.getTag().toString().toLowerCase();
         var lineMap = cu.getLineMap();
         var varSymbol = new Symbol.VarSymbol(0, m.nextId("yielded"), target.type, currentMethod());
-        yieldStat.target = mk().Ident(varSymbol).setType(target.type);
+        var valueVarDecl = mk().VarDef(varSymbol, yieldStat.value);
+        yieldStat.value = mk().Ident(varSymbol).setType(target.type);
         this.result = mk().Block(0, List.of(
-                mk().VarDef(varSymbol, yieldStat.value),
+                valueVarDecl,
                 mk().Exec(instrumentation.logYield(
                         mk().Ident(varSymbol).setType(target.type),
                         targetDescr,
