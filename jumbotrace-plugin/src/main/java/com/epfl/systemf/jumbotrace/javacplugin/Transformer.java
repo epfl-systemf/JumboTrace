@@ -160,6 +160,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitLambda(JCLambda lambda) {
+        // TODO
         if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID) {
             lambda.body = mk().Exec(bodyExpr);
         }
@@ -189,8 +190,43 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitWhileLoop(JCWhileLoop tree) {
-        super.visitWhileLoop(tree);  // TODO
+    public void visitWhileLoop(JCWhileLoop whileLoop) {
+        final var loopType = "while";
+        super.visitWhileLoop(whileLoop);
+        var lineMap = cu.getLineMap();
+        var filename = currentFilename();
+        whileLoop.cond = instrumentation.logLoopCondition(
+                whileLoop.cond,
+                loopType,
+                filename,
+                lineMap.getLineNumber(whileLoop.cond.pos),
+                lineMap.getColumnNumber(whileLoop.cond.pos),
+                safeGetEndLine(whileLoop.cond),
+                safeGetEndCol(whileLoop.cond)
+        );
+        var loopStartLine = lineMap.getLineNumber(whileLoop.pos);
+        var loopStartCol = lineMap.getColumnNumber(whileLoop.pos);
+        var loopEndLine = safeGetEndLine(whileLoop);
+        var loopEndCol = safeGetEndCol(whileLoop);
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logLoopEnter(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                )),
+                whileLoop,
+                mk().Exec(instrumentation.logLoopExit(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                ))
+        ));
     }
 
     @Override
@@ -216,11 +252,6 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitSwitchExpression(JCSwitchExpression switchExpr) {
         super.visitSwitchExpression(switchExpr);  // TODO
-    }
-
-    @Override
-    public void visitSynchronized(JCSynchronized tree) {
-        super.visitSynchronized(tree);  // TODO
     }
 
     @Override

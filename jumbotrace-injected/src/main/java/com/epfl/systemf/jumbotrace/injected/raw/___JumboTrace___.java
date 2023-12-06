@@ -126,6 +126,31 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static void loopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("ENTER LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
+    public static void loopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("EXIT LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
+    public static boolean loopCond(boolean evalRes, String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("LOOP CONDITION evaluates to ", evalRes, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return evalRes;
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);

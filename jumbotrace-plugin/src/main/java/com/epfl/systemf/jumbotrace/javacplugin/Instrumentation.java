@@ -352,6 +352,92 @@ public final class Instrumentation {
 
     //</editor-fold>
 
+    //<editor-fold desc="Loops">
+
+    private LogMethodSig loopEnterLogger(){
+        return new LogMethodSig(
+                "loopEnter",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logLoopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(loopEnterLogger()),
+                List.of(
+                        mk().Literal(loopType),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig loopExitLogger(){
+        return new LogMethodSig(
+                "loopExit",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logLoopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(loopExitLogger()),
+                List.of(
+                        mk().Literal(loopType),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig loopCondLogger(){
+        return new LogMethodSig(
+                "loopCond",
+                new Type.MethodType(
+                        List.of(st().booleanType, st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().booleanType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logLoopCondition(JCExpression loopCond, String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(loopCondLogger()),
+                List.of(
+                        loopCond,
+                        mk().Literal(loopType),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().booleanType);
+    }
+
+    //</editor-fold>
+
     //<editor-fold desc="Utils">
 
     private JCExpression makeSelectFromMethodSig(LogMethodSig sig) {

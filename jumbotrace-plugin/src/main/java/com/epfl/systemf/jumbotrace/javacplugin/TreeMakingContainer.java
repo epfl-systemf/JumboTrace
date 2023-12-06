@@ -14,7 +14,7 @@ public final class TreeMakingContainer {
 
     private final Names names;
     private final Symtab symbolTable;
-    private final AtomicLong idGenerator;   // TODO check that we don't redefine existing identifiers
+    private final AtomicLong idGenerator;   // TODO linter to check that we don't redefine existing identifiers + reject synchronized
 
 
     public TreeMakingContainer(TreeMaker treeMaker, Names names, Symtab symbolTable) {
