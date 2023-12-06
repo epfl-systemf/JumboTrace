@@ -13,7 +13,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
 import java.util.LinkedList;
-import java.util.function.Supplier;
 
 public final class Transformer extends TreeTranslator {
 
@@ -32,8 +31,6 @@ public final class Transformer extends TreeTranslator {
 
     private final Deque<Symbol.ClassSymbol> classesStack;
     private final Deque<Symbol.MethodSymbol> methodsStack;
-    private final Deque<JCTree> continueTargetsStack;
-    private final Deque<JCTree> breakTargetsStack;
 
     public Transformer(JCTree.JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
         this.cu = cu;
@@ -42,8 +39,6 @@ public final class Transformer extends TreeTranslator {
         this.endPosTable = endPosTable;
         classesStack = new LinkedList<>();
         methodsStack = new LinkedList<>();
-        continueTargetsStack = new LinkedList<>();
-        breakTargetsStack = new LinkedList<>();
     }
 
     //</editor-fold>
@@ -83,14 +78,6 @@ public final class Transformer extends TreeTranslator {
                         new Type.MethodType(List.nil(), st().voidType, List.nil(), currentClass().type.tsym),
                         currentClass()
                 );
-    }
-
-    private JCTree currentDefaultBreakTarget() {
-        return breakTargetsStack.getFirst();
-    }
-
-    private JCTree currentDefaultContinueStack() {
-        return continueTargetsStack.getFirst();
     }
 
     private boolean isInsideMethod() {
@@ -198,45 +185,27 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitDoLoop(JCDoWhileLoop tree) {
-        breakTargetsStack.addFirst(tree);
-        continueTargetsStack.addFirst(tree);
         super.visitDoLoop(tree);  // TODO
-        breakTargetsStack.removeFirst();
-        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitWhileLoop(JCWhileLoop tree) {
-        breakTargetsStack.addFirst(tree);
-        continueTargetsStack.addFirst(tree);
         super.visitWhileLoop(tree);  // TODO
-        breakTargetsStack.removeFirst();
-        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitForLoop(JCForLoop tree) {
-        breakTargetsStack.addFirst(tree);
-        continueTargetsStack.addFirst(tree);
         super.visitForLoop(tree);  // TODO
-        breakTargetsStack.removeFirst();
-        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitForeachLoop(JCEnhancedForLoop tree) {
-        breakTargetsStack.addFirst(tree);
-        continueTargetsStack.addFirst(tree);
         super.visitForeachLoop(tree);  // TODO
-        breakTargetsStack.removeFirst();
-        continueTargetsStack.removeFirst();
     }
 
     @Override
     public void visitSwitch(JCSwitch tree) {
-        breakTargetsStack.addFirst(tree);
         super.visitSwitch(tree);  // TODO
-        breakTargetsStack.removeFirst();
     }
 
     @Override
@@ -245,8 +214,8 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitSwitchExpression(JCSwitchExpression tree) {
-        super.visitSwitchExpression(tree);  // TODO
+    public void visitSwitchExpression(JCSwitchExpression switchExpr) {
+        super.visitSwitchExpression(switchExpr);  // TODO
     }
 
     @Override
@@ -277,7 +246,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitBreak(JCBreak breakStat) {
         super.visitBreak(breakStat);
-        var target = resolveJumpTarget(breakStat.target, this::currentDefaultBreakTarget);
+        var target = resolveJumpTarget(breakStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
         var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
@@ -297,14 +266,35 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitYield(JCYield tree) {
-        super.visitYield(tree);  // TODO
+    public void visitYield(JCYield yieldStat) {
+        // TODO check edge-cases like yield null (and maybe also nulls at other places)
+        super.visitYield(yieldStat);
+        var target = yieldStat.target;
+        var targetDescr = target.getTag().toString().toLowerCase();
+        var lineMap = cu.getLineMap();
+        var varSymbol = new Symbol.VarSymbol(0, m.nextId("yielded"), target.type, currentMethod());
+        yieldStat.target = mk().Ident(varSymbol).setType(target.type);
+        this.result = mk().Block(0, List.of(
+                mk().VarDef(varSymbol, yieldStat.value),
+                mk().Exec(instrumentation.logYield(
+                        mk().Ident(varSymbol).setType(target.type),
+                        targetDescr,
+                        lineMap.getLineNumber(target.pos),
+                        lineMap.getColumnNumber(target.pos),
+                        currentFilename(),
+                        lineMap.getLineNumber(yieldStat.pos),
+                        lineMap.getColumnNumber(yieldStat.pos),
+                        safeGetEndLine(yieldStat),
+                        safeGetEndCol(yieldStat)
+                )),
+                yieldStat
+        ));
     }
 
     @Override
     public void visitContinue(JCContinue continueStat) {
-        super.visitContinue(continueStat);  // TODO
-        var target = resolveJumpTarget(continueStat.target, this::currentDefaultContinueStack);
+        super.visitContinue(continueStat);
+        var target = resolveJumpTarget(continueStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
         var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
@@ -424,10 +414,9 @@ public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Visitor helpers">
 
-    private JCTree resolveJumpTarget(JCTree rawTarget, Supplier<JCTree> defaultGen){
-        if (rawTarget == null){
-            return defaultGen.get();
-        } else if (rawTarget instanceof JCLabeledStatement labeledStatement){
+    private JCTree resolveJumpTarget(JCTree rawTarget) {
+        Assertions.checkPrecondition(rawTarget != null, "target must not be null");
+        if (rawTarget instanceof JCLabeledStatement labeledStatement) {
             return labeledStatement.body;
         } else {
             return rawTarget;

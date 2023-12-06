@@ -231,7 +231,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logReturnStat(String methodName, String filename, int startLine,
-                                       int startCol, int endLine, int endCol) {
+                                      int startCol, int endLine, int endCol) {
         return mk().Apply(
                 List.nil(),
                 makeSelectFromMethodSig(returnStatLogger()),
@@ -248,9 +248,9 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="break and continue">
+    //<editor-fold desc="break, continue, yield">
 
-    private LogMethodSig breakLogger(){
+    private LogMethodSig breakLogger() {
         return new LogMethodSig(
                 "breakStat",
                 new Type.MethodType(
@@ -266,7 +266,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logBreak(String targetDescr, int targetLine, int targetCol,
-                                 String filename, int startLine, int startCol, int endLine, int endCol){
+                                 String filename, int startLine, int startCol, int endLine, int endCol) {
         return mk().Apply(
                 List.nil(),
                 makeSelectFromMethodSig(breakLogger()),
@@ -283,7 +283,7 @@ public final class Instrumentation {
         ).setType(st().voidType);
     }
 
-    private LogMethodSig continueLogger(){
+    private LogMethodSig continueLogger() {
         return new LogMethodSig(
                 "continueStat",
                 new Type.MethodType(
@@ -299,11 +299,45 @@ public final class Instrumentation {
     }
 
     public JCExpression logContinue(String targetDescr, int targetLine, int targetCol,
-                                    String filename, int startLine, int startCol, int endLine, int endCol){
+                                    String filename, int startLine, int startCol, int endLine, int endCol) {
         return mk().Apply(
                 List.nil(),
                 makeSelectFromMethodSig(continueLogger()),
                 List.of(
+                        mk().Literal(targetDescr),
+                        mk().Literal(targetLine),
+                        mk().Literal(targetCol),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    private LogMethodSig yieldLogger() {
+        return new LogMethodSig(
+                "yieldStat",
+                new Type.MethodType(
+                        List.of(
+                                st().objectType, st().stringType, st().intType, st().intType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType
+                        ),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logYield(JCExpression yieldedVal, String targetDescr, int targetLine, int targetCol,
+                                 String filename, int startLine, int startCol, int endLine, int endCol) {
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(yieldLogger()),
+                List.of(
+                        yieldedVal,
                         mk().Literal(targetDescr),
                         mk().Literal(targetLine),
                         mk().Literal(targetCol),
