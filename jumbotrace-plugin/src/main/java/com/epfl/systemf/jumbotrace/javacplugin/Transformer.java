@@ -127,7 +127,7 @@ public final class Transformer extends TreeTranslator {
                             lineMap.getColumnNumber(method.pos)
                     )
             ));
-            if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID){
+            if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID) {
                 body.stats = body.stats.append(mk().Exec(
                         instrumentation.logImplicitReturn(
                                 method.name.toString(),
@@ -196,7 +196,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitDoLoop(JCDoWhileLoop doWhileLoop) {
-        final var loopType = "do-while";    // TODO test program that uses a do-while
+        final var loopType = "do-while";
         super.visitDoLoop(doWhileLoop);
         var lineMap = cu.getLineMap();
         var filename = currentFilename();
@@ -275,8 +275,46 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitForLoop(JCForLoop tree) {
-        super.visitForLoop(tree);  // TODO
+    public void visitForLoop(JCForLoop forLoop) {
+        final var loopType = "for";
+        super.visitForLoop(forLoop);
+        var lineMap = cu.getLineMap();
+        var filename = currentFilename();
+        var condEvalLogCall = instrumentation.logLoopCondition(
+                forLoop.cond,
+                loopType,
+                filename,
+                lineMap.getLineNumber(forLoop.cond.pos),
+                lineMap.getColumnNumber(forLoop.cond.pos),
+                safeGetEndLine(forLoop.cond),
+                safeGetEndCol(forLoop.cond)
+        );
+        var forLoopStartLine = lineMap.getLineNumber(forLoop.pos);
+        var forLoopStartCol = lineMap.getColumnNumber(forLoop.pos);
+        var forLoopEndLine = safeGetEndLine(forLoop);
+        var forLoopEndCol = safeGetEndCol(forLoop);
+        var enterLogCall = instrumentation.logLoopEnter(
+                loopType,
+                filename,
+                forLoopStartLine,
+                forLoopStartCol,
+                forLoopEndLine,
+                forLoopEndCol
+        );
+        var exitLogCall = instrumentation.logLoopExit(
+                loopType,
+                filename,
+                forLoopStartLine,
+                forLoopStartCol,
+                forLoopEndLine,
+                forLoopEndCol
+        );
+        var bodyAsBlock = makeBlock(forLoop.body);
+        var newLoop = mk().WhileLoop(condEvalLogCall, mk().Block(0,
+                bodyAsBlock.stats.appendList(forLoop.step.map(x -> x))
+        ));
+        this.result = mk().Block(0,
+                forLoop.init.prepend(mk().Exec(enterLogCall)).append(newLoop).append(mk().Exec(exitLogCall)));
     }
 
     @Override
@@ -667,6 +705,14 @@ public final class Transformer extends TreeTranslator {
             return fieldAccess.sym.isStatic() ? null : fieldAccess.selected;
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
+        }
+    }
+
+    private JCBlock makeBlock(JCStatement stat) {
+        if (stat instanceof JCBlock block) {
+            return block;
+        } else {
+            return mk().Block(0, List.of(stat));
         }
     }
 
