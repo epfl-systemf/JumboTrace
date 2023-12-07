@@ -321,6 +321,7 @@ public final class Transformer extends TreeTranslator {
     public void visitForeachLoop(JCEnhancedForLoop foreachLoop) {
         final var loopType = "for-each";
         super.visitForeachLoop(foreachLoop);
+        // FIXME does not work if foreachLoop.expr is an array ; try using Arrays.asList
         var lineMap = cu.getLineMap();
         var filename = currentFilename();
         var loopStartLine = lineMap.getLineNumber(foreachLoop.pos);
