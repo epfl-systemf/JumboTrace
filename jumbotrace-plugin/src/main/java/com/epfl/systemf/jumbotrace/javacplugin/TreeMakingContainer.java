@@ -1,5 +1,6 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Name;
@@ -37,6 +38,14 @@ public final class TreeMakingContainer {
 
     public Name nextId(String debugHint) {
         return names.fromString("$" + idGenerator.incrementAndGet() + "_" + debugHint);
+    }
+
+    public Symbol.PackageSymbol makeCompositePackageSymbol(Symbol.PackageSymbol rootPackage, String... parts) {
+        var curr = rootPackage;
+        for (var part : parts) {
+            curr = new Symbol.PackageSymbol(n().fromString(part), curr);
+        }
+        return curr;
     }
 
 }

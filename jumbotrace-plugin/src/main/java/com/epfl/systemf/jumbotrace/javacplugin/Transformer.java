@@ -12,6 +12,7 @@ import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedList;
 
 public final class Transformer extends TreeTranslator {
@@ -318,8 +319,85 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitForeachLoop(JCEnhancedForLoop tree) {
-        super.visitForeachLoop(tree);  // TODO
+    public void visitForeachLoop(JCEnhancedForLoop foreachLoop) {
+        final var loopType = "for-each";
+        super.visitForeachLoop(foreachLoop);
+        var lineMap = cu.getLineMap();
+        var filename = currentFilename();
+        var loopStartLine = lineMap.getLineNumber(foreachLoop.pos);
+        var loopStartCol = lineMap.getColumnNumber(foreachLoop.pos);
+        var loopEndLine = safeGetEndLine(foreachLoop);
+        var loopEndCol = safeGetEndCol(foreachLoop);
+        var iterableClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC, n().fromString("java.lang.Iterable"), st().rootPackage);
+        var iteratorClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC, n().fromString("java.util.Iterator"), st().rootPackage);
+        var iteratorType = new Type.ClassType(Type.noType, List.nil(), iteratorClassSymbol);
+        iteratorClassSymbol.type = iteratorType;
+        var iteratorSymbol = new Symbol.VarSymbol(0, m.nextId("iterator"), iteratorType, currentMethod());
+        var iteratorIdent = mk().Ident(iteratorSymbol).setType(iteratorType);
+        var callToHasNext = mk().Apply(
+                List.nil(),
+                mk().Select(
+                        iteratorIdent,
+                        new Symbol.MethodSymbol(0, n().fromString("hasNext"), new Type.MethodType(
+                                List.nil(), st().booleanType, List.nil(), iteratorClassSymbol
+                        ), iteratorClassSymbol)
+                ),
+                List.nil()
+        ).setType(st().booleanType);
+        var callToNext = mk().Apply(
+                List.nil(),
+                mk().Select(
+                        iteratorIdent,
+                        new Symbol.MethodSymbol(0, n().fromString("next"), new Type.MethodType(
+                                List.nil(), st().objectType, List.nil(), iteratorClassSymbol
+                        ), iteratorClassSymbol)
+                ),
+                List.nil()
+        ).setType(st().objectType);
+        var callToIterator = mk().Apply(
+                List.nil(),
+                mk().Select(foreachLoop.expr,
+                        new Symbol.MethodSymbol(Flags.PUBLIC, n().iterator, new Type.MethodType(
+                                List.nil(), st().iteratorType, List.nil(), iterableClassSymbol
+                        ), iterableClassSymbol)),
+                List.nil()
+        ).setType(iteratorType);
+        var iteratedVarDecl = foreachLoop.var;
+        iteratedVarDecl.init = mk().TypeCast(iteratedVarDecl.vartype, callToNext).setType(iteratedVarDecl.vartype.type);
+        var loopCondition = instrumentation.logLoopCondition(
+                callToHasNext,
+                loopType,
+                filename,
+                loopStartLine,
+                loopStartCol,
+                safeGetEndLine(foreachLoop.expr),
+                safeGetEndCol(foreachLoop.expr)
+        );
+        var newLoopBody = makeBlock(foreachLoop.body);
+        newLoopBody.stats = newLoopBody.stats.prepend(iteratedVarDecl);
+        this.result = mk().Block(0, List.of(
+                mk().VarDef(iteratorSymbol, callToIterator),
+                mk().Exec(instrumentation.logLoopEnter(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                )),
+                mk().WhileLoop(
+                        loopCondition,
+                        newLoopBody
+                ),
+                mk().Exec(instrumentation.logLoopExit(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                ))
+        ));
     }
 
     @Override
@@ -574,6 +652,11 @@ public final class Transformer extends TreeTranslator {
                 );
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = (receiver == null) ? argsIds : argsIds.tail;
+        if (receiver != null && invocation.meth instanceof JCIdent indent){
+            // FIXME
+        } else if (receiver != null && invocation.meth instanceof JCFieldAccess fieldAccess){
+            // FIXME
+        }
         return new CallInstrumentationPieces(argsDecls, loggingStat, invocation);
     }
 
@@ -696,7 +779,7 @@ public final class Transformer extends TreeTranslator {
     }
 
     private @Nullable JCExpression getReceiver(JCExpression method) {
-        if (method instanceof JCTree.JCIdent ident) {
+        if (method instanceof JCTree.JCIdent ident) {   // FIXME what happens if ident is "this"?
             return ident.sym.isStatic() ?
                     null :
                     mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))

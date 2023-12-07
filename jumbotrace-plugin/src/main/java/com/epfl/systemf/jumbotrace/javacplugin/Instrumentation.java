@@ -28,7 +28,7 @@ public final class Instrumentation {
 
     public Instrumentation(TreeMakingContainer m) {
         this.m = m;
-        var jumbotracePackage = makeCompositePackageSymbol("com", "epfl", "systemf", "jumbotrace", "injected", "processed");
+        var jumbotracePackage = m.makeCompositePackageSymbol(st().rootPackage, "com", "epfl", "systemf", "jumbotrace", "injected", "processed");
         st().defineClass(n().fromString(JUMBOTRACE_CLASS_NAME), jumbotracePackage);
         jumbotraceClassSymbol = new Symbol.ClassSymbol(0, n().fromString(JUMBOTRACE_CLASS_NAME), Type.noType, jumbotracePackage);
         jumbotraceClassSymbol.type = new Type.ClassType(Type.noType, List.nil(), jumbotraceClassSymbol);
@@ -477,14 +477,6 @@ public final class Instrumentation {
                         jumbotraceClassSymbol
                 )
         );
-    }
-
-    private Symbol.PackageSymbol makeCompositePackageSymbol(String... parts) {
-        var curr = st().rootPackage;
-        for (var part : parts) {
-            curr = new Symbol.PackageSymbol(n().fromString(part), curr);
-        }
-        return curr;
     }
 
     private record LogMethodSig(String name, Type.MethodType type) {
