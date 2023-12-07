@@ -12,7 +12,6 @@ import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.LinkedList;
 
 public final class Transformer extends TreeTranslator {
@@ -653,9 +652,9 @@ public final class Transformer extends TreeTranslator {
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = (receiver == null) ? argsIds : argsIds.tail;
         if (receiver != null && invocation.meth instanceof JCIdent indent){
-            // FIXME
+            invocation.meth = mk().Select(argsIds.head, indent.sym).setType(indent.type);
         } else if (receiver != null && invocation.meth instanceof JCFieldAccess fieldAccess){
-            // FIXME
+            fieldAccess.selected = argsIds.head;
         }
         return new CallInstrumentationPieces(argsDecls, loggingStat, invocation);
     }
@@ -779,7 +778,7 @@ public final class Transformer extends TreeTranslator {
     }
 
     private @Nullable JCExpression getReceiver(JCExpression method) {
-        if (method instanceof JCTree.JCIdent ident) {   // FIXME what happens if ident is "this"?
+        if (method instanceof JCTree.JCIdent ident) {
             return ident.sym.isStatic() ?
                     null :
                     mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))
