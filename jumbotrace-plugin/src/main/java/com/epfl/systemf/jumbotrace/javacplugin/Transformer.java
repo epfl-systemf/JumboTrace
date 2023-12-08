@@ -321,15 +321,14 @@ public final class Transformer extends TreeTranslator {
     public void visitForeachLoop(JCEnhancedForLoop foreachLoop) {
         final var loopType = "for-each";
         super.visitForeachLoop(foreachLoop);
-        // FIXME does not work if foreachLoop.expr is an array ; try using Arrays.asList
         var lineMap = cu.getLineMap();
         var filename = currentFilename();
         var loopStartLine = lineMap.getLineNumber(foreachLoop.pos);
         var loopStartCol = lineMap.getColumnNumber(foreachLoop.pos);
         var loopEndLine = safeGetEndLine(foreachLoop);
         var loopEndCol = safeGetEndCol(foreachLoop);
-        var iterableClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC, n().fromString("java.lang.Iterable"), st().rootPackage);
-        var iteratorClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC, n().fromString("java.util.Iterator"), st().rootPackage);
+        var iterableClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC | Flags.INTERFACE, n().fromString("java.lang.Iterable"), st().rootPackage);
+        var iteratorClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC | Flags.INTERFACE, n().fromString("java.util.Iterator"), st().rootPackage);
         var iteratorType = new Type.ClassType(Type.noType, List.nil(), iteratorClassSymbol);
         iteratorClassSymbol.type = iteratorType;
         var iteratorSymbol = new Symbol.VarSymbol(0, m.nextId("iterator"), iteratorType, currentMethod());
@@ -354,9 +353,26 @@ public final class Transformer extends TreeTranslator {
                 ),
                 List.nil()
         ).setType(st().objectType);
+        var arraysClassSymbol = new Symbol.ClassSymbol(0, n().fromString("java.util.Arrays"), st().rootPackage);
+        var iteratorCallReceiver = (foreachLoop.expr.type instanceof Type.ArrayType) ?
+                mk().Apply(
+                        List.nil(),
+                        mk().Select(
+                                mk().Ident(arraysClassSymbol).setType(st().arraysType),
+                                new Symbol.MethodSymbol(Flags.PUBLIC | Flags.STATIC, n().fromString("asList"),
+                                        new Type.MethodType(
+                                                List.of(new Type.ArrayType(st().objectType, st().arrayClass)),
+                                                st().listType,
+                                                List.nil(),
+                                                st().listType.tsym
+                                        ), arraysClassSymbol)
+                        ),
+                        List.of(foreachLoop.expr)
+                ).setType(st().listType) :
+                foreachLoop.expr;
         var callToIterator = mk().Apply(
                 List.nil(),
-                mk().Select(foreachLoop.expr,
+                mk().Select(iteratorCallReceiver,
                         new Symbol.MethodSymbol(Flags.PUBLIC, n().iterator, new Type.MethodType(
                                 List.nil(), st().iteratorType, List.nil(), iterableClassSymbol
                         ), iterableClassSymbol)),
@@ -652,9 +668,9 @@ public final class Transformer extends TreeTranslator {
                 );
         var loggingStat = mk().Exec(logCall).setType(st().voidType);
         invocation.args = (receiver == null) ? argsIds : argsIds.tail;
-        if (receiver != null && invocation.meth instanceof JCIdent indent){
+        if (receiver != null && invocation.meth instanceof JCIdent indent) {
             invocation.meth = mk().Select(argsIds.head, indent.sym).setType(indent.type);
-        } else if (receiver != null && invocation.meth instanceof JCFieldAccess fieldAccess){
+        } else if (receiver != null && invocation.meth instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = argsIds.head;
         }
         return new CallInstrumentationPieces(argsDecls, loggingStat, invocation);
