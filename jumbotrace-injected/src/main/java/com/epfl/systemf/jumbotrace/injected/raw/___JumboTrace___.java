@@ -159,6 +159,15 @@ public class ___JumboTrace___ {
         return evalRes;
     }
 
+    public static boolean ifCond(boolean evalRes, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("IF CONDITION evaluates to ", evalRes, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return evalRes;
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);

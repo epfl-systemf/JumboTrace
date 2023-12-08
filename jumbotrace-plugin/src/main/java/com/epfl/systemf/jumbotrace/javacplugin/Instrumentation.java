@@ -379,7 +379,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Loops">
+    //<editor-fold desc="Loops and if">
 
     private LogMethodSig loopEnterLogger(){
         return new LogMethodSig(
@@ -454,6 +454,33 @@ public final class Instrumentation {
                 List.of(
                         loopCond,
                         mk().Literal(loopType),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().booleanType);
+    }
+
+    private LogMethodSig ifCondLogger(){
+        return new LogMethodSig(
+                "ifCond",
+                new Type.MethodType(
+                        List.of(st().booleanType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().booleanType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logIfCond(JCExpression loopCond, String filename, int startLine, int startCol, int endLine, int endCol){
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(ifCondLogger()),
+                List.of(
+                        loopCond,
                         mk().Literal(filename),
                         mk().Literal(startLine),
                         mk().Literal(startCol),

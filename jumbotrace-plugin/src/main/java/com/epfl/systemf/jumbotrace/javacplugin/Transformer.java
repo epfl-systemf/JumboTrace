@@ -112,7 +112,6 @@ public final class Transformer extends TreeTranslator {
     public void visitMethodDef(JCMethodDecl method) {
         methodsStack.addFirst(method.sym);
         super.visitMethodDef(method);
-        var lineMap = cu.getLineMap();
         var body = method.getBody();
         if (body != null) {
             body.stats = body.stats.prepend(mk().Exec(
@@ -123,8 +122,8 @@ public final class Transformer extends TreeTranslator {
                             // (apparently when there is a second class on the same file)
                             method.type.asMethodType(),
                             currentFilename(),
-                            lineMap.getLineNumber(method.pos),
-                            lineMap.getColumnNumber(method.pos)
+                            getStartLine(method),
+                            getStartCol(method)
                     )
             ));
             if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID) {
@@ -198,19 +197,18 @@ public final class Transformer extends TreeTranslator {
     public void visitDoLoop(JCDoWhileLoop doWhileLoop) {
         final var loopType = "do-while";
         super.visitDoLoop(doWhileLoop);
-        var lineMap = cu.getLineMap();
         var filename = currentFilename();
         doWhileLoop.cond = instrumentation.logLoopCondition(
                 doWhileLoop.cond,
                 loopType,
                 filename,
-                lineMap.getLineNumber(doWhileLoop.cond.pos),
-                lineMap.getColumnNumber(doWhileLoop.cond.pos),
+                getStartLine(doWhileLoop.cond),
+                getStartCol(doWhileLoop.cond),
                 safeGetEndLine(doWhileLoop.cond),
                 safeGetEndCol(doWhileLoop.cond)
         );
-        var loopStartLine = lineMap.getLineNumber(doWhileLoop.pos);
-        var loopStartCol = lineMap.getColumnNumber(doWhileLoop.pos);
+        var loopStartLine = getStartLine(doWhileLoop);
+        var loopStartCol = getStartCol(doWhileLoop);
         var loopEndLine = safeGetEndLine(doWhileLoop);
         var loopEndCol = safeGetEndCol(doWhileLoop);
         this.result = mk().Block(0, List.of(
@@ -238,19 +236,18 @@ public final class Transformer extends TreeTranslator {
     public void visitWhileLoop(JCWhileLoop whileLoop) {
         final var loopType = "while";
         super.visitWhileLoop(whileLoop);
-        var lineMap = cu.getLineMap();
         var filename = currentFilename();
         whileLoop.cond = instrumentation.logLoopCondition(
                 whileLoop.cond,
                 loopType,
                 filename,
-                lineMap.getLineNumber(whileLoop.cond.pos),
-                lineMap.getColumnNumber(whileLoop.cond.pos),
+                getStartLine(whileLoop.cond),
+                getStartCol(whileLoop.cond),
                 safeGetEndLine(whileLoop.cond),
                 safeGetEndCol(whileLoop.cond)
         );
-        var loopStartLine = lineMap.getLineNumber(whileLoop.pos);
-        var loopStartCol = lineMap.getColumnNumber(whileLoop.pos);
+        var loopStartLine = getStartLine(whileLoop);
+        var loopStartCol = getStartCol(whileLoop);
         var loopEndLine = safeGetEndLine(whileLoop);
         var loopEndCol = safeGetEndCol(whileLoop);
         this.result = mk().Block(0, List.of(
@@ -278,19 +275,18 @@ public final class Transformer extends TreeTranslator {
     public void visitForLoop(JCForLoop forLoop) {
         final var loopType = "for";
         super.visitForLoop(forLoop);
-        var lineMap = cu.getLineMap();
         var filename = currentFilename();
         var condEvalLogCall = instrumentation.logLoopCondition(
                 forLoop.cond,
                 loopType,
                 filename,
-                lineMap.getLineNumber(forLoop.cond.pos),
-                lineMap.getColumnNumber(forLoop.cond.pos),
+                getStartLine(forLoop.cond),
+                getStartCol(forLoop.cond),
                 safeGetEndLine(forLoop.cond),
                 safeGetEndCol(forLoop.cond)
         );
-        var forLoopStartLine = lineMap.getLineNumber(forLoop.pos);
-        var forLoopStartCol = lineMap.getColumnNumber(forLoop.pos);
+        var forLoopStartLine = getStartLine(forLoop);
+        var forLoopStartCol = getStartCol(forLoop);
         var forLoopEndLine = safeGetEndLine(forLoop);
         var forLoopEndCol = safeGetEndCol(forLoop);
         var enterLogCall = instrumentation.logLoopEnter(
@@ -321,10 +317,9 @@ public final class Transformer extends TreeTranslator {
     public void visitForeachLoop(JCEnhancedForLoop foreachLoop) {
         final var loopType = "for-each";
         super.visitForeachLoop(foreachLoop);
-        var lineMap = cu.getLineMap();
         var filename = currentFilename();
-        var loopStartLine = lineMap.getLineNumber(foreachLoop.pos);
-        var loopStartCol = lineMap.getColumnNumber(foreachLoop.pos);
+        var loopStartLine = getStartLine(foreachLoop);
+        var loopStartCol = getStartCol(foreachLoop);
         var loopEndLine = safeGetEndLine(foreachLoop);
         var loopEndCol = safeGetEndCol(foreachLoop);
         var iterableClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC | Flags.INTERFACE, n().fromString("java.lang.Iterable"), st().rootPackage);
@@ -447,8 +442,16 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitIf(JCIf tree) {
-        super.visitIf(tree);  // TODO
+    public void visitIf(JCIf ifStat) {
+        super.visitIf(ifStat);
+        ifStat.cond = instrumentation.logIfCond(
+                ifStat.cond,
+                currentFilename(),
+                getStartLine(ifStat.cond),
+                getStartCol(ifStat.cond),
+                safeGetEndLine(ifStat.cond),
+                safeGetEndCol(ifStat.cond)
+        );
     }
 
     @Override
@@ -456,15 +459,14 @@ public final class Transformer extends TreeTranslator {
         super.visitBreak(breakStat);
         var target = resolveJumpTarget(breakStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
-        var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
                         mk().Exec(instrumentation.logBreak(
                                 targetDescr,
-                                lineMap.getLineNumber(target.pos),
-                                lineMap.getColumnNumber(target.pos),
+                                getStartLine(target),
+                                getStartCol(target),
                                 currentFilename(),
-                                lineMap.getLineNumber(breakStat.pos),
-                                lineMap.getColumnNumber(breakStat.pos),
+                                getStartLine(breakStat),
+                                getStartCol(breakStat),
                                 safeGetEndLine(breakStat),
                                 safeGetEndCol(breakStat)
                         )),
@@ -479,7 +481,6 @@ public final class Transformer extends TreeTranslator {
         super.visitYield(yieldStat);
         var target = yieldStat.target;
         var targetDescr = target.getTag().toString().toLowerCase();
-        var lineMap = cu.getLineMap();
         var varSymbol = new Symbol.VarSymbol(0, m.nextId("yielded"), target.type, currentMethod());
         var valueVarDecl = mk().VarDef(varSymbol, yieldStat.value);
         yieldStat.value = mk().Ident(varSymbol).setType(target.type);
@@ -488,11 +489,11 @@ public final class Transformer extends TreeTranslator {
                 mk().Exec(instrumentation.logYield(
                         mk().Ident(varSymbol).setType(target.type),
                         targetDescr,
-                        lineMap.getLineNumber(target.pos),
-                        lineMap.getColumnNumber(target.pos),
+                        getStartLine(target),
+                        getStartCol(target),
                         currentFilename(),
-                        lineMap.getLineNumber(yieldStat.pos),
-                        lineMap.getColumnNumber(yieldStat.pos),
+                        getStartLine(yieldStat),
+                        getStartCol(yieldStat),
                         safeGetEndLine(yieldStat),
                         safeGetEndCol(yieldStat)
                 )),
@@ -505,15 +506,14 @@ public final class Transformer extends TreeTranslator {
         super.visitContinue(continueStat);
         var target = resolveJumpTarget(continueStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
-        var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logContinue(
                         targetDescr,
-                        lineMap.getLineNumber(target.pos),
-                        lineMap.getColumnNumber(target.pos),
+                        getStartLine(target),
+                        getStartCol(target),
                         currentFilename(),
-                        lineMap.getLineNumber(continueStat.pos),
-                        lineMap.getColumnNumber(continueStat.pos),
+                        getStartLine(continueStat),
+                        getStartCol(continueStat),
                         safeGetEndLine(continueStat),
                         safeGetEndCol(continueStat)
                 )),
@@ -524,13 +524,12 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitReturn(JCReturn returnStat) {
         super.visitReturn(returnStat);
-        var lineMap = cu.getLineMap();
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logReturnStat(
                         currentMethod().name.toString(),
                         currentFilename(),
-                        lineMap.getLineNumber(returnStat.pos),
-                        lineMap.getColumnNumber(returnStat.pos),
+                        getStartLine(returnStat),
+                        getStartCol(returnStat),
                         safeGetEndLine(returnStat),
                         safeGetEndCol(returnStat)
                 )),
@@ -641,7 +640,6 @@ public final class Transformer extends TreeTranslator {
         var precomputation = makeArgsPrecomputations(allArgs, allArgTypes, invocation.varargsElement);
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
-        var lineMap = cu.getLineMap();
         var logCall = (receiver == null) ?
                 instrumentation.logStaticMethodCall(
                         classNameOf(invocation.meth),
@@ -649,8 +647,8 @@ public final class Transformer extends TreeTranslator {
                         invocation.meth.type.asMethodType(),
                         argsIds,
                         currentFilename(),
-                        lineMap.getLineNumber(invocation.meth.pos),
-                        lineMap.getColumnNumber(invocation.meth.pos),
+                        getStartLine(invocation.meth),
+                        getStartCol(invocation.meth),
                         safeGetEndLine(invocation),
                         safeGetEndCol(invocation)
                 ) :
@@ -661,8 +659,8 @@ public final class Transformer extends TreeTranslator {
                         argsIds.head,
                         argsIds.tail,
                         currentFilename(),
-                        lineMap.getLineNumber(invocation.meth.pos),
-                        lineMap.getColumnNumber(invocation.meth.pos),
+                        getStartLine(invocation.meth),
+                        getStartCol(invocation.meth),
                         safeGetEndLine(invocation),
                         safeGetEndCol(invocation)
                 );
@@ -680,10 +678,9 @@ public final class Transformer extends TreeTranslator {
         var precomputation = makeArgsPrecomputations(newClass.args, newClass.constructorType.getParameterTypes(), newClass.varargsElement);
         var argsDecls = precomputation._1;
         var argsIds = precomputation._2;
-        var lineMap = cu.getLineMap();
         // in practice not a static call, but passing it the receiver is useless and would probably lead to issues (not initialized)
-        var startLine = lineMap.getLineNumber(newClass.pos);
-        var startCol = lineMap.getColumnNumber(newClass.pos);
+        var startLine = getStartLine(newClass);
+        var startCol = getStartCol(newClass);
         var endLine = safeGetEndLine(newClass);
         var endCol = safeGetEndCol(newClass);
         var logCall = instrumentation.logStaticMethodCall(
@@ -710,7 +707,6 @@ public final class Transformer extends TreeTranslator {
     }
 
     private JCExpression makeLet(JCExpression invocation, String className, String methodName, CallInstrumentationPieces instrPieces) {
-        var lineMap = cu.getLineMap();
         return mk().LetExpr(
                 instrPieces.argsLocalsDefs,
                 mk().LetExpr(
@@ -720,8 +716,8 @@ public final class Transformer extends TreeTranslator {
                                 methodName,
                                 instrPieces.initialMethodInvocation,
                                 currentFilename(),
-                                lineMap.getLineNumber(invocation.pos),
-                                lineMap.getColumnNumber(invocation.pos),
+                                getStartLine(invocation),
+                                getStartCol(invocation),
                                 safeGetEndLine(invocation),
                                 safeGetEndCol(invocation)
                         )
@@ -730,7 +726,6 @@ public final class Transformer extends TreeTranslator {
     }
 
     private JCBlock makeBlock(JCExpression call, String className, String methodName, CallInstrumentationPieces instrPieces) {
-        var lineMap = cu.getLineMap();
         return mk().Block(0,
                 instrPieces.argsLocalsDefs
                         .append(instrPieces.logMethodCall)
@@ -739,8 +734,8 @@ public final class Transformer extends TreeTranslator {
                                 className,
                                 methodName,
                                 currentFilename(),
-                                lineMap.getLineNumber(call.pos),
-                                lineMap.getColumnNumber(call.pos),
+                                getStartLine(call),
+                                getStartCol(call),
                                 safeGetEndLine(call),
                                 safeGetEndCol(call)
                         )))
@@ -813,6 +808,16 @@ public final class Transformer extends TreeTranslator {
         } else {
             return mk().Block(0, List.of(stat));
         }
+    }
+
+    private int getStartLine(JCTree tree) {
+        var lineMap = cu.getLineMap();
+        return lineMap.getLineNumber(tree.pos);
+    }
+
+    private int getStartCol(JCTree tree) {
+        var lineMap = cu.getLineMap();
+        return lineMap.getColumnNumber(tree.pos);
     }
 
     private int safeGetEndLine(JCTree tree) {
