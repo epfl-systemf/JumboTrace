@@ -97,7 +97,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitVarDef(JCVariableDecl varDecl) {
-        if (!Flags.isEnum(varDecl.sym)) {
+        if (!Flags.isEnum(varDecl.sym.owner)) {
             super.visitVarDef(varDecl);
         } else {
             /* Do not log the call to the constructor inside an enum case
