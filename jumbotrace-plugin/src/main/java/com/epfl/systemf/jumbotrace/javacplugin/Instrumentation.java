@@ -10,8 +10,6 @@ import com.sun.tools.javac.util.Names;
 
 import static com.sun.tools.javac.tree.JCTree.JCExpression;
 
-// TODO implicit return event at the end of void methods
-
 public final class Instrumentation {
 
     //<editor-fold desc="Constants">
@@ -168,7 +166,7 @@ public final class Instrumentation {
 
     public JCExpression logMethodReturnValue(String className, String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
-        var type = returnValue.type.isPrimitive() ? returnValue.type : st().objectType;
+        var type = topmostTypeFor(returnValue.type);
         var apply = mk().Apply(
                 List.nil(),
                 makeSelectFromMethodSig(methodRetLogger(type)),
@@ -379,7 +377,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Loops and if">
+    //<editor-fold desc="Loops">
 
     private LogMethodSig loopEnterLogger(){
         return new LogMethodSig(
@@ -463,6 +461,10 @@ public final class Instrumentation {
         ).setType(st().booleanType);
     }
 
+    //</editor-fold>
+
+    //<editor-fold desc="if and switch">
+
     private LogMethodSig ifCondLogger(){
         return new LogMethodSig(
                 "ifCond",
@@ -490,9 +492,43 @@ public final class Instrumentation {
         ).setType(st().booleanType);
     }
 
+    private LogMethodSig switchLogger(Type specializedType){
+        return new LogMethodSig(
+                "switchConstruct",
+                new Type.MethodType(
+                        List.of(specializedType, st().booleanType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        specializedType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logSwitchConstruct(JCExpression selector, boolean isSwitchExpr,
+                                           String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = topmostTypeFor(selector.type);
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(switchLogger(type)),
+                List.of(
+                        selector,
+                        mk().Literal(isSwitchExpr),
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(type);
+    }
+
     //</editor-fold>
 
     //<editor-fold desc="Utils">
+
+    private Type topmostTypeFor(Type rawType){
+        return rawType.isPrimitive() ? rawType : st().objectType;
+    }
 
     private JCExpression makeSelectFromMethodSig(LogMethodSig sig) {
         return mk().Select(

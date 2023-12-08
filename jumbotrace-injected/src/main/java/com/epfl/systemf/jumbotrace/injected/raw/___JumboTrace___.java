@@ -134,6 +134,16 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize Object switchConstruct(@Specialize Object selector, boolean isExpr, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            var switchTypeDescr = isExpr ? " (switch expression)" : " (switch statement)";
+            log("SWITCH selector=", selector, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
+            enableLogging();
+        }
+        return selector;
+    }
+
     public static void loopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();

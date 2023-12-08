@@ -412,8 +412,17 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitSwitch(JCSwitch tree) {
-        super.visitSwitch(tree);  // TODO
+    public void visitSwitch(JCSwitch switchStat) {
+        super.visitSwitch(switchStat);
+        switchStat.selector = instrumentation.logSwitchConstruct(
+                switchStat.selector,
+                false,
+                currentFilename(),
+                getStartLine(switchStat),
+                getStartCol(switchStat),
+                safeGetEndLine(switchStat),
+                safeGetEndCol(switchStat)
+        );
     }
 
     @Override
@@ -423,7 +432,16 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitSwitchExpression(JCSwitchExpression switchExpr) {
-        super.visitSwitchExpression(switchExpr);  // TODO
+        super.visitSwitchExpression(switchExpr);
+        switchExpr.selector = instrumentation.logSwitchConstruct(
+                switchExpr.selector,
+                true,
+                currentFilename(),
+                getStartLine(switchExpr),
+                getStartCol(switchExpr),
+                safeGetEndLine(switchExpr),
+                safeGetEndCol(switchExpr)
+        );
     }
 
     @Override
