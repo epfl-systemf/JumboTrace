@@ -166,10 +166,10 @@ public final class Instrumentation {
 
     public JCExpression logMethodReturnValue(String className, String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
-        var type = topmostTypeFor(returnValue.type);
+        var higherType = topmostTypeFor(returnValue.type);
         var apply = mk().Apply(
                 List.nil(),
-                makeSelectFromMethodSig(methodRetLogger(type)),
+                makeSelectFromMethodSig(methodRetLogger(higherType)),
                 List.of(
                         mk().Literal(className),
                         mk().Literal(methodName),
@@ -180,12 +180,8 @@ public final class Instrumentation {
                         mk().Literal(endLine),
                         mk().Literal(endCol)
                 )
-        ).setType(type);
-        if (returnValue.type.isPrimitive()) {
-            return apply;
-        } else {
-            return mk().TypeCast(returnValue.type, apply);
-        }
+        ).setType(higherType);
+        return castIfNeeded(returnValue.type, apply);
     }
 
     private LogMethodSig methodRetVoidLogger() {
@@ -445,7 +441,8 @@ public final class Instrumentation {
         );
     }
 
-    public JCExpression logLoopCondition(JCExpression loopCond, String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
+    public JCExpression logLoopCondition(JCExpression loopCond, String loopType,
+                                         String filename, int startLine, int startCol, int endLine, int endCol){
         return mk().Apply(
                 List.nil(),
                 makeSelectFromMethodSig(loopCondLogger()),
@@ -459,6 +456,34 @@ public final class Instrumentation {
                         mk().Literal(endCol)
                 )
         ).setType(st().booleanType);
+    }
+
+    private LogMethodSig foreachNextIterLogger(Type specializedType){
+        return new LogMethodSig(
+                "foreachLoopNextIter",
+                new Type.MethodType(
+                        List.of(specializedType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logForeachNextIter(JCExpression elem, String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = topmostTypeFor(elem.type);
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(foreachNextIterLogger(type)),
+                List.of(
+                        elem,
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
     }
 
     //</editor-fold>
@@ -506,10 +531,10 @@ public final class Instrumentation {
 
     public JCExpression logSwitchConstruct(JCExpression selector, boolean isSwitchExpr,
                                            String filename, int startLine, int startCol, int endLine, int endCol){
-        var type = topmostTypeFor(selector.type);
-        return mk().Apply(
+        var higherType = topmostTypeFor(selector.type);
+        var apply = mk().Apply(
                 List.nil(),
-                makeSelectFromMethodSig(switchLogger(type)),
+                makeSelectFromMethodSig(switchLogger(higherType)),
                 List.of(
                         selector,
                         mk().Literal(isSwitchExpr),
@@ -519,7 +544,8 @@ public final class Instrumentation {
                         mk().Literal(endLine),
                         mk().Literal(endCol)
                 )
-        ).setType(type);
+        ).setType(higherType);
+        return castIfNeeded(selector.type, apply);
     }
 
     //</editor-fold>
@@ -540,6 +566,10 @@ public final class Instrumentation {
                         jumbotraceClassSymbol
                 )
         );
+    }
+
+    private JCExpression castIfNeeded(Type type, JCExpression expr){
+        return (type == expr.type) ? expr : mk().TypeCast(type, expr);
     }
 
     private record LogMethodSig(String name, Type.MethodType type) {

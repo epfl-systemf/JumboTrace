@@ -1,11 +1,8 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
 import com.sun.tools.javac.code.*;
-import com.sun.tools.javac.tree.EndPosTable;
-import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.tree.JCTree.*;
-import com.sun.tools.javac.tree.TreeMaker;
-import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Names;
 import com.sun.tools.javac.util.Position;
@@ -276,7 +273,11 @@ public final class Transformer extends TreeTranslator {
         final var loopType = "for";
         super.visitForLoop(forLoop);
         var filename = currentFilename();
-        var condEvalLogCall = instrumentation.logLoopCondition(
+        var loopStartLine = getStartLine(forLoop);
+        var loopStartCol = getStartCol(forLoop);
+        var loopEndLine = safeGetEndLine(forLoop);
+        var loopEndCol = safeGetEndCol(forLoop);
+        forLoop.cond = instrumentation.logLoopCondition(
                 forLoop.cond,
                 loopType,
                 filename,
@@ -285,32 +286,25 @@ public final class Transformer extends TreeTranslator {
                 safeGetEndLine(forLoop.cond),
                 safeGetEndCol(forLoop.cond)
         );
-        var forLoopStartLine = getStartLine(forLoop);
-        var forLoopStartCol = getStartCol(forLoop);
-        var forLoopEndLine = safeGetEndLine(forLoop);
-        var forLoopEndCol = safeGetEndCol(forLoop);
-        var enterLogCall = instrumentation.logLoopEnter(
-                loopType,
-                filename,
-                forLoopStartLine,
-                forLoopStartCol,
-                forLoopEndLine,
-                forLoopEndCol
-        );
-        var exitLogCall = instrumentation.logLoopExit(
-                loopType,
-                filename,
-                forLoopStartLine,
-                forLoopStartCol,
-                forLoopEndLine,
-                forLoopEndCol
-        );
-        var bodyAsBlock = makeBlock(forLoop.body);
-        var newLoop = mk().WhileLoop(condEvalLogCall, mk().Block(0,
-                bodyAsBlock.stats.appendList(forLoop.step.map(x -> x))
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logLoopEnter(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                )),
+                forLoop,
+                mk().Exec(instrumentation.logLoopExit(
+                        loopType,
+                        filename,
+                        loopStartLine,
+                        loopStartCol,
+                        loopEndLine,
+                        loopEndCol
+                ))
         ));
-        this.result = mk().Block(0,
-                forLoop.init.prepend(mk().Exec(enterLogCall)).append(newLoop).append(mk().Exec(exitLogCall)));
     }
 
     @Override
@@ -322,72 +316,16 @@ public final class Transformer extends TreeTranslator {
         var loopStartCol = getStartCol(foreachLoop);
         var loopEndLine = safeGetEndLine(foreachLoop);
         var loopEndCol = safeGetEndCol(foreachLoop);
-        var iterableClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC | Flags.INTERFACE, n().fromString("java.lang.Iterable"), st().rootPackage);
-        var iteratorClassSymbol = new Symbol.ClassSymbol(Flags.PUBLIC | Flags.INTERFACE, n().fromString("java.util.Iterator"), st().rootPackage);
-        var iteratorType = new Type.ClassType(Type.noType, List.nil(), iteratorClassSymbol);
-        iteratorClassSymbol.type = iteratorType;
-        var iteratorSymbol = new Symbol.VarSymbol(0, m.nextId("iterator"), iteratorType, currentMethod());
-        var iteratorIdent = mk().Ident(iteratorSymbol).setType(iteratorType);
-        var callToHasNext = mk().Apply(
-                List.nil(),
-                mk().Select(
-                        iteratorIdent,
-                        new Symbol.MethodSymbol(0, n().fromString("hasNext"), new Type.MethodType(
-                                List.nil(), st().booleanType, List.nil(), iteratorClassSymbol
-                        ), iteratorClassSymbol)
-                ),
-                List.nil()
-        ).setType(st().booleanType);
-        var callToNext = mk().Apply(
-                List.nil(),
-                mk().Select(
-                        iteratorIdent,
-                        new Symbol.MethodSymbol(0, n().fromString("next"), new Type.MethodType(
-                                List.nil(), st().objectType, List.nil(), iteratorClassSymbol
-                        ), iteratorClassSymbol)
-                ),
-                List.nil()
-        ).setType(st().objectType);
-        var arraysClassSymbol = new Symbol.ClassSymbol(0, n().fromString("java.util.Arrays"), st().rootPackage);
-        var iteratorCallReceiver = (foreachLoop.expr.type instanceof Type.ArrayType) ?
-                mk().Apply(
-                        List.nil(),
-                        mk().Select(
-                                mk().Ident(arraysClassSymbol).setType(st().arraysType),
-                                new Symbol.MethodSymbol(Flags.PUBLIC | Flags.STATIC, n().fromString("asList"),
-                                        new Type.MethodType(
-                                                List.of(new Type.ArrayType(st().objectType, st().arrayClass)),
-                                                st().listType,
-                                                List.nil(),
-                                                st().listType.tsym
-                                        ), arraysClassSymbol)
-                        ),
-                        List.of(foreachLoop.expr)
-                ).setType(st().listType) :
-                foreachLoop.expr;
-        var callToIterator = mk().Apply(
-                List.nil(),
-                mk().Select(iteratorCallReceiver,
-                        new Symbol.MethodSymbol(Flags.PUBLIC, n().iterator, new Type.MethodType(
-                                List.nil(), st().iteratorType, List.nil(), iterableClassSymbol
-                        ), iterableClassSymbol)),
-                List.nil()
-        ).setType(iteratorType);
-        var iteratedVarDecl = foreachLoop.var;
-        iteratedVarDecl.init = mk().TypeCast(iteratedVarDecl.vartype, callToNext).setType(iteratedVarDecl.vartype.type);
-        var loopCondition = instrumentation.logLoopCondition(
-                callToHasNext,
-                loopType,
+        var loopBody = makeBlock(foreachLoop.body);
+        loopBody.stats = loopBody.stats.prepend(mk().Exec(instrumentation.logForeachNextIter(
+                mk().Ident(foreachLoop.var.sym).setType(foreachLoop.var.vartype.type),
                 filename,
                 loopStartLine,
                 loopStartCol,
-                safeGetEndLine(foreachLoop.expr),
-                safeGetEndCol(foreachLoop.expr)
-        );
-        var newLoopBody = makeBlock(foreachLoop.body);
-        newLoopBody.stats = newLoopBody.stats.prepend(iteratedVarDecl);
+                loopEndLine,
+                loopEndCol
+        )));
         this.result = mk().Block(0, List.of(
-                mk().VarDef(iteratorSymbol, callToIterator),
                 mk().Exec(instrumentation.logLoopEnter(
                         loopType,
                         filename,
@@ -396,10 +334,7 @@ public final class Transformer extends TreeTranslator {
                         loopEndLine,
                         loopEndCol
                 )),
-                mk().WhileLoop(
-                        loopCondition,
-                        newLoopBody
-                ),
+                foreachLoop,
                 mk().Exec(instrumentation.logLoopExit(
                         loopType,
                         filename,

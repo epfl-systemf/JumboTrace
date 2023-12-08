@@ -76,7 +76,9 @@ public final class Transformer extends ModifierVisitor<Void> {
 
     private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type) {
         var copy = methodDeclaration.clone();
-        copy.setType(type);
+        if (!methodDeclaration.getType().isVoidType()){
+            copy.setType(type);
+        }
         copy.getParameters().forEach(parameter -> {
             var mustReplicate = checkAndDeleteTargetAnnotation(parameter.getAnnotations());
             if (mustReplicate) {

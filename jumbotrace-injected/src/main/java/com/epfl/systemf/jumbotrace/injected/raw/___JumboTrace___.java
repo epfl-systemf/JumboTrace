@@ -169,6 +169,14 @@ public class ___JumboTrace___ {
         return evalRes;
     }
 
+    public static void foreachLoopNextIter(@Specialize Object newElem, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("NEXT ITER elem='", newElem, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     public static boolean ifCond(boolean evalRes, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
