@@ -2,11 +2,14 @@ package com.epfl.systemf.jumbotrace.injected.raw;
 
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
 
+import java.io.PrintStream;
 import java.nio.file.Paths;
 import java.util.Arrays;
 
 @SuppressWarnings("unused")
 public class ___JumboTrace___ {
+
+    public static PrintStream printStream = System.out;
 
     private static final int NO_POS = -1;
 
@@ -23,7 +26,7 @@ public class ___JumboTrace___ {
             sb.append(obj);
         }
         sb.append(COLOR_RESET_CODE);
-        System.out.println(sb);
+        printStream.println(sb);
     }
 
     private static boolean loggingEnabled = true;
@@ -138,7 +141,7 @@ public class ___JumboTrace___ {
         if (loggingEnabled){
             disableLogging();
             var switchTypeDescr = isExpr ? " (switch expression)" : " (switch statement)";
-            log("SWITCH selector=", selector, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
+            log("SWITCH selector='", selector, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
             enableLogging();
         }
         return selector;
@@ -163,7 +166,7 @@ public class ___JumboTrace___ {
     public static boolean loopCond(boolean evalRes, String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
-            log("LOOP CONDITION evaluates to ", evalRes, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            log("LOOP CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
         return evalRes;
@@ -180,7 +183,7 @@ public class ___JumboTrace___ {
     public static boolean ifCond(boolean evalRes, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
-            log("IF CONDITION evaluates to ", evalRes, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            log("IF CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
         return evalRes;
