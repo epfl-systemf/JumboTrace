@@ -192,6 +192,48 @@ public class ___JumboTrace___ {
         return evalRes;
     }
 
+    public static @Specialize Object localVarAssignment(String varName, @Specialize Object assignedValue,
+                                                        String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("VAR ASSIGN ", varName, " = ", assignedValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return assignedValue;
+    }
+
+    public static @Specialize Object staticFieldAssignment(String className, String fieldName, @Specialize Object assignedValue,
+                                                           String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("STATIC FIELD ASSIGN ", className, ".", fieldName, " = ", assignedValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return assignedValue;
+    }
+
+    public static @Specialize Object instanceFieldAssignment(String className, Object instance, String fieldName, @Specialize Object assignedValue,
+                                                             String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("INSTANCE FIELD ASSIGN ", instance, ".", className, "::", fieldName, " = ", assignedValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return assignedValue;
+    }
+
+    public static void arrayElemSet(Object array, int index, @Specialize Object assignedValue,
+                                                  String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("ARRAY SET ", array, "[", index, "] = ", assignedValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);

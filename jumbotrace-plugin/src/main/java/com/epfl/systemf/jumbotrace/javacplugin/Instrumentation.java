@@ -269,6 +269,140 @@ public final class Instrumentation {
 
     //</editor-fold>
 
+    //<editor-fold desc="Assignments">
+
+    private LogMethodSig localVarAssignmentLogger(Type specializedType){
+        return new LogMethodSig(
+                "localVarAssignment",
+                new Type.MethodType(
+                        List.of(st().stringType, specializedType, st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        specializedType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logLocalVarAssignment(String varName, JCExpression rhs,
+                                              String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(rhs.type);
+        var apply = mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(localVarAssignmentLogger(higherType)),
+                List.of(
+                        mk().Literal(varName),
+                        rhs,
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(higherType);
+        return castIfNeeded(rhs.type, apply);
+    }
+
+    private LogMethodSig staticFieldAssignmentLogger(Type specializedType){
+        return new LogMethodSig(
+                "staticFieldAssignment",
+                new Type.MethodType(
+                        List.of(st().stringType, st().stringType, specializedType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        specializedType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logStaticFieldAssignment(String className, String fieldName, JCExpression rhs,
+                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(rhs.type);
+        var apply = mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(staticFieldAssignmentLogger(higherType)),
+                List.of(
+                        mk().Literal(className),
+                        mk().Literal(fieldName),
+                        rhs,
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(higherType);
+        return castIfNeeded(rhs.type, apply);
+    }
+
+    private LogMethodSig instanceFieldAssignmentLogger(Type specializedType){
+        return new LogMethodSig(
+                "instanceFieldAssignment",
+                new Type.MethodType(
+                        List.of(st().stringType, st().objectType, st().stringType, specializedType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        specializedType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logInstanceFieldAssignment(String className, JCExpression selected, String fieldName, JCExpression rhs,
+                                                   String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(rhs.type);
+        var apply = mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(instanceFieldAssignmentLogger(higherType)),
+                List.of(
+                        mk().Literal(className),
+                        selected,
+                        mk().Literal(fieldName),
+                        rhs,
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(higherType);
+        return castIfNeeded(rhs.type, apply);
+    }
+
+    private LogMethodSig arrayElemSetLogger(Type specializedType){
+        return new LogMethodSig(
+                "arrayElemSet",
+                new Type.MethodType(
+                        List.of(st().objectType, st().intType, specializedType,
+                                st().stringType, st().intType, st().intType, st().intType, st().intType),
+                        st().voidType,
+                        List.nil(),
+                        jumbotraceClassSymbol
+                )
+        );
+    }
+
+    public JCExpression logArrayElemSet(JCExpression array, JCExpression index, JCExpression rhs,
+                                        String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(rhs.type);
+        return mk().Apply(
+                List.nil(),
+                makeSelectFromMethodSig(arrayElemSetLogger(higherType)),
+                List.of(
+                        array,
+                        index,
+                        rhs,
+                        mk().Literal(filename),
+                        mk().Literal(startLine),
+                        mk().Literal(startCol),
+                        mk().Literal(endLine),
+                        mk().Literal(endCol)
+                )
+        ).setType(st().voidType);
+    }
+
+    //<editor-fold>
+
     //<editor-fold desc="break, continue, yield">
 
     private LogMethodSig breakLogger() {

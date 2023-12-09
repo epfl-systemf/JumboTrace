@@ -8,8 +8,12 @@ import com.sun.tools.javac.util.Names;
 import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
 
+import javax.lang.model.element.ElementKind;
 import java.util.Deque;
 import java.util.LinkedList;
+
+// TODO set positions in generated nodes to avoid ping-pong with line 1 in generated code
+// (this may cause error messages to wrongly be reported on line 1)
 
 public final class Transformer extends TreeTranslator {
 
@@ -21,7 +25,7 @@ public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Fields and constructors">
 
-    private final JCTree.JCCompilationUnit cu;
+    private final JCCompilationUnit cu;
     private final TreeMakingContainer m;
     private final Instrumentation instrumentation;
     private final EndPosTable endPosTable;
@@ -29,7 +33,7 @@ public final class Transformer extends TreeTranslator {
     private final Deque<Symbol.ClassSymbol> classesStack;
     private final Deque<Symbol.MethodSymbol> methodsStack;
 
-    public Transformer(JCTree.JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
+    public Transformer(JCCompilationUnit cu, TreeMakingContainer m, Instrumentation instrumentation, EndPosTable endPosTable) {
         this.cu = cu;
         this.m = m;
         this.instrumentation = instrumentation;
@@ -86,7 +90,7 @@ public final class Transformer extends TreeTranslator {
     //<editor-fold desc="Visitor implementation">
 
     @Override
-    public void visitClassDef(JCTree.JCClassDecl tree) {
+    public void visitClassDef(JCClassDecl tree) {
         classesStack.addFirst(tree.sym);
         super.visitClassDef(tree);
         classesStack.removeFirst();
@@ -506,13 +510,112 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitAssign(JCAssign tree) {
-        super.visitAssign(tree);  // TODO
+    public void visitAssign(JCAssign assignment) {
+        // FIXME logging calls are dropped when the RHS is a constant
+        /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
+         * naive implementation would treat them as reads */
+        var effectiveLhs = withoutParentheses(assignment.lhs);
+        if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+            assignment.rhs = translate(assignment.rhs);
+            handleLocalVarAssignment(assignment, ident);
+            this.result = assignment;
+        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+            assignment.rhs = translate(assignment.rhs);
+            handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
+            this.result = assignment;
+        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+            assignment.rhs = translate(assignment.rhs);
+            handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name.toString());
+            this.result = assignment;
+        } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
+            assignment.rhs = translate(assignment.rhs);
+            handleStaticFieldAssignment(assignment, fieldAccess.selected.toString(), fieldAccess.name.toString());
+            this.result = assignment;
+        } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
+            fieldAccess.selected = translate(fieldAccess.selected);
+            assignment.rhs = translate(assignment.rhs);
+            handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name.toString());
+            this.result = assignment;
+        } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
+            arrayAccess.indexed = translate(arrayAccess.indexed);
+            arrayAccess.index = translate(arrayAccess.index);
+            assignment.rhs = translate(assignment.rhs);
+            handleArrayAssignment(assignment, arrayAccess);
+        } else {
+            super.visitAssign(assignment);
+        }
+    }
+
+    private void handleLocalVarAssignment(JCAssign assignment, JCIdent ident) {
+        assignment.rhs = instrumentation.logLocalVarAssignment(
+                ident.name.toString(),
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+    }
+
+    private void handleStaticFieldAssignment(JCAssign assignment, String className, String fieldName) {
+        assignment.rhs = instrumentation.logStaticFieldAssignment(
+                className,
+                fieldName,
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+    }
+
+    private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, String fieldName) {
+        assignment.rhs = instrumentation.logInstanceFieldAssignment(
+                className,
+                selected,
+                fieldName,
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+    }
+
+    private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
+        var arrayVarSymbol = new Symbol.VarSymbol(0, m.nextId("array"), arrayAccess.indexed.type, currentMethod());
+        var indexVarSymbol = new Symbol.VarSymbol(0, m.nextId("index"), arrayAccess.index.type, currentMethod());
+        var arrayIdent = mk().Ident(arrayVarSymbol).setType(arrayAccess.indexed.type);
+        var indexIdent = mk().Ident(indexVarSymbol).setType(arrayAccess.index.type);
+        var initialArrayExpr = arrayAccess.indexed;
+        var initialIndexExpr = arrayAccess.index;
+        arrayAccess.indexed = arrayIdent;
+        arrayAccess.index = indexIdent;
+        this.result = mk().LetExpr(
+                List.of(
+                        mk().VarDef(arrayVarSymbol, initialArrayExpr),
+                        mk().VarDef(indexVarSymbol, initialIndexExpr),
+                        mk().Exec(instrumentation.logArrayElemSet(
+                                arrayIdent,
+                                indexIdent,
+                                assignment.rhs,
+                                currentFilename(),
+                                getStartLine(assignment),
+                                getStartCol(assignment),
+                                safeGetEndLine(assignment),
+                                safeGetEndCol(assignment)
+                        ))
+                ),
+                assignment
+        ).setType(arrayAccess.type);
     }
 
     @Override
-    public void visitAssignop(JCAssignOp tree) {
-        super.visitAssignop(tree);  // TODO
+    public void visitAssignop(JCAssignOp assignOp) {
+        super.visitAssignop(assignOp);  // TODO
     }
 
     @Override
@@ -585,7 +688,7 @@ public final class Transformer extends TreeTranslator {
     }
 
     private CallInstrumentationPieces makeMethodCallInstrumentationPieces(JCMethodInvocation invocation) {
-        var receiver = getReceiver(invocation.meth);
+        var receiver = getInvocationReceiver(invocation.meth);
         var allArgs = (receiver == null) ? invocation.args : invocation.args.prepend(receiver);
         var allArgTypes = (receiver == null) ?
                 invocation.meth.type.asMethodType().argtypes :
@@ -723,9 +826,9 @@ public final class Transformer extends TreeTranslator {
     }
 
     private String classNameOf(JCExpression method) {
-        if (method instanceof JCTree.JCIdent) {
+        if (method instanceof JCIdent) {
             return currentClass().toString();
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
+        } else if (method instanceof JCFieldAccess fieldAccess) {
             return fieldAccess.selected.type.tsym.toString();
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
@@ -733,22 +836,19 @@ public final class Transformer extends TreeTranslator {
     }
 
     private String methodNameOf(JCExpression method) {
-        if (method instanceof JCTree.JCIdent ident) {
+        if (method instanceof JCIdent ident) {
             return ident.toString();
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
+        } else if (method instanceof JCFieldAccess fieldAccess) {
             return fieldAccess.name.toString();
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
         }
     }
 
-    private @Nullable JCExpression getReceiver(JCExpression method) {
-        if (method instanceof JCTree.JCIdent ident) {
-            return ident.sym.isStatic() ?
-                    null :
-                    mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))
-                            .setType(currentClass().type);
-        } else if (method instanceof JCTree.JCFieldAccess fieldAccess) {
+    private @Nullable JCExpression getInvocationReceiver(JCExpression method) {
+        if (method instanceof JCIdent ident) {
+            return ident.sym.isStatic() ? null : makeThisExpr();
+        } else if (method instanceof JCFieldAccess fieldAccess) {
             return fieldAccess.sym.isStatic() ? null : fieldAccess.selected;
         } else {
             throw new AssertionError("unexpected: " + method.getClass() + " (position: " + method.pos() + ")");
@@ -761,6 +861,17 @@ public final class Transformer extends TreeTranslator {
         } else {
             return mk().Block(0, List.of(stat));
         }
+    }
+
+    private JCExpression makeThisExpr() {
+        return mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))
+                .setType(currentClass().type);
+    }
+
+    private JCExpression withoutParentheses(JCExpression expr){
+        return (expr instanceof JCParens parentheses) ?
+                withoutParentheses(parentheses.expr) :
+                expr;
     }
 
     private int getStartLine(JCTree tree) {
