@@ -518,24 +518,19 @@ public final class Transformer extends TreeTranslator {
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignment.rhs = translate(assignment.rhs);
             handleLocalVarAssignment(assignment, ident);
-            this.result = assignment;
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
             handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
-            this.result = assignment;
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignment.rhs = translate(assignment.rhs);
             handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name.toString());
-            this.result = assignment;
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
             handleStaticFieldAssignment(assignment, fieldAccess.selected.toString(), fieldAccess.name.toString());
-            this.result = assignment;
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignment.rhs = translate(assignment.rhs);
             handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name.toString());
-            this.result = assignment;
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
@@ -556,6 +551,7 @@ public final class Transformer extends TreeTranslator {
                 safeGetEndLine(assignment),
                 safeGetEndCol(assignment)
         );
+        this.result = assignment;
     }
 
     private void handleStaticFieldAssignment(JCAssign assignment, String className, String fieldName) {
@@ -569,6 +565,7 @@ public final class Transformer extends TreeTranslator {
                 safeGetEndLine(assignment),
                 safeGetEndCol(assignment)
         );
+        this.result = assignment;
     }
 
     private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, String fieldName) {
@@ -583,6 +580,7 @@ public final class Transformer extends TreeTranslator {
                 safeGetEndLine(assignment),
                 safeGetEndCol(assignment)
         );
+        this.result = assignment;
     }
 
     private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
