@@ -5,12 +5,12 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.comments.LineComment;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.type.Type;
-import com.github.javaparser.ast.visitor.GenericVisitor;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
 import com.github.javaparser.ast.visitor.Visitable;
 import com.github.javaparser.ast.visitor.VoidVisitor;
@@ -35,6 +35,13 @@ public final class Transformer extends ModifierVisitor<Void> {
     private static final String PROCESSED_PACKAGE_NAME = "processed";
     private static final String IMPORT_TO_REMOVE = "com.epfl.systemf.jumbotrace.injected.annot.Specialize";
     private static final String IMPORT_NAME_TO_ADD = "Specialized";
+    private static final String OUTPUT_PRINT_STREAM_NAME = "PRINT_STREAM";
+
+    private final boolean testMode;
+
+    public Transformer(boolean testMode) {
+        this.testMode = testMode;
+    }
 
     @Override
     public Visitable visit(CompilationUnit n, Void arg) {
@@ -62,6 +69,15 @@ public final class Transformer extends ModifierVisitor<Void> {
         }
         classOrInterfaceDecl.setMembers(newMembersList);
         return classOrInterfaceDecl;
+    }
+
+    @Override
+    public Visitable visit(FieldDeclaration n, Void arg) {
+        super.visit(n, arg);
+        if (testMode && n.getVariables().size() == 1 && n.getVariables().get(0).getName().getIdentifier().equals(OUTPUT_PRINT_STREAM_NAME)){
+            n.getVariables().get(0).setInitializer(new NullLiteralExpr());
+        }
+        return n;
     }
 
     private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration) {

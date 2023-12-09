@@ -10,6 +10,12 @@ plugin_dir: Final[str] = "../jumbotrace-plugin"
 injected_dir: Final[str] = "../jumbotrace-injected"
 injectedgen_dir: Final[str] = "../jumbotrace-injectedgen"
 
+test_excluded_examples: Final[List[str]] = [
+    "Chemistry",    # currently no support for tests based on whole projects
+    "Counters",     # FIXME this one should work but does not
+    "Exceptions",   # should fail
+]
+
 
 def log(colored_str: str, uncolored_str: str = ""):
     print(colored("[automation] " + colored_str, "magenta") + uncolored_str)
@@ -30,43 +36,62 @@ def cmd(command: str, msg: str):
         exit(ret_code)
 
 
-def compile_example(example_name: str):
+def compile_example(example_name: str, test_mode: bool):
     compile_plugin()
-    compile_injected()
+    compile_injected(test_mode)
     copy_injection_to_example(example_name)
     cmd(
         f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace {examples_dir}/{example_name}/*.java",
-        f"compiling example {example_name}"
+        f"compiling example {example_name} [instrumented version]"
     )
 
 
-def run_example(example_name: str, main_class_name: str = "Main"):
-    compile_example(example_name)
+def compile_example_raw(example_name: str):
     cmd(
-        f"java -cp {examples_dir}/{example_name} {main_class_name}",
-        f"running example {example_name} (mainclass=\'{main_class_name}\')"
+        f"javac -g {examples_dir}/{example_name}/*.java",
+        f"compiling example {example_name} [non-instrumented version]"
     )
 
 
-def compile_example_project(example_name: str):
+def run_example(example_name: str, main_class_name: str = "Main", redirection_target: str | None = None, test_mode: bool = False):
+    compile_example(example_name, test_mode)
+    command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
+    msg = f"running example {example_name} [instrumented] (mainclass=\'{main_class_name}\')"
+    if redirection_target is not None:
+        command += " > " + redirection_target
+        msg += f" output redirected to {redirection_target}"
+    cmd(command, msg)
+
+
+def run_example_raw(example_name: str, main_class_name: str = "Main", redirection_target: str | None = None):
+    compile_example_raw(example_name)
+    command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
+    msg = f"running example {example_name} [not instrumented] (mainclass=\'{main_class_name}\')"
+    if redirection_target is not None:
+        command += " > " + redirection_target
+        msg += f" output redirected to {redirection_target}"
+    cmd(command, msg)
+
+
+def compile_example_project(example_name: str, test_mode: bool):
     all_java_files = find_all_java_files(f"{examples_dir}/{example_name}/src")
     compile_plugin()
-    compile_injected()
+    compile_injected(test_mode)
     copy_injection_to_example(f"{example_name}/target/classes")
     cmd(
         f"javac -g -cp {plugin_dir}/target/classes -Xplugin:JumboTrace -d {examples_dir}/{example_name}/target/classes {" ".join(all_java_files)}",
-        f"compiling example {example_name}"
+        f"compiling example {example_name} (using plugin)"
     )
 
 
-def run_example_project(example_name: str):
+def run_example_project(example_name: str, test_mode: bool = False):
     main_class, args = read_config_file(examples_dir + "/" + example_name)
     log(f"read main class from config file: {main_class}")
     log(f"read args from config file: {args}")
-    compile_example_project(example_name)
+    compile_example_project(example_name, test_mode)
     cmd(
         f"java -cp {examples_dir}/{example_name}/target/classes {main_class} \"{args}\"",
-        f"running example {example_name}"
+        f"running example {example_name} [not instrumented]"
     )
 
 
@@ -84,19 +109,22 @@ def compile_injectedgen():
     )
 
 
-def run_injectedgen():
+def run_injectedgen(test_mode: bool):
     compile_injectedgen()
+    args = "___JumboTrace___.java"
+    if test_mode:
+        args = "#test " + args
     cmd(
-        f"mvn -f {injectedgen_dir} exec:java",
+        f"mvn -f {injectedgen_dir} -Dexec.args=\"{args}\" exec:java",
         "running injectedgen"
     )
 
 
-def compile_injected():
-    run_injectedgen()
+def compile_injected(test_mode: bool):
+    run_injectedgen(test_mode)
     cmd(
         f"mvn -f {injected_dir}/pom.xml clean:clean compiler:compile",
-        "compiling injected code"
+        f"compiling injected code (test mode {"enabled" if test_mode else "disabled"})"
     )
 
 
@@ -106,6 +134,29 @@ def copy_injection_to_example(example_name: str):
     dst = f"{examples_dir}/{example_dir}/com"
     log(f"copying {src} -> {dst}")
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
+
+
+def run_tests():
+    log("Running tests")
+    examples = os.listdir(examples_dir)
+    examples = [ex for ex in examples if ex not in test_excluded_examples]
+    n_tests = len(examples)
+    log("Example programs found: " + ", ".join(examples))
+    for test_idx, example in enumerate(examples):
+        log(f"TEST {example} STARTS (test {test_idx+1} out of {n_tests})")
+        raw_out = f"{examples_dir}/{example}/test-raw.testout"
+        instr_out = f"{examples_dir}/{example}/test-instr.testout"
+        run_example_raw(example, redirection_target=raw_out)
+        run_example(example, redirection_target=instr_out, test_mode=True)
+        with open(raw_out, mode="r") as raw, open(instr_out, mode="r") as instr:
+            raw_lines = raw.readlines()
+            instr_lines = instr.readlines()
+            for line_idx in range(min(len(raw_lines), len(instr_lines))):
+                assert raw_lines[line_idx] == instr_lines[line_idx], f"outputs differ starting at line {line_idx}"
+            assert len(raw_lines) == len(instr_lines), "output lengths differ"
+        log(f"TEST {example} PASSED (test {test_idx+1} out of {n_tests})")
+    log("Finished running tests: " + ", ".join(examples))
+    log("Tests finished: no error detected")
 
 
 def read_config_file(directory: str):
@@ -135,13 +186,13 @@ def main(args: List[str]):
         exit(0)
     match args:
         case ["compile", "example", ex]:
-            compile_example(ex)
+            compile_example(ex, test_mode=False)
         case ["run", "example", ex]:
             run_example(ex)
         case ["run", "example", ex, maincl]:
             run_example(ex, maincl)
         case ["compile", "exproj", ex]:
-            compile_example_project(ex)
+            compile_example_project(ex, test_mode=False)
         case ["run", "exproj", ex]:
             run_example_project(ex)
         case ["compile", "plugin"]:
@@ -149,9 +200,11 @@ def main(args: List[str]):
         case ["compile", "injectedgen"]:
             compile_injectedgen()
         case ["run", "injectedgen"]:
-            run_injectedgen()
+            run_injectedgen(test_mode=False)
         case ["compile", "injected"]:
-            compile_injected()
+            compile_injected(test_mode=False)
+        case ["test"]:
+            run_tests()
         case _:
             print("unknown command: " + " ".join(args), file=sys.stderr)
 

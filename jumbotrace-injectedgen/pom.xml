@@ -37,9 +37,6 @@
                 </executions>
                 <configuration>
                     <mainClass>com.epfl.systemf.jumbotrace.injectedgen.Main</mainClass>
-                    <arguments>
-                        <argument>___JumboTrace___.java</argument>
-                    </arguments>
                 </configuration>
             </plugin>
         </plugins>

@@ -9,7 +9,8 @@ import java.util.Arrays;
 @SuppressWarnings("unused")
 public class ___JumboTrace___ {
 
-    public static PrintStream printStream = System.out;
+    // May be set to null by the code generation system
+    private static final PrintStream PRINT_STREAM = System.out;
 
     private static final int NO_POS = -1;
 
@@ -18,15 +19,17 @@ public class ___JumboTrace___ {
     private static final String COLOR_RESET_CODE = "\u001B[0m";
 
     private static void log(Object... objects) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(COLOR_YELLOW_CODE);
-        sb.append("[jbt] ");
-        sb.append(" ".repeat(indent));
-        for (var obj : objects) {
-            sb.append(obj);
+        if (PRINT_STREAM != null) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(COLOR_YELLOW_CODE);
+            sb.append("[jbt] ");
+            sb.append(" ".repeat(indent));
+            for (var obj : objects) {
+                sb.append(obj);
+            }
+            sb.append(COLOR_RESET_CODE);
+            PRINT_STREAM.println(sb);
         }
-        sb.append(COLOR_RESET_CODE);
-        printStream.println(sb);
     }
 
     private static boolean loggingEnabled = true;
