@@ -56,12 +56,13 @@ public final class Transformer extends ModifierVisitor<Void> {
         super.visit(classOrInterfaceDecl, arg);
         var newMembersList = new NodeList<BodyDeclaration<?>>();
         for (var member : classOrInterfaceDecl.getMembers()) {
+            boolean specializeRetType;
             if (member instanceof MethodDeclaration methodDeclaration && (
-                    checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations()) ||
+                    (specializeRetType = checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations())) ||
                             methodDeclaration.getParameters().stream()
                                     .anyMatch(param -> param.isAnnotationPresent(TARGET_ANNOTATION_NAME)))
             ) {
-                var replicated = replicate(methodDeclaration);
+                var replicated = replicate(methodDeclaration, specializeRetType);
                 newMembersList.addAll(replicated);
             } else {
                 newMembersList.add(member);
@@ -80,19 +81,19 @@ public final class Transformer extends ModifierVisitor<Void> {
         return n;
     }
 
-    private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration) {
+    private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration, boolean specializeReturnType) {
         var specializedMethods = new LinkedList<MethodDeclaration>();
         specializedMethods.add(new CommentMethodDeclaration("<editor-fold desc=\"" + methodDeclaration.getName().getIdentifier() + "\">"));
         for (var type : TOPMOST_TYPES) {
-            specializedMethods.add(copyWithType(methodDeclaration, type));
+            specializedMethods.add(copyWithType(methodDeclaration, type, specializeReturnType));
         }
         specializedMethods.add(new CommentMethodDeclaration("</editor-fold>"));
         return specializedMethods;
     }
 
-    private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type) {
+    private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type, boolean specializeReturnType) {
         var copy = methodDeclaration.clone();
-        if (!methodDeclaration.getType().isVoidType()){
+        if (specializeReturnType){
             copy.setType(type);
         }
         copy.getParameters().forEach(parameter -> {
