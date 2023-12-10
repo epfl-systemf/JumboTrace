@@ -102,8 +102,8 @@ public class ___JumboTrace___ {
         }
     }
 
-    public static void implicitReturn(String methodName, String filename, int line, int col){
-        if (loggingEnabled){
+    public static void implicitReturn(String methodName, String filename, int line, int col) {
+        if (loggingEnabled) {
             disableLogging();
             log(methodName, " EXITS at ", formatPosition(filename, line, col));
             enableLogging();
@@ -140,8 +140,8 @@ public class ___JumboTrace___ {
         }
     }
 
-    public static @Specialize Object switchConstruct(@Specialize Object selector, boolean isExpr, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static @Specialize Object switchConstruct(@Specialize Object selector, boolean isExpr, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             var switchTypeDescr = isExpr ? " (switch expression)" : " (switch statement)";
             log("SWITCH selector='", selector, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
@@ -150,24 +150,24 @@ public class ___JumboTrace___ {
         return selector;
     }
 
-    public static void loopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static void loopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("ENTER LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }
 
-    public static void loopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static void loopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("EXIT LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }
 
-    public static boolean loopCond(boolean evalRes, String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static boolean loopCond(boolean evalRes, String loopType, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("LOOP CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
@@ -175,16 +175,16 @@ public class ___JumboTrace___ {
         return evalRes;
     }
 
-    public static void foreachLoopNextIter(@Specialize Object newElem, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static void foreachLoopNextIter(@Specialize Object newElem, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("NEXT ITER elem='", newElem, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }
 
-    public static boolean ifCond(boolean evalRes, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static boolean ifCond(boolean evalRes, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("IF CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
@@ -193,8 +193,8 @@ public class ___JumboTrace___ {
     }
 
     public static @Specialize Object localVarAssignment(String varName, @Specialize Object assignedValue,
-                                                        String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                                        String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("VAR ASSIGN ", varName, " = ", assignedValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
@@ -203,8 +203,8 @@ public class ___JumboTrace___ {
     }
 
     public static @Specialize Object staticFieldAssignment(String className, String fieldName, @Specialize Object assignedValue,
-                                                           String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                                           String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("STATIC FIELD ASSIGN ", className, ".", fieldName, " = ", assignedValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
@@ -214,8 +214,8 @@ public class ___JumboTrace___ {
     }
 
     public static @Specialize Object instanceFieldAssignment(String className, Object instance, String fieldName, @Specialize Object assignedValue,
-                                                             String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                                             String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("INSTANCE FIELD ASSIGN ", instance, ".", className, "::", fieldName, " = ", assignedValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
@@ -225,8 +225,8 @@ public class ___JumboTrace___ {
     }
 
     public static void arrayElemSet(Object array, int index, @Specialize Object assignedValue,
-                                                  String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                    String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("ARRAY SET ", array, "[", index, "] = ", assignedValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
