@@ -15,6 +15,8 @@ import java.util.LinkedList;
 // TODO set positions in generated nodes to avoid ping-pong with line 1 in generated code
 // (this may cause error messages to wrongly be reported on line 1)
 
+// TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null"
+
 public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Constants">
@@ -511,7 +513,6 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitAssign(JCAssign assignment) {
-        // FIXME logging calls are dropped when the RHS is a constant
         /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
          * naive implementation would treat them as reads */
         var effectiveLhs = withoutParentheses(assignment.lhs);
@@ -670,6 +671,16 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitIdent(JCIdent tree) {
         super.visitIdent(tree);  // TODO
+    }
+
+    @Override
+    public void visitLiteral(JCLiteral literal) {
+        // prevent constant folding, because it causes the codegen to not include the injected logging code into the bytecode
+        // FIXME this solution causes other issues (e.g. Fibonacci example)
+        if (literal.type.constValue() != null){
+            literal.type = literal.type.baseType();
+        }
+        super.visitLiteral(literal);
     }
 
     //</editor-fold>
