@@ -25,7 +25,11 @@ public class ___JumboTrace___ {
             sb.append("[jbt] ");
             sb.append(" ".repeat(indent));
             for (var obj : objects) {
-                sb.append(obj);
+                try {
+                    sb.append(obj);
+                } catch (Throwable e) {  // relies on user-defined toString, so we need to recover from exceptions
+                    sb.append("<??>");
+                }
             }
             sb.append(COLOR_RESET_CODE);
             PRINT_STREAM.println(sb);
