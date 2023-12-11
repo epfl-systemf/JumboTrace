@@ -17,6 +17,8 @@ import java.util.LinkedList;
 
 // TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null"
 
+// TODO keep in mind to use null in tests (and probably add nulls to existing tests). null seems to be a dangerous edge case for types handling
+
 public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Constants">
@@ -433,7 +435,6 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitYield(JCYield yieldStat) {
-        // TODO check edge-cases like yield null (and maybe also nulls at other places)
         super.visitYield(yieldStat);
         var target = yieldStat.target;
         var targetDescr = target.getTag().toString().toLowerCase();
@@ -673,7 +674,6 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitLiteral(JCLiteral literal) {
         // prevent constant folding, because it causes the codegen to not include the injected logging code into the bytecode
-        // FIXME this solution causes other issues (e.g. Fibonacci example)
         if (literal.type.constValue() != null){
             literal.type = literal.type.baseType();
         }
