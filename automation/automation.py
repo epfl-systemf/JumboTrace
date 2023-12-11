@@ -14,6 +14,7 @@ test_excluded_examples: Final[List[str]] = [
     "Chemistry",    # currently no support for tests based on whole projects
     "Counters",     # FIXME this one should work but does not
     "Exceptions",   # should fail
+    "Casts"         # should fail
 ]
 
 
