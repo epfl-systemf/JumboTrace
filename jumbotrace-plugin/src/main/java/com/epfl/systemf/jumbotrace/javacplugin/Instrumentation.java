@@ -160,6 +160,18 @@ public final class Instrumentation {
 
     //<editor-fold desc="Assignments and variable declaration">
 
+    public JCExpression logVariableDeclaration(String varName, String typeDescr,
+                                               String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "variableDeclared",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(varName)),
+                        new Argument(st().stringType, mk().Literal(typeDescr))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
+    }
+
     public JCExpression logLocalVarAssignment(String varName, JCExpression rhs,
                                               String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);

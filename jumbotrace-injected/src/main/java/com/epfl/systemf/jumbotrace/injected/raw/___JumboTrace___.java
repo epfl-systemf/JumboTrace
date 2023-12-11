@@ -238,6 +238,16 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static void variableDeclared(String varName, String typeDescr,
+                                        String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("VAR DECLARED: ", varName, " (of static type ", typeDescr, ") at ",
+                    formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);

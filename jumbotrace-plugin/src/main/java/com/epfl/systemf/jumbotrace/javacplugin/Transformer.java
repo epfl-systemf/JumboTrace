@@ -102,15 +102,51 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitVarDef(JCVariableDecl varDecl) {
-        if (!Flags.isEnum(varDecl.sym.owner)) {
-            super.visitVarDef(varDecl);
-        } else {
+        // actual handling of variable declarations is performed in visitBlock
+        if (Flags.isEnum(varDecl.sym.owner)) {
             /* Do not log the call to the constructor inside an enum case
              * This crashes the lowering phase, which is expecting an NewClass, not a LetExpr
              */
             // TODO try to find a solution
             this.result = varDecl;
+        } else {
+            super.visitVarDef(varDecl);
         }
+    }
+
+    @Override
+    public void visitBlock(JCBlock block) {
+        super.visitBlock(block);
+        // TODO
+        var newStats = List.<JCStatement>nil();
+        // iterating in reverse order to keep complexity linear
+        for (var remStats = block.stats.reverse(); remStats.nonEmpty(); remStats = remStats.tail){
+            var currStat = remStats.head;
+            if (currStat instanceof JCVariableDecl variableDecl && variableDecl.init != null){
+                variableDecl.init = instrumentation.logLocalVarAssignment(
+                        variableDecl.name.toString(),
+                        variableDecl.init,
+                        currentFilename(),
+                        getStartLine(variableDecl),
+                        getStartCol(variableDecl),
+                        safeGetEndLine(variableDecl),
+                        safeGetEndCol(variableDecl)
+                );
+            }
+            newStats = newStats.prepend(currStat);
+            if (currStat instanceof JCVariableDecl variableDecl){
+                newStats = newStats.prepend(mk().Exec(instrumentation.logVariableDeclaration(
+                        variableDecl.name.toString(),
+                        variableDecl.vartype.toString(),
+                        currentFilename(),
+                        getStartLine(variableDecl),
+                        getStartCol(variableDecl),
+                        safeGetEndLine(variableDecl),
+                        safeGetEndCol(variableDecl)
+                )));
+            }
+        }
+        block.stats = newStats;
     }
 
     @Override
