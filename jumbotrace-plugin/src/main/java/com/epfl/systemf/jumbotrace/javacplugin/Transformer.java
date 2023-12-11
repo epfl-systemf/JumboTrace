@@ -117,7 +117,6 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitBlock(JCBlock block) {
         super.visitBlock(block);
-        // TODO
         var newStats = List.<JCStatement>nil();
         // iterating in reverse order to keep complexity linear
         for (var remStats = block.stats.reverse(); remStats.nonEmpty(); remStats = remStats.tail){
@@ -182,29 +181,29 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitExec(JCExpressionStatement tree) {
+    public void visitExec(JCExpressionStatement exprStat) {
         // TODO check that this comment is up to date
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
          * Assumption: all such calls are wrapped in a JCExpressionStatement or a lambda
          * Solution: special-case it (here)
          * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
-        if (tree.expr instanceof JCMethodInvocation invocation
+        if (exprStat.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.contentEquals(CONSTRUCTOR_NAME)
                 && invocation.meth.toString().equals("super")) {
             // TODO maybe try to still save the information when control-flow enters a superclass constructor
             invocation.args = translate(invocation.args);
-            this.result = tree;
-        } else if (tree.expr instanceof JCNewClass newClass) {
+            this.result = exprStat;
+        } else if (exprStat.expr instanceof JCNewClass newClass) {
             newClass.args = translate(newClass.args);
             var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
             this.result = makeBlock(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
-        } else if (tree.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
+        } else if (exprStat.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             invocation.args = translate(invocation.args);
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
             this.result = makeBlock(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
         } else {
-            super.visitExec(tree);
+            super.visitExec(exprStat);
         }
     }
 
@@ -220,6 +219,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitApply(JCMethodInvocation invocation) {
         super.visitApply(invocation);
+        deleteConstantFolding(invocation);
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
         }
@@ -230,6 +230,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitNewClass(JCNewClass newClass) {
         super.visitNewClass(newClass);
+        deleteConstantFolding(newClass);
         var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
         this.result = makeLet(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
     }
@@ -414,6 +415,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitSwitchExpression(JCSwitchExpression switchExpr) {
         super.visitSwitchExpression(switchExpr);
+        deleteConstantFolding(switchExpr);
         switchExpr.selector = instrumentation.logSwitchConstruct(
                 switchExpr.selector,
                 true,
@@ -431,8 +433,9 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitConditional(JCConditional tree) {
-        super.visitConditional(tree);  // TODO
+    public void visitConditional(JCConditional conditional) {
+        super.visitConditional(conditional);  // TODO
+        deleteConstantFolding(conditional);
     }
 
     @Override
@@ -574,6 +577,7 @@ public final class Transformer extends TreeTranslator {
         } else {
             super.visitAssign(assignment);
         }
+        deleteConstantFolding(assignment);
     }
 
     private void handleLocalVarAssignment(JCAssign assignment, JCIdent ident) {
@@ -649,26 +653,31 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitAssignop(JCAssignOp assignOp) {
         super.visitAssignop(assignOp);  // TODO
+        deleteConstantFolding(assignOp);
     }
 
     @Override
-    public void visitUnary(JCUnary tree) {
-        super.visitUnary(tree);  // TODO
+    public void visitUnary(JCUnary unary) {
+        super.visitUnary(unary);  // TODO
+        deleteConstantFolding(unary);
     }
 
     @Override
-    public void visitBinary(JCBinary tree) {
-        super.visitBinary(tree);  // TODO
+    public void visitBinary(JCBinary binary) {
+        super.visitBinary(binary);  // TODO
+        deleteConstantFolding(binary);
     }
 
     @Override
-    public void visitTypeCast(JCTypeCast tree) {
-        super.visitTypeCast(tree);  // TODO
+    public void visitTypeCast(JCTypeCast typeCast) {
+        super.visitTypeCast(typeCast);  // TODO
+        deleteConstantFolding(typeCast);
     }
 
     @Override
-    public void visitTypeTest(JCInstanceOf tree) {
-        super.visitTypeTest(tree);  // TODO
+    public void visitTypeTest(JCInstanceOf instanceOf) {
+        super.visitTypeTest(instanceOf);  // TODO
+        deleteConstantFolding(instanceOf);
     }
 
     @Override
@@ -687,33 +696,46 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitIndexed(JCArrayAccess tree) {
-        super.visitIndexed(tree);  // TODO
+    public void visitIndexed(JCArrayAccess arrayAccess) {
+        super.visitIndexed(arrayAccess);  // TODO
+        deleteConstantFolding(arrayAccess);
     }
 
     @Override
-    public void visitSelect(JCFieldAccess tree) {
-        super.visitSelect(tree);  // TODO
+    public void visitSelect(JCFieldAccess fieldAccess) {
+        super.visitSelect(fieldAccess);  // TODO
+        deleteConstantFolding(fieldAccess);
     }
 
     @Override
-    public void visitReference(JCMemberReference tree) {
+    public void visitReference(JCMemberReference memberReference) {
         // things like Foo::bar
-        super.visitReference(tree);  // TODO
+        super.visitReference(memberReference);  // TODO
+        deleteConstantFolding(memberReference);
     }
 
     @Override
-    public void visitIdent(JCIdent tree) {
-        super.visitIdent(tree);  // TODO
+    public void visitIdent(JCIdent ident) {
+        super.visitIdent(ident);  // TODO
+        deleteConstantFolding(ident);
     }
 
     @Override
     public void visitLiteral(JCLiteral literal) {
-        // prevent constant folding, because it causes the codegen to not include the injected logging code into the bytecode
-        if (literal.type.constValue() != null){
-            literal.type = literal.type.baseType();
-        }
         super.visitLiteral(literal);
+        deleteConstantFolding(literal);
+    }
+
+    @Override
+    public void visitParens(JCParens parens) {
+        super.visitParens(parens);
+        deleteConstantFolding(parens);
+    }
+
+    @Override
+    public void visitLetExpr(LetExpr letExpr) {
+        super.visitLetExpr(letExpr);
+        deleteConstantFolding(letExpr);
     }
 
     //</editor-fold>
@@ -914,6 +936,13 @@ public final class Transformer extends TreeTranslator {
         return (expr instanceof JCParens parentheses) ?
                 withoutParentheses(parentheses.expr) :
                 expr;
+    }
+
+    // constant folding sometimes causes the codegen to not include the injected logging code into the bytecode
+    private void deleteConstantFolding(JCExpression expr){
+        while (expr.type != null && expr.type.constValue() != null){
+            expr.type = expr.type.baseType();
+        }
     }
 
     private int getStartLine(JCTree tree) {

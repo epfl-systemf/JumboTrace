@@ -31,7 +31,7 @@ public class Main {
         foo = x;
         System.out.println(foo);
         System.out.println(Inner.baz);
-        Inner.baz = 32;
+        Inner.baz = 32*2;
         x = 19;
         x = 2*x;
         System.out.println(Inner.baz);
