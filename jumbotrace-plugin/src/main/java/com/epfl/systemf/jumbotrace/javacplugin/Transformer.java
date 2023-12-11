@@ -367,8 +367,10 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitCase(JCCase tree) {
-        super.visitCase(tree);  // TODO
+    public void visitCase(JCCase switchCase) {
+        // do not propagate the modifications to the labels, because it would erase their constant-containing type
+        switchCase.stats = translate(switchCase.stats);
+        this.result = switchCase;
     }
 
     @Override
