@@ -233,7 +233,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="break, continue, yield">
+    //<editor-fold desc="Jumps: break, continue, yield, catch">
 
     public JCExpression logBreak(String targetDescr, int targetLine, int targetCol,
                                  String filename, int startLine, int startCol, int endLine, int endCol) {
@@ -270,6 +270,17 @@ public final class Instrumentation {
                         new Argument(st().stringType, mk().Literal(targetDescr)),
                         new Argument(st().intType, mk().Literal(targetLine)),
                         new Argument(st().intType, mk().Literal(targetCol))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
+    }
+
+    public JCExpression logCaught(JCExpression exprYieldingThrowable,
+                                  String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "caught",
+                List.of(
+                        new Argument(st().throwableType, exprYieldingThrowable)
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType
         );

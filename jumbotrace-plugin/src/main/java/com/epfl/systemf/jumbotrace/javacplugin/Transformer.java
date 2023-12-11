@@ -428,8 +428,17 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitCatch(JCCatch tree) {
-        super.visitCatch(tree);  // TODO
+    public void visitCatch(JCCatch catchClause) {
+        super.visitCatch(catchClause);
+        var body = catchClause.body;
+        body.stats = body.stats.prepend(mk().Exec(instrumentation.logCaught(
+                mk().Ident(catchClause.param.sym),
+                currentFilename(),
+                getStartLine(catchClause),
+                getStartCol(catchClause),
+                safeGetEndLine(catchClause),
+                safeGetEndCol(catchClause)
+        )));
     }
 
     @Override
