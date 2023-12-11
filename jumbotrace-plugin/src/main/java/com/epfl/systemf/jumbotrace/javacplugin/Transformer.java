@@ -388,11 +388,6 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitTry(JCTry tree) {
-        super.visitTry(tree);  // TODO
-    }
-
-    @Override
     public void visitCatch(JCCatch tree) {
         super.visitCatch(tree);  // TODO
     }
