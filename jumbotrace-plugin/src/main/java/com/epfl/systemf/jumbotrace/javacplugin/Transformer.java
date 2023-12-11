@@ -544,7 +544,8 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitThrow(JCThrow tree) {
-        super.visitThrow(tree);  // TODO
+        // TODO decide whether we want to log throws (inconsistent with e.g. x/0, where the throw is not logged)
+        super.visitThrow(tree);
     }
 
     @Override
