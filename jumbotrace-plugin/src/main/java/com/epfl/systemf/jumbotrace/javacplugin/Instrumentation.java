@@ -233,7 +233,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Jumps: break, continue, yield, catch">
+    //<editor-fold desc="Jumps: break, continue, yield">
 
     public JCExpression logBreak(String targetDescr, int targetLine, int targetCol,
                                  String filename, int startLine, int startCol, int endLine, int endCol) {
@@ -275,6 +275,10 @@ public final class Instrumentation {
         );
     }
 
+    //</editor-fold>
+
+    //<editor-fold desc="Exceptions and casts">
+
     public JCExpression logCaught(JCExpression exprYieldingThrowable,
                                   String filename, int startLine, int startCol, int endLine, int endCol){
         return makeLogMethodCall(
@@ -284,6 +288,21 @@ public final class Instrumentation {
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType
         );
+    }
+
+    public JCExpression logCastAttempt(JCExpression castedExpr, String targetTypeDescr, JCExpression successExpr,
+                                       String filename, int startLine, int startCol, int endLine, int endCol){
+        var highestType = topmostTypeFor(castedExpr.type);
+        var apply = makeLogMethodCall(
+                "castAttempt",
+                List.of(
+                        new Argument(highestType, castedExpr),
+                        new Argument(st().stringType, mk().Literal(targetTypeDescr)),
+                        new Argument(st().booleanType, successExpr)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                highestType
+        );
+        return mk().TypeCast(castedExpr.type, apply);
     }
 
     //</editor-fold>

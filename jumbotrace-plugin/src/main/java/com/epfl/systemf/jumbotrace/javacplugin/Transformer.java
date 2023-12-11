@@ -565,29 +565,35 @@ public final class Transformer extends TreeTranslator {
         var effectiveLhs = withoutParentheses(assignment.lhs);
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleLocalVarAssignment(assignment, ident);
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleStaticFieldAssignment(assignment, fieldAccess.selected.toString(), fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
             assignment.rhs = translate(assignment.rhs);
+            deleteConstantFolding(assignment);
             handleArrayAssignment(assignment, arrayAccess);
         } else {
             super.visitAssign(assignment);
+            deleteConstantFolding(assignment);
         }
-        deleteConstantFolding(assignment);
     }
 
     private void handleLocalVarAssignment(JCAssign assignment, JCIdent ident) {
@@ -680,8 +686,31 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitTypeCast(JCTypeCast typeCast) {
-        super.visitTypeCast(typeCast);  // TODO
+        super.visitTypeCast(typeCast);
         deleteConstantFolding(typeCast);
+        var castedVarSymbol = new Symbol.VarSymbol(0, m.nextId("casted"), typeCast.expr.type, currentMethod());
+        var castedVarIdent = mk().Ident(castedVarSymbol).setType(typeCast.expr.type);
+        var successVarSymbol = new Symbol.VarSymbol(0, m.nextId("castWillSucceed"), st().booleanType, currentMethod());
+        var successVarIdent = mk().Ident(successVarSymbol).setType(st().booleanType);
+        var oldExpr = typeCast.expr;
+        typeCast.expr = castedVarIdent;
+        this.result = mk().LetExpr(
+                List.of(
+                        mk().VarDef(castedVarSymbol, oldExpr),
+                        mk().VarDef(successVarSymbol, mk().TypeTest(castedVarIdent, typeCast.clazz).setType(st().booleanType)),
+                        mk().Exec(instrumentation.logCastAttempt(
+                                castedVarIdent,
+                                typeCast.clazz.toString(),
+                                successVarIdent,
+                                currentFilename(),
+                                getStartLine(typeCast),
+                                getStartCol(typeCast),
+                                safeGetEndLine(typeCast),
+                                safeGetEndCol(typeCast)
+                        ))
+                ),
+                typeCast
+        ).setType(typeCast.type);
     }
 
     @Override

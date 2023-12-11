@@ -256,6 +256,18 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize Object castAttempt(@Specialize Object value, String targetTypeDescr, boolean willSucceed,
+                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            var resultMsg = willSucceed ? "SUCCEEDED" : "FAILED";
+            log("CAST ", value, " to type ", targetTypeDescr, " ", resultMsg, " at ",
+                    formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return value;
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);
