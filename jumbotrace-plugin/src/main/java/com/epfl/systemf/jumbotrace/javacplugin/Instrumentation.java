@@ -52,633 +52,289 @@ public final class Instrumentation {
 
     //<editor-fold desc="Method calls and enters">
 
-    private Type methodCallLoggerArgsArrayType() {
-        return new Type.ArrayType(st().objectType, st().arrayClass);
-    }
-
-    private LogMethodSig staticMethodCallLogger() {
-        return new LogMethodSig("staticMethodCall", new Type.MethodType(
-                List.of(st().stringType, st().stringType, st().stringType, methodCallLoggerArgsArrayType(),
-                        st().stringType, st().intType, st().intType, st().intType, st().intType),
-                st().voidType,
-                List.nil(),
-                jumbotraceClassSymbol
-        ));
-    }
-
     public JCExpression logStaticMethodCall(
             String className, String methodName, Type.MethodType methodSig, List<JCExpression> args,
             String filename, int startLine, int startCol, int endLine, int endCol
     ) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(staticMethodCallLogger()),
+        return makeLogMethodCall(
+                "staticMethodCall",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(methodName),
-                        mk().Literal(methodSig.toString()),
-                        mk().NewArray(mk().Type(st().objectType), List.nil(), args).setType(methodCallLoggerArgsArrayType()),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig nonStaticMethodCallLogger() {
-        return new LogMethodSig("nonStaticMethodCall", new Type.MethodType(
-                List.of(st().stringType, st().stringType, st().stringType, st().objectType, methodCallLoggerArgsArrayType(),
-                        st().stringType, st().intType, st().intType, st().intType, st().intType),
-                st().voidType,
-                List.nil(),
-                jumbotraceClassSymbol
-        ));
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(methodName)),
+                        new Argument(st().stringType, mk().Literal(methodSig.toString())),
+                        new Argument(
+                                methodCallLoggerArgsArrayType(),
+                                mk().NewArray(mk().Type(st().objectType), List.nil(), args).setType(methodCallLoggerArgsArrayType())
+                        )
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
     }
 
     public JCExpression logNonStaticMethodCall(
             String className, String methodName, Type.MethodType methodSig, JCExpression receiver, List<JCExpression> args,
             String filename, int startLine, int startCol, int endLine, int endCol
     ) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(nonStaticMethodCallLogger()),
+        return makeLogMethodCall(
+                "nonStaticMethodCall",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(methodName),
-                        mk().Literal(methodSig.toString()),
-                        receiver,
-                        mk().NewArray(mk().Type(st().objectType), List.nil(), args).setType(methodCallLoggerArgsArrayType()),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig methodEnterLogger() {
-        return new LogMethodSig(
-                "methodEnter",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().stringType, st().stringType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(methodName)),
+                        new Argument(st().stringType, mk().Literal(methodSig.toString())),
+                        new Argument(st().objectType, receiver),
+                        new Argument(
+                                methodCallLoggerArgsArrayType(),
+                                mk().NewArray(mk().Type(st().objectType), List.nil(), args).setType(methodCallLoggerArgsArrayType())
+                        )
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
     public JCExpression logMethodEnter(String className, String methodName, Type.MethodType methodSig,
                                        String filename, int line, int col) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(methodEnterLogger()),
+        return makeLogMethodCall(
+                "methodEnter",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(methodName),
-                        mk().Literal(methodSig.toString()),
-                        mk().Literal(filename),
-                        mk().Literal(line),
-                        mk().Literal(col)
-                )
-        ).setType(st().voidType);
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(methodName)),
+                        new Argument(st().stringType, mk().Literal(methodSig.toString()))
+                ).appendList(makeSinglePositionArgsList(filename, line, col)),
+                st().voidType
+        );
     }
 
     //</editor-fold>
 
     //<editor-fold desc="Method returns">
 
-    private LogMethodSig methodRetLogger(Type specializedType) {
-        return new LogMethodSig(
-                "methodRet",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, specializedType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
     public JCExpression logMethodReturnValue(String className, String methodName, JCExpression returnValue,
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(returnValue.type);
-        var apply = mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(methodRetLogger(higherType)),
+        var apply = makeLogMethodCall(
+                "methodRet",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(methodName),
-                        returnValue,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(higherType);
-        return castIfNeeded(returnValue.type, apply);
-    }
-
-    private LogMethodSig methodRetVoidLogger() {
-        return new LogMethodSig(
-                "methodRetVoid",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(methodName)),
+                        new Argument(higherType, returnValue)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
         );
+        return castIfNeeded(returnValue.type, apply);
     }
 
     public JCExpression logMethodReturnVoid(String className, String methodName, String filename, int startLine,
                                             int startCol, int endLine, int endCol) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(methodRetVoidLogger()),
+        return makeLogMethodCall(
+                "methodRetVoid",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(methodName),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig returnStatLogger() {
-        return new LogMethodSig(
-                "returnStat",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(methodName))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
     public JCExpression logReturnStat(String methodName, String filename, int startLine,
                                       int startCol, int endLine, int endCol) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(returnStatLogger()),
+        return makeLogMethodCall(
+                "returnStat",
                 List.of(
-                        mk().Literal(methodName),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig implicitReturnLogger(){
-        return new LogMethodSig(
-                "implicitReturn",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(methodName))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
-    public JCExpression logImplicitReturn(String methodName, String filename, int line, int col){
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(implicitReturnLogger()),
+    public JCExpression logImplicitReturn(String methodName, String filename, int line, int col) {
+        return makeLogMethodCall(
+                "implicitReturn",
                 List.of(
-                        mk().Literal(methodName),
-                        mk().Literal(filename),
-                        mk().Literal(line),
-                        mk().Literal(col)
-                )
-        ).setType(st().voidType);
+                        new Argument(st().stringType, mk().Literal(methodName))
+                ).appendList(makeSinglePositionArgsList(filename, line, col)),
+                st().voidType
+        );
     }
 
     //</editor-fold>
 
-    //<editor-fold desc="Assignments">
-
-    private LogMethodSig localVarAssignmentLogger(Type specializedType){
-        return new LogMethodSig(
-                "localVarAssignment",
-                new Type.MethodType(
-                        List.of(st().stringType, specializedType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
+    //<editor-fold desc="Assignments and variable declaration">
 
     public JCExpression logLocalVarAssignment(String varName, JCExpression rhs,
-                                              String filename, int startLine, int startCol, int endLine, int endCol){
+                                              String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
-        var apply = mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(localVarAssignmentLogger(higherType)),
+        var apply = makeLogMethodCall(
+                "localVarAssignment",
                 List.of(
-                        mk().Literal(varName),
-                        rhs,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(higherType);
-        return castIfNeeded(rhs.type, apply);
-    }
-
-    private LogMethodSig staticFieldAssignmentLogger(Type specializedType){
-        return new LogMethodSig(
-                "staticFieldAssignment",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, specializedType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(varName)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
         );
+        return castIfNeeded(rhs.type, apply);
     }
 
     public JCExpression logStaticFieldAssignment(String className, String fieldName, JCExpression rhs,
-                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+                                                 String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
-        var apply = mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(staticFieldAssignmentLogger(higherType)),
+        var apply = makeLogMethodCall(
+                "staticFieldAssignment",
                 List.of(
-                        mk().Literal(className),
-                        mk().Literal(fieldName),
-                        rhs,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(higherType);
-        return castIfNeeded(rhs.type, apply);
-    }
-
-    private LogMethodSig instanceFieldAssignmentLogger(Type specializedType){
-        return new LogMethodSig(
-                "instanceFieldAssignment",
-                new Type.MethodType(
-                        List.of(st().stringType, st().objectType, st().stringType, specializedType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
         );
+        return castIfNeeded(rhs.type, apply);
     }
 
     public JCExpression logInstanceFieldAssignment(String className, JCExpression selected, String fieldName, JCExpression rhs,
-                                                   String filename, int startLine, int startCol, int endLine, int endCol){
+                                                   String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
-        var apply = mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(instanceFieldAssignmentLogger(higherType)),
+        var apply = makeLogMethodCall(
+                "instanceFieldAssignment",
                 List.of(
-                        mk().Literal(className),
-                        selected,
-                        mk().Literal(fieldName),
-                        rhs,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(higherType);
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().objectType, selected),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
         return castIfNeeded(rhs.type, apply);
     }
 
-    private LogMethodSig arrayElemSetLogger(Type specializedType){
-        return new LogMethodSig(
+    public JCExpression logArrayElemSet(JCExpression array, JCExpression index, JCExpression rhs,
+                                        String filename, int startLine, int startCol, int endLine, int endCol) {
+        var higherType = topmostTypeFor(rhs.type);
+        return makeLogMethodCall(
                 "arrayElemSet",
-                new Type.MethodType(
-                        List.of(st().objectType, st().intType, specializedType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                List.of(
+                        new Argument(st().objectType, array),
+                        new Argument(st().intType, index),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
-    public JCExpression logArrayElemSet(JCExpression array, JCExpression index, JCExpression rhs,
-                                        String filename, int startLine, int startCol, int endLine, int endCol){
-        var higherType = topmostTypeFor(rhs.type);
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(arrayElemSetLogger(higherType)),
-                List.of(
-                        array,
-                        index,
-                        rhs,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    //<editor-fold>
+    //</editor-fold>
 
     //<editor-fold desc="break, continue, yield">
 
-    private LogMethodSig breakLogger() {
-        return new LogMethodSig(
-                "breakStat",
-                new Type.MethodType(
-                        List.of(
-                                st().stringType, st().intType, st().intType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType
-                        ),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
     public JCExpression logBreak(String targetDescr, int targetLine, int targetCol,
                                  String filename, int startLine, int startCol, int endLine, int endCol) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(breakLogger()),
+        return makeLogMethodCall(
+                "breakStat",
                 List.of(
-                        mk().Literal(targetDescr),
-                        mk().Literal(targetLine),
-                        mk().Literal(targetCol),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig continueLogger() {
-        return new LogMethodSig(
-                "continueStat",
-                new Type.MethodType(
-                        List.of(
-                                st().stringType, st().intType, st().intType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType
-                        ),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(targetDescr)),
+                        new Argument(st().intType, mk().Literal(targetLine)),
+                        new Argument(st().intType, mk().Literal(targetCol))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
     public JCExpression logContinue(String targetDescr, int targetLine, int targetCol,
                                     String filename, int startLine, int startCol, int endLine, int endCol) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(continueLogger()),
+        return makeLogMethodCall(
+                "continueStat",
                 List.of(
-                        mk().Literal(targetDescr),
-                        mk().Literal(targetLine),
-                        mk().Literal(targetCol),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig yieldLogger() {
-        return new LogMethodSig(
-                "yieldStat",
-                new Type.MethodType(
-                        List.of(
-                                st().objectType, st().stringType, st().intType, st().intType,
-                                st().stringType, st().intType, st().intType, st().intType, st().intType
-                        ),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(targetDescr)),
+                        new Argument(st().intType, mk().Literal(targetLine)),
+                        new Argument(st().intType, mk().Literal(targetCol))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
     public JCExpression logYield(JCExpression yieldedVal, String targetDescr, int targetLine, int targetCol,
                                  String filename, int startLine, int startCol, int endLine, int endCol) {
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(yieldLogger()),
+        return makeLogMethodCall(
+                "yieldStat",
                 List.of(
-                        yieldedVal,
-                        mk().Literal(targetDescr),
-                        mk().Literal(targetLine),
-                        mk().Literal(targetCol),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
+                        new Argument(st().objectType, yieldedVal),
+                        new Argument(st().stringType, mk().Literal(targetDescr)),
+                        new Argument(st().intType, mk().Literal(targetLine)),
+                        new Argument(st().intType, mk().Literal(targetCol))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
     }
 
     //</editor-fold>
 
     //<editor-fold desc="Loops">
 
-    private LogMethodSig loopEnterLogger(){
-        return new LogMethodSig(
+    public JCExpression logLoopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol) {
+        return makeLogMethodCall(
                 "loopEnter",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                List.of(
+                        new Argument(st().stringType, mk().Literal(loopType))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
-    public JCExpression logLoopEnter(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(loopEnterLogger()),
-                List.of(
-                        mk().Literal(loopType),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig loopExitLogger(){
-        return new LogMethodSig(
+    public JCExpression logLoopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol) {
+        return makeLogMethodCall(
                 "loopExit",
-                new Type.MethodType(
-                        List.of(st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
-    public JCExpression logLoopExit(String loopType, String filename, int startLine, int startCol, int endLine, int endCol){
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(loopExitLogger()),
                 List.of(
-                        mk().Literal(loopType),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
-    }
-
-    private LogMethodSig loopCondLogger(){
-        return new LogMethodSig(
-                "loopCond",
-                new Type.MethodType(
-                        List.of(st().booleanType, st().stringType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().booleanType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().stringType, mk().Literal(loopType))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
         );
     }
 
     public JCExpression logLoopCondition(JCExpression loopCond, String loopType,
-                                         String filename, int startLine, int startCol, int endLine, int endCol){
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(loopCondLogger()),
+                                         String filename, int startLine, int startCol, int endLine, int endCol) {
+        return makeLogMethodCall(
+                "loopCond",
                 List.of(
-                        loopCond,
-                        mk().Literal(loopType),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().booleanType);
-    }
-
-    private LogMethodSig foreachNextIterLogger(Type specializedType){
-        return new LogMethodSig(
-                "foreachLoopNextIter",
-                new Type.MethodType(
-                        List.of(specializedType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().voidType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().booleanType, loopCond),
+                        new Argument(st().stringType, mk().Literal(loopType))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().booleanType
         );
     }
 
-    public JCExpression logForeachNextIter(JCExpression elem, String filename, int startLine, int startCol, int endLine, int endCol){
-        var type = topmostTypeFor(elem.type);
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(foreachNextIterLogger(type)),
+    public JCExpression logForeachNextIter(JCExpression elem, String filename, int startLine, int startCol, int endLine, int endCol) {
+        var specializedType = topmostTypeFor(elem.type);
+        return makeLogMethodCall(
+                "foreachLoopNextIter",
                 List.of(
-                        elem,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().voidType);
+                        new Argument(specializedType, elem)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
     }
 
     //</editor-fold>
 
     //<editor-fold desc="if and switch">
 
-    private LogMethodSig ifCondLogger(){
-        return new LogMethodSig(
+    public JCExpression logIfCond(JCExpression loopCond, String filename, int startLine, int startCol, int endLine, int endCol) {
+        return makeLogMethodCall(
                 "ifCond",
-                new Type.MethodType(
-                        List.of(st().booleanType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        st().booleanType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
-        );
-    }
-
-    public JCExpression logIfCond(JCExpression loopCond, String filename, int startLine, int startCol, int endLine, int endCol){
-        return mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(ifCondLogger()),
                 List.of(
-                        loopCond,
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(st().booleanType);
-    }
-
-    private LogMethodSig switchLogger(Type specializedType){
-        return new LogMethodSig(
-                "switchConstruct",
-                new Type.MethodType(
-                        List.of(specializedType, st().booleanType, st().stringType, st().intType, st().intType, st().intType, st().intType),
-                        specializedType,
-                        List.nil(),
-                        jumbotraceClassSymbol
-                )
+                        new Argument(st().booleanType, loopCond)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().booleanType
         );
     }
 
     public JCExpression logSwitchConstruct(JCExpression selector, boolean isSwitchExpr,
-                                           String filename, int startLine, int startCol, int endLine, int endCol){
+                                           String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(selector.type);
-        var apply = mk().Apply(
-                List.nil(),
-                makeSelectFromMethodSig(switchLogger(higherType)),
+        var apply = makeLogMethodCall(
+                "switchConstruct",
                 List.of(
-                        selector,
-                        mk().Literal(isSwitchExpr),
-                        mk().Literal(filename),
-                        mk().Literal(startLine),
-                        mk().Literal(startCol),
-                        mk().Literal(endLine),
-                        mk().Literal(endCol)
-                )
-        ).setType(higherType);
+                        new Argument(higherType, selector),
+                        new Argument(st().booleanType, mk().Literal(isSwitchExpr))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
         return castIfNeeded(selector.type, apply);
     }
 
@@ -686,27 +342,62 @@ public final class Instrumentation {
 
     //<editor-fold desc="Utils">
 
-    private Type topmostTypeFor(Type rawType){
-        return rawType.isPrimitive() ? rawType : st().objectType;
-    }
-
-    private JCExpression makeSelectFromMethodSig(LogMethodSig sig) {
-        return mk().Select(
-                mk().Ident(jumbotraceClassSymbol),
-                new Symbol.MethodSymbol(
-                        Flags.PUBLIC | Flags.STATIC,
-                        n().fromString(sig.name),
-                        sig.type,
-                        jumbotraceClassSymbol
-                )
+    private List<Argument> makePositionIntervalArgsList(String filename, int startLine, int startCol, int endLine, int endCol) {
+        return List.of(
+                new Argument(st().stringType, mk().Literal(filename)),
+                new Argument(st().intType, mk().Literal(startLine)),
+                new Argument(st().intType, mk().Literal(startCol)),
+                new Argument(st().intType, mk().Literal(endLine)),
+                new Argument(st().intType, mk().Literal(endCol))
         );
     }
 
-    private JCExpression castIfNeeded(Type type, JCExpression expr){
-        return (type == expr.type) ? expr : mk().TypeCast(type, expr);
+    private List<Argument> makeSinglePositionArgsList(String filename, int line, int col) {
+        return List.of(
+                new Argument(st().stringType, mk().Literal(filename)),
+                new Argument(st().intType, mk().Literal(line)),
+                new Argument(st().intType, mk().Literal(col))
+        );
     }
 
-    private record LogMethodSig(String name, Type.MethodType type) {
+    private Type methodCallLoggerArgsArrayType() {
+        return new Type.ArrayType(st().objectType, st().arrayClass);
+    }
+
+    private JCExpression makeLogMethodCall(String methodName, List<Argument> args, Type retType) {
+        var argsExprs = List.<JCExpression>nil();
+        var argTypes = List.<Type>nil();
+        for (var remArgs = args; remArgs.nonEmpty(); remArgs = remArgs.tail) {
+            argsExprs = argsExprs.append(remArgs.head.expr());
+            argTypes = argTypes.append(remArgs.head.type());
+        }
+        var methodType = new Type.MethodType(
+                argTypes,
+                retType,
+                List.nil(),
+                jumbotraceClassSymbol
+        );
+        var methodSelect = mk().Select(
+                mk().Ident(jumbotraceClassSymbol),
+                new Symbol.MethodSymbol(
+                        Flags.PUBLIC | Flags.STATIC,
+                        n().fromString(methodName),
+                        methodType,
+                        jumbotraceClassSymbol
+                )
+        );
+        return mk().Apply(List.nil(), methodSelect, argsExprs).setType(retType);
+    }
+
+    private record Argument(Type type, JCExpression expr) {
+    }
+
+    private Type topmostTypeFor(Type rawType) {
+        return rawType.isPrimitive() ? rawType : st().objectType;
+    }
+
+    private JCExpression castIfNeeded(Type type, JCExpression expr) {
+        return (type == expr.type) ? expr : mk().TypeCast(type, expr);
     }
 
     //</editor-fold>
