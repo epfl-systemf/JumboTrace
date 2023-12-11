@@ -54,23 +54,32 @@ def compile_example_raw(example_name: str):
     )
 
 
-def run_example(example_name: str, main_class_name: str = "Main", redirection_target: str | None = None, test_mode: bool = False):
+def run_example(example_name: str, main_class_name: str = "Main",
+                stdout_target: str | None = None, stderr_target: str | None = None,
+                test_mode: bool = False):
     compile_example(example_name, test_mode)
     command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
     msg = f"running example {example_name} [instrumented] (mainclass=\'{main_class_name}\')"
-    if redirection_target is not None:
-        command += " > " + redirection_target
-        msg += f" output redirected to {redirection_target}"
+    if stdout_target is not None:
+        command += " > " + stdout_target
+        msg += f" stdout redirected to {stdout_target}"
+    if stderr_target is not None:
+        command += " 2> " + stderr_target
+        msg += f" stderr redirected to {stderr_target}"
     cmd(command, msg)
 
 
-def run_example_raw(example_name: str, main_class_name: str = "Main", redirection_target: str | None = None):
+def run_example_raw(example_name: str, main_class_name: str = "Main",
+                    stdout_target: str | None = None, stderr_target: str | None = None):
     compile_example_raw(example_name)
     command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
     msg = f"running example {example_name} [not instrumented] (mainclass=\'{main_class_name}\')"
-    if redirection_target is not None:
-        command += " > " + redirection_target
-        msg += f" output redirected to {redirection_target}"
+    if stdout_target is not None:
+        command += " > " + stdout_target
+        msg += f" stdout redirected to {stdout_target}"
+    if stderr_target is not None:
+        command += " 2> " + stderr_target
+        msg += f" stderr redirected to {stderr_target}"
     cmd(command, msg)
 
 
@@ -145,19 +154,26 @@ def run_tests():
     log("Example programs found: " + ", ".join(examples))
     for test_idx, example in enumerate(examples):
         log(f"TEST {example} STARTS (test {test_idx+1} out of {n_tests})")
-        raw_out = f"{examples_dir}/{example}/test-raw.testout"
-        instr_out = f"{examples_dir}/{example}/test-instr.testout"
-        run_example_raw(example, redirection_target=raw_out)
-        run_example(example, redirection_target=instr_out, test_mode=True)
-        with open(raw_out, mode="r") as raw, open(instr_out, mode="r") as instr:
-            raw_lines = raw.readlines()
-            instr_lines = instr.readlines()
-            for line_idx in range(min(len(raw_lines), len(instr_lines))):
-                assert raw_lines[line_idx] == instr_lines[line_idx], f"outputs differ starting at line {line_idx}"
-            assert len(raw_lines) == len(instr_lines), "output lengths differ"
+        raw_stdout_target = f"{examples_dir}/{example}/test-raw-stdout.testout"
+        raw_stderr_target = f"{examples_dir}/{example}/test-raw-stderr.testout"
+        instr_stdout_target = f"{examples_dir}/{example}/test-instr-stdout.testout"
+        instr_stderr_target = f"{examples_dir}/{example}/test-instr-stderr.testout"
+        run_example_raw(example, stdout_target=raw_stdout_target, stderr_target=raw_stderr_target)
+        run_example(example, stdout_target=instr_stdout_target, stderr_target=instr_stderr_target, test_mode=True)
+        assert_files_equal(raw_stdout_target, instr_stdout_target)
+        assert_files_equal(raw_stderr_target, instr_stderr_target)
         log(f"TEST {example} PASSED (test {test_idx+1} out of {n_tests})")
     log("Finished running tests: " + ", ".join(examples))
     log("Tests finished: no error detected")
+
+
+def assert_files_equal(raw_out, instr_out):
+    with open(raw_out, mode="r") as raw, open(instr_out, mode="r") as instr:
+        raw_lines = raw.readlines()
+        instr_lines = instr.readlines()
+        for line_idx in range(min(len(raw_lines), len(instr_lines))):
+            assert raw_lines[line_idx] == instr_lines[line_idx], f"outputs differ starting at line {line_idx}"
+        assert len(raw_lines) == len(instr_lines), "output lengths differ"
 
 
 def read_config_file(directory: str):
