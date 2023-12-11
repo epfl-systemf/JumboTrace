@@ -1,5 +1,7 @@
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 public class Main {
 
@@ -58,7 +60,7 @@ public class Main {
     // switch expr
     @SuppressWarnings("all")
     static boolean isFrenchSoundingName(String s) {
-        return switch (s) {
+        return switch (dummyUpperCase(s)) {
             case "Adelaide", "Berenice", "Charles" -> true;
             case "Emilie", "Francoise" -> {
                 yield true;
@@ -107,6 +109,26 @@ public class Main {
             }
         }
         return res;
+    }
+
+    static String dummiestUpperCase(String name) {
+        return switch (name) {
+            case "adelaide":
+                var r = "adelaide";
+                r = r.replaceFirst("a", "A");
+                yield r;
+            case "berenice":
+                yield "Berenice";
+            case "charles":
+                yield null;
+            default:
+                yield name.isEmpty() ? name : null;
+        };
+    }
+
+    static String dummyUpperCase(String name){
+        var r = dummiestUpperCase(name);
+        return (r == null) ? name.replaceFirst(String.valueOf(name.charAt(0)), name.substring(0, 1).toUpperCase()) : r;
     }
 
 }
