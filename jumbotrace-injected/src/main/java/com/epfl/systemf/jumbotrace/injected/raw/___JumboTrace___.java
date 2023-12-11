@@ -277,7 +277,9 @@ public class ___JumboTrace___ {
     }
 
     private static String formatPosition(String filename, int line, int col) {
-        return String.format("%s:%d:%d", simplifyFilename(filename), line, col);
+        var lineStr = (line == NO_POS) ? "?" : String.valueOf(line);
+        var colStr = (col == NO_POS) ? "?" : String.valueOf(col);
+        return String.format("%s:%s:%s", simplifyFilename(filename), lineStr, colStr);
     }
 
     private static String simplifyFilename(String filename) {
