@@ -251,7 +251,7 @@ public class ___JumboTrace___ {
     public static void caught(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol){
         if (loggingEnabled){
             disableLogging();
-            log("CAUGHT ", throwable, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            log("CATCH ", throwable, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
     }
@@ -266,6 +266,15 @@ public class ___JumboTrace___ {
             enableLogging();
         }
         return value;
+    }
+
+    public static Throwable throwStat(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("THROW ", throwable, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return throwable;
     }
 
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {

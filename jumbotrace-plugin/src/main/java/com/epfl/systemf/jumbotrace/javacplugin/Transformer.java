@@ -543,9 +543,16 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitThrow(JCThrow tree) {
-        // TODO decide whether we want to log throws (inconsistent with e.g. x/0, where the throw is not logged)
-        super.visitThrow(tree);
+    public void visitThrow(JCThrow throwStat) {
+        super.visitThrow(throwStat);
+        this.result = mk().Throw(instrumentation.logThrowStat(
+                throwStat.expr,
+                currentFilename(),
+                getStartLine(throwStat),
+                getStartCol(throwStat),
+                safeGetEndLine(throwStat),
+                safeGetEndCol(throwStat)
+        ));
     }
 
     @Override

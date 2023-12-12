@@ -305,6 +305,16 @@ public final class Instrumentation {
         return mk().TypeCast(castedExpr.type, apply);
     }
 
+    public JCExpression logThrowStat(JCExpression throwable, String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "throwStat",
+                List.of(
+                        new Argument(st().throwableType, throwable)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().throwableType
+        );
+    }
+
     //</editor-fold>
 
     //<editor-fold desc="Loops">
