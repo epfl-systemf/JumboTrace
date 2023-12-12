@@ -556,8 +556,26 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitAssert(JCAssert tree) {
-        super.visitAssert(tree);  // TODO
+    public void visitAssert(JCAssert assertStat) {
+        super.visitAssert(assertStat);
+        var origAssertionCond = assertStat.cond;
+        var assertionDescr = assertStat.toString();
+        var assertedVarSymbol = new Symbol.VarSymbol(0, m.nextId("asserted"), st().booleanType, currentMethod());
+        var assertedVarIdent = mk().Ident(assertedVarSymbol).setType(st().booleanType);
+        assertStat.cond = assertedVarIdent;
+        this.result = mk().Block(0, List.of(
+                mk().VarDef(assertedVarSymbol, origAssertionCond),
+                mk().Exec(instrumentation.logAssertion(
+                        assertedVarIdent,
+                        assertionDescr,
+                        currentFilename(),
+                        getStartLine(assertStat),
+                        getStartCol(assertStat),
+                        safeGetEndLine(assertStat),
+                        safeGetEndCol(assertStat)
+                )),
+                assertStat
+        ));
     }
 
     @Override

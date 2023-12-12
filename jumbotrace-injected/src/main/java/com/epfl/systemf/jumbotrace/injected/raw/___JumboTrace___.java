@@ -277,6 +277,17 @@ public class ___JumboTrace___ {
         return throwable;
     }
 
+    public static boolean assertionStat(boolean asserted, String assertionDescr, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            var successOrFailDescr = asserted ? " SUCCEEDS" : " FAILS";
+            log("ASSERTION ", assertionDescr, successOrFailDescr,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return asserted;
+    }
+
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {
         if (endLine == NO_POS) {
             return formatPosition(simplifyFilename(filename), startLine, startCol);

@@ -277,7 +277,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Exceptions and casts">
+    //<editor-fold desc="Exceptions, casts, assertions">
 
     public JCExpression logCaught(JCExpression exprYieldingThrowable,
                                   String filename, int startLine, int startCol, int endLine, int endCol){
@@ -312,6 +312,18 @@ public final class Instrumentation {
                         new Argument(st().throwableType, throwable)
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().throwableType
+        );
+    }
+
+    public JCExpression logAssertion(JCExpression asserted, String assertedDescr,
+                                     String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "assertionStat",
+                List.of(
+                        new Argument(st().booleanType, asserted),
+                        new Argument(st().stringType, mk().Literal(assertedDescr))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().booleanType
         );
     }
 
