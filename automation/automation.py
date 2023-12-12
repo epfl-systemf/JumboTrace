@@ -58,7 +58,7 @@ def run_example(example_name: str, main_class_name: str = "Main",
                 stdout_target: str | None = None, stderr_target: str | None = None,
                 test_mode: bool = False):
     compile_example(example_name, test_mode)
-    command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
+    command = f"java -ea -cp {examples_dir}/{example_name} {main_class_name}"
     msg = f"running example {example_name} [instrumented] (mainclass=\'{main_class_name}\')"
     if stdout_target is not None:
         command += " > " + stdout_target
@@ -72,7 +72,7 @@ def run_example(example_name: str, main_class_name: str = "Main",
 def run_example_raw(example_name: str, main_class_name: str = "Main",
                     stdout_target: str | None = None, stderr_target: str | None = None):
     compile_example_raw(example_name)
-    command = f"java -cp {examples_dir}/{example_name} {main_class_name}"
+    command = f"java -ea -cp {examples_dir}/{example_name} {main_class_name}"
     msg = f"running example {example_name} [not instrumented] (mainclass=\'{main_class_name}\')"
     if stdout_target is not None:
         command += " > " + stdout_target
@@ -100,7 +100,7 @@ def run_example_project(example_name: str, test_mode: bool = False):
     log(f"read args from config file: {args}")
     compile_example_project(example_name, test_mode)
     cmd(
-        f"java -cp {examples_dir}/{example_name}/target/classes {main_class} \"{args}\"",
+        f"java -ea -cp {examples_dir}/{example_name}/target/classes {main_class} \"{args}\"",
         f"running example {example_name} [not instrumented]"
     )
 
