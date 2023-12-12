@@ -557,9 +557,9 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitAssert(JCAssert assertStat) {
+        var assertionDescr = assertStat.toString(); // save this BEFORE transforming the subtrees
         super.visitAssert(assertStat);
         var origAssertionCond = assertStat.cond;
-        var assertionDescr = assertStat.toString();
         var assertedVarSymbol = new Symbol.VarSymbol(0, m.nextId("asserted"), st().booleanType, currentMethod());
         var assertedVarIdent = mk().Ident(assertedVarSymbol).setType(st().booleanType);
         assertStat.cond = assertedVarIdent;
