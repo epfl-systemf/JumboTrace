@@ -211,7 +211,7 @@ public class ___JumboTrace___ {
                                         String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            log("VAR UPDATE ", varName, " ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+            log("VAR UPDATE ", varName, " ", operator, "= ", rhs, " : ", oldValue, " -> ", newValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
@@ -233,7 +233,7 @@ public class ___JumboTrace___ {
                                            String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            log("STATIC FIELD UPDATE ", className, ".", fieldName, " ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+            log("STATIC FIELD UPDATE ", className, ".", fieldName, " ", operator, "= ", rhs, " : ", oldValue, " -> ", newValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
@@ -255,7 +255,7 @@ public class ___JumboTrace___ {
                                              String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            log("INSTANCE FIELD UPDATE ", instance, ".", className, "::", fieldName, " ", operator, " ", rhs, " : ",
+            log("INSTANCE FIELD UPDATE ", instance, ".", className, "::", fieldName, " ", operator, "= ", rhs, " : ",
                     oldValue, " -> ", newValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
@@ -276,7 +276,7 @@ public class ___JumboTrace___ {
                                          String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            log("ARRAY UPDATE ", array, "[", index, "] ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+            log("ARRAY UPDATE ", array, "[", index, "] ", operator, "= ", rhs, " : ", oldValue, " -> ", newValue,
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
