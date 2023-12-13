@@ -260,7 +260,7 @@ public final class Instrumentation {
                 "instanceFieldAssignOp",
                 List.of(
                         new Argument(st().stringType, mk().Literal(className)),
-                        new Argument(higherType, instance),
+                        new Argument(st().objectType, instance),
                         new Argument(st().stringType, mk().Literal(fieldName)),
                         new Argument(higherType, newValue),
                         new Argument(higherType, oldValue),
