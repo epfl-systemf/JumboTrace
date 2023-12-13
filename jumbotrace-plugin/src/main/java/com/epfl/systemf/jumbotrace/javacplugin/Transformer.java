@@ -676,28 +676,30 @@ public final class Transformer extends TreeTranslator {
     public void visitTypeCast(JCTypeCast typeCast) {
         super.visitTypeCast(typeCast);
         deleteConstantFolding(typeCast);
-        this.result =
-                withNewLocal("casted", typeCast.expr, (castedVarSymbol, castedVarIdent, castedVarDef) -> {
-                    typeCast.expr = castedVarIdent;
-                    return withNewLocal("castWillSucceed", mk().TypeTest(castedVarIdent, typeCast.clazz).setType(st().booleanType),
-                            (successVarSymbol, successVarIdent, successVarDef) -> mk().LetExpr(
-                                    List.of(
-                                            castedVarDef,
-                                            successVarDef,
-                                            mk().Exec(instrumentation.logCastAttempt(
-                                                    castedVarIdent,
-                                                    typeCast.clazz.toString(),
-                                                    successVarIdent,
-                                                    currentFilename(),
-                                                    getStartLine(typeCast),
-                                                    getStartCol(typeCast),
-                                                    safeGetEndLine(typeCast),
-                                                    safeGetEndCol(typeCast)
-                                            ))
-                                    ),
-                                    typeCast
-                            ).setType(typeCast.type));
-                });
+        if (!typeCast.clazz.type.isPrimitive()) {
+            this.result =
+                    withNewLocal("casted", typeCast.expr, (castedVarSymbol, castedVarIdent, castedVarDef) -> {
+                        typeCast.expr = castedVarIdent;
+                        return withNewLocal("castWillSucceed", mk().TypeTest(castedVarIdent, typeCast.clazz).setType(st().booleanType),
+                                (successVarSymbol, successVarIdent, successVarDef) -> mk().LetExpr(
+                                        List.of(
+                                                castedVarDef,
+                                                successVarDef,
+                                                mk().Exec(instrumentation.logCastAttempt(
+                                                        castedVarIdent,
+                                                        typeCast.clazz.toString(),
+                                                        successVarIdent,
+                                                        currentFilename(),
+                                                        getStartLine(typeCast),
+                                                        getStartCol(typeCast),
+                                                        safeGetEndLine(typeCast),
+                                                        safeGetEndCol(typeCast)
+                                                ))
+                                        ),
+                                        typeCast
+                                ).setType(typeCast.type));
+                    });
+        }
     }
 
     @Override
