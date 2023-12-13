@@ -186,6 +186,23 @@ public final class Instrumentation {
         return castIfNeeded(rhs.type, apply);
     }
 
+    public JCExpression logLocalVarAssignOp(String varName, JCExpression newValue,
+                                            JCExpression oldValue, String operator, JCExpression rhs,
+                                            String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(newValue.type);
+        return makeLogMethodCall(
+                "localVarAssignOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(varName)),
+                        new Argument(higherType, newValue),
+                        new Argument(higherType, oldValue),
+                        new Argument(st().stringType, mk().Literal(operator)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
+    }
+
     public JCExpression logStaticFieldAssignment(String className, String fieldName, JCExpression rhs,
                                                  String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
@@ -199,6 +216,24 @@ public final class Instrumentation {
                 higherType
         );
         return castIfNeeded(rhs.type, apply);
+    }
+
+    public JCExpression logStaticFieldAssignOp(String className, String fieldName, JCExpression newValue,
+                                               JCExpression oldValue, String operator, JCExpression rhs,
+                                               String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(newValue.type);
+        return makeLogMethodCall(
+                "staticFieldAssignOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(higherType, newValue),
+                        new Argument(higherType, oldValue),
+                        new Argument(st().stringType, mk().Literal(operator)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
     }
 
     public JCExpression logInstanceFieldAssignment(String className, JCExpression selected, String fieldName, JCExpression rhs,
@@ -217,6 +252,25 @@ public final class Instrumentation {
         return castIfNeeded(rhs.type, apply);
     }
 
+    public JCExpression logInstanceFieldAssignOp(String className, JCExpression instance, String fieldName, JCExpression newValue,
+                                                 JCExpression oldValue, String operator, JCExpression rhs,
+                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(newValue.type);
+        return makeLogMethodCall(
+                "instanceFieldAssignOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(higherType, instance),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(higherType, newValue),
+                        new Argument(higherType, oldValue),
+                        new Argument(st().stringType, mk().Literal(operator)),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
+    }
+
     public JCExpression logArrayElemSet(JCExpression array, JCExpression index, JCExpression rhs,
                                         String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
@@ -225,6 +279,24 @@ public final class Instrumentation {
                 List.of(
                         new Argument(st().objectType, array),
                         new Argument(st().intType, index),
+                        new Argument(higherType, rhs)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
+    }
+
+    public JCExpression logArrayElemAssignOp(JCExpression array, JCExpression index, JCExpression newValue,
+                                             JCExpression oldValue, String operator, JCExpression rhs,
+                                             String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(newValue.type);
+        return makeLogMethodCall(
+                "arrayElemAssignOp",
+                List.of(
+                        new Argument(st().objectType, array),
+                        new Argument(st().intType, index),
+                        new Argument(higherType, newValue),
+                        new Argument(higherType, oldValue),
+                        new Argument(st().stringType, mk().Literal(operator)),
                         new Argument(higherType, rhs)
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType

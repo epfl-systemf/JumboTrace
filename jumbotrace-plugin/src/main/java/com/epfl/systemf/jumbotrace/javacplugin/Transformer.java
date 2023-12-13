@@ -4,6 +4,7 @@ import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.*;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
 import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Nullable;
@@ -119,9 +120,9 @@ public final class Transformer extends TreeTranslator {
         super.visitBlock(block);
         var newStats = List.<JCStatement>nil();
         // iterating in reverse order to keep complexity linear
-        for (var remStats = block.stats.reverse(); remStats.nonEmpty(); remStats = remStats.tail){
+        for (var remStats = block.stats.reverse(); remStats.nonEmpty(); remStats = remStats.tail) {
             var currStat = remStats.head;
-            if (currStat instanceof JCVariableDecl variableDecl && variableDecl.init != null){
+            if (currStat instanceof JCVariableDecl variableDecl && variableDecl.init != null) {
                 variableDecl.init = instrumentation.logLocalVarAssignment(
                         variableDecl.name.toString(),
                         variableDecl.init,
@@ -133,7 +134,7 @@ public final class Transformer extends TreeTranslator {
                 );
             }
             newStats = newStats.prepend(currStat);
-            if (currStat instanceof JCVariableDecl variableDecl){
+            if (currStat instanceof JCVariableDecl variableDecl) {
                 newStats = newStats.prepend(mk().Exec(instrumentation.logVariableDeclaration(
                         variableDecl.name.toString(),
                         variableDecl.vartype.toString(),
@@ -599,7 +600,7 @@ public final class Transformer extends TreeTranslator {
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignment.rhs = translate(assignment.rhs);
             deleteConstantFolding(assignment);
-            handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name.toString());
+            handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name);
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
             deleteConstantFolding(assignment);
@@ -608,7 +609,7 @@ public final class Transformer extends TreeTranslator {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignment.rhs = translate(assignment.rhs);
             deleteConstantFolding(assignment);
-            handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name.toString());
+            handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name);
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
@@ -621,80 +622,42 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
-    private void handleLocalVarAssignment(JCAssign assignment, JCIdent ident) {
-        assignment.rhs = instrumentation.logLocalVarAssignment(
-                ident.name.toString(),
-                assignment.rhs,
-                currentFilename(),
-                getStartLine(assignment),
-                getStartCol(assignment),
-                safeGetEndLine(assignment),
-                safeGetEndCol(assignment)
-        );
-        this.result = assignment;
-    }
-
-    private void handleStaticFieldAssignment(JCAssign assignment, String className, String fieldName) {
-        assignment.rhs = instrumentation.logStaticFieldAssignment(
-                className,
-                fieldName,
-                assignment.rhs,
-                currentFilename(),
-                getStartLine(assignment),
-                getStartCol(assignment),
-                safeGetEndLine(assignment),
-                safeGetEndCol(assignment)
-        );
-        this.result = assignment;
-    }
-
-    private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, String fieldName) {
-        assignment.rhs = instrumentation.logInstanceFieldAssignment(
-                className,
-                selected,
-                fieldName,
-                assignment.rhs,
-                currentFilename(),
-                getStartLine(assignment),
-                getStartCol(assignment),
-                safeGetEndLine(assignment),
-                safeGetEndCol(assignment)
-        );
-        this.result = assignment;
-    }
-
-    private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
-        var arrayVarSymbol = new Symbol.VarSymbol(0, m.nextId("array"), arrayAccess.indexed.type, currentMethod());
-        var indexVarSymbol = new Symbol.VarSymbol(0, m.nextId("index"), arrayAccess.index.type, currentMethod());
-        var arrayIdent = mk().Ident(arrayVarSymbol).setType(arrayAccess.indexed.type);
-        var indexIdent = mk().Ident(indexVarSymbol).setType(arrayAccess.index.type);
-        var initialArrayExpr = arrayAccess.indexed;
-        var initialIndexExpr = arrayAccess.index;
-        arrayAccess.indexed = arrayIdent;
-        arrayAccess.index = indexIdent;
-        this.result = mk().LetExpr(
-                List.of(
-                        mk().VarDef(arrayVarSymbol, initialArrayExpr),
-                        mk().VarDef(indexVarSymbol, initialIndexExpr),
-                        mk().Exec(instrumentation.logArrayElemSet(
-                                arrayIdent,
-                                indexIdent,
-                                assignment.rhs,
-                                currentFilename(),
-                                getStartLine(assignment),
-                                getStartCol(assignment),
-                                safeGetEndLine(assignment),
-                                safeGetEndCol(assignment)
-                        ))
-                ),
-                assignment
-        ).setType(arrayAccess.type);
-    }
-
     @Override
     public void visitAssignop(JCAssignOp assignOp) {
-        super.visitAssignop(assignOp);  // TODO
-        deleteConstantFolding(assignOp);
+        /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
+         * naive implementation would treat them as reads */
+        var effectiveLhs = withoutParentheses(assignOp.lhs);
+        if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleLocalVarAssignOp(assignOp, ident);
+        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleStaticFieldAssignOp(assignOp, ident, currentClass().toString(), ident.name.toString());
+        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleInstanceFieldAssignOp(assignOp, currentClass().toString(), makeThisExpr(), ident.name.toString());
+        } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleStaticFieldAssignOp(assignOp, fieldAccess, fieldAccess.selected.toString(), fieldAccess.name.toString());
+        } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
+            fieldAccess.selected = translate(fieldAccess.selected);
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleInstanceFieldAssignOp(assignOp, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name.toString());
+        } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
+            arrayAccess.indexed = translate(arrayAccess.indexed);
+            arrayAccess.index = translate(arrayAccess.index);
+            assignOp.rhs = translate(assignOp.rhs);
+            deleteConstantFolding(assignOp);
+            handleArrayAssignOp(assignOp, arrayAccess);
+        } else {
+            super.visitAssignop(assignOp);
+            deleteConstantFolding(assignOp);
+        }
     }
 
     @Override
@@ -806,6 +769,227 @@ public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Visitor helpers">
 
+    private void handleLocalVarAssignment(JCAssign assignment, JCIdent ident) {
+        assignment.rhs = instrumentation.logLocalVarAssignment(
+                ident.name.toString(),
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+        this.result = assignment;
+    }
+
+    private void handleLocalVarAssignOp(JCAssignOp assignOp, JCIdent localVarIdent) {
+        var varType = localVarIdent.type;
+        var oldValueVarSymbol = new Symbol.VarSymbol(0, m.nextId("oldVal"), varType, currentMethod());
+        var rhsVarSymbol = new Symbol.VarSymbol(0, m.nextId("rhs"), varType, currentMethod());
+        var resultVarSymbol = new Symbol.VarSymbol(0, m.nextId("result"), varType, currentMethod());
+        var oldValueVarIdent = mk().Ident(oldValueVarSymbol);
+        var rhsVarIdent = mk().Ident(rhsVarSymbol);
+        var resultVarIdent = mk().Ident(resultVarSymbol);
+        var oldRhs = assignOp.rhs;
+        assignOp.rhs = rhsVarIdent;
+        this.result = mk().LetExpr(
+                List.of(
+                        mk().VarDef(oldValueVarSymbol, localVarIdent),
+                        mk().VarDef(rhsVarSymbol, oldRhs),
+                        mk().VarDef(resultVarSymbol, assignOp),
+                        mk().Exec(
+                                instrumentation.logLocalVarAssignOp(
+                                        localVarIdent.name.toString(),
+                                        localVarIdent,
+                                        oldValueVarIdent,
+                                        assignOp.operator.toString(),
+                                        rhsVarIdent,
+                                        currentFilename(),
+                                        getStartLine(assignOp),
+                                        getStartCol(assignOp),
+                                        safeGetEndLine(assignOp),
+                                        safeGetEndCol(assignOp)
+                                )
+                        )
+                ),
+                resultVarIdent
+        ).setType(varType);
+    }
+
+    private void handleStaticFieldAssignment(JCAssign assignment, String className, String fieldName) {
+        assignment.rhs = instrumentation.logStaticFieldAssignment(
+                className,
+                fieldName,
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+        this.result = assignment;
+    }
+
+    private void handleStaticFieldAssignOp(JCAssignOp assignOp, JCExpression fieldExpr, String className, String fieldName) {
+        var fieldType = fieldExpr.type;
+        var oldValueVarSymbol = new Symbol.VarSymbol(0, m.nextId("oldVal"), fieldType, currentMethod());
+        var rhsVarSymbol = new Symbol.VarSymbol(0, m.nextId("rhs"), fieldType, currentMethod());
+        var resultVarSymbol = new Symbol.VarSymbol(0, m.nextId("result"), fieldType, currentMethod());
+        var oldValueVarIdent = mk().Ident(oldValueVarSymbol);
+        var rhsVarIdent = mk().Ident(rhsVarSymbol);
+        var resultVarIdent = mk().Ident(resultVarSymbol);
+        var oldRhs = assignOp.rhs;
+        assignOp.rhs = rhsVarIdent;
+        this.result = mk().LetExpr(
+                List.of(
+                        mk().VarDef(oldValueVarSymbol, fieldExpr),
+                        mk().VarDef(rhsVarSymbol, oldRhs),
+                        mk().VarDef(resultVarSymbol, assignOp),
+                        mk().Exec(
+                                instrumentation.logStaticFieldAssignOp(
+                                        className,
+                                        fieldName,
+                                        fieldExpr,
+                                        oldValueVarIdent,
+                                        assignOp.operator.toString(),
+                                        rhsVarIdent,
+                                        currentFilename(),
+                                        getStartLine(assignOp),
+                                        getStartCol(assignOp),
+                                        safeGetEndLine(assignOp),
+                                        safeGetEndCol(assignOp)
+                                )
+                        )
+                ),
+                resultVarIdent
+        ).setType(fieldType);
+    }
+
+    private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, Name fieldName) {
+        var receiverVarSymbol = new Symbol.VarSymbol(0, m.nextId("receiver"), selected.type, currentMethod());
+        var receiverVarDef = mk().VarDef(receiverVarSymbol, selected);
+        var receiverVarIdent = mk().Ident(receiverVarSymbol);
+        assignment.rhs = instrumentation.logInstanceFieldAssignment(
+                className,
+                receiverVarIdent,
+                fieldName.toString(),
+                assignment.rhs,
+                currentFilename(),
+                getStartLine(assignment),
+                getStartCol(assignment),
+                safeGetEndLine(assignment),
+                safeGetEndCol(assignment)
+        );
+        assignment.lhs = mk().Select(
+                receiverVarIdent,
+                new Symbol.VarSymbol(0, fieldName, assignment.lhs.type, currentMethod())
+        ).setType(assignment.lhs.type);
+        this.result = mk().LetExpr(
+                List.of(
+                        receiverVarDef
+                ),
+                assignment
+        ).setType(assignment.type);
+    }
+
+    private void handleInstanceFieldAssignOp(JCAssignOp assignOp, String className, JCExpression selected, String fieldName) {
+        this.result =
+                withNewLocal("receiver", selected, (receiverSymbol, receiverIdent, receiverVarDecl) ->
+                        withNewLocal("oldValue", assignOp.lhs, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
+                                withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
+                                    assignOp.rhs = rhsIdent;
+                                    return withNewLocal("result", assignOp, (resultSymbol, resultIdent, resultVarDecl) ->
+                                            mk().LetExpr(
+                                                    List.of(
+                                                            receiverVarDecl,
+                                                            oldValueVarDecl,
+                                                            rhsVarDecl,
+                                                            resultVarDecl,
+                                                            mk().Exec(instrumentation.logInstanceFieldAssignOp(
+                                                                    className,
+                                                                    receiverIdent,
+                                                                    fieldName,
+                                                                    assignOp.lhs,
+                                                                    oldValueIdent,
+                                                                    assignOp.operator.toString(),
+                                                                    rhsIdent,
+                                                                    currentFilename(),
+                                                                    getStartLine(assignOp),
+                                                                    getStartCol(assignOp),
+                                                                    safeGetEndLine(assignOp),
+                                                                    safeGetEndCol(assignOp)
+                                                            ))
+                                                    ),
+                                                    resultIdent
+                                            ).setType(assignOp.type));
+                                })));
+    }
+
+    private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
+        var arrayVarSymbol = new Symbol.VarSymbol(0, m.nextId("array"), arrayAccess.indexed.type, currentMethod());
+        var indexVarSymbol = new Symbol.VarSymbol(0, m.nextId("index"), arrayAccess.index.type, currentMethod());
+        var arrayIdent = mk().Ident(arrayVarSymbol).setType(arrayAccess.indexed.type);
+        var indexIdent = mk().Ident(indexVarSymbol).setType(arrayAccess.index.type);
+        var initialArrayExpr = arrayAccess.indexed;
+        var initialIndexExpr = arrayAccess.index;
+        arrayAccess.indexed = arrayIdent;
+        arrayAccess.index = indexIdent;
+        this.result = mk().LetExpr(
+                List.of(
+                        mk().VarDef(arrayVarSymbol, initialArrayExpr),
+                        mk().VarDef(indexVarSymbol, initialIndexExpr),
+                        mk().Exec(instrumentation.logArrayElemSet(
+                                arrayIdent,
+                                indexIdent,
+                                assignment.rhs,
+                                currentFilename(),
+                                getStartLine(assignment),
+                                getStartCol(assignment),
+                                safeGetEndLine(assignment),
+                                safeGetEndCol(assignment)
+                        ))
+                ),
+                assignment
+        ).setType(arrayAccess.type);
+    }
+
+    private void handleArrayAssignOp(JCAssignOp assignOp, JCArrayAccess arrayAccess) {
+        this.result =
+                withNewLocal("array", arrayAccess.indexed, (arraySymbol, arrayIdent, arrayVarDecl) ->
+                        withNewLocal("index", arrayAccess.index, (indexSymbol, indexIdent, indexVarDecl) -> {
+                            arrayAccess.indexed = arrayIdent;
+                            arrayAccess.index = indexIdent;
+                            return withNewLocal("oldValue", arrayAccess, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
+                                    withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
+                                        assignOp.rhs = rhsIdent;
+                                        return withNewLocal("result", assignOp, (resultSymbol, resultIdent, resultVarDecl) ->
+                                                mk().LetExpr(
+                                                        List.of(
+                                                                arrayVarDecl,
+                                                                indexVarDecl,
+                                                                oldValueVarDecl,
+                                                                rhsVarDecl,
+                                                                resultVarDecl,
+                                                                mk().Exec(instrumentation.logArrayElemAssignOp(
+                                                                        arrayIdent,
+                                                                        indexIdent,
+                                                                        arrayAccess,
+                                                                        oldValueIdent,
+                                                                        assignOp.operator.toString(),
+                                                                        rhsIdent,
+                                                                        currentFilename(),
+                                                                        getStartLine(assignOp),
+                                                                        getStartCol(assignOp),
+                                                                        safeGetEndLine(assignOp),
+                                                                        safeGetEndCol(assignOp)
+                                                                ))
+                                                        ),
+                                                        resultIdent
+                                                ).setType(assignOp.type));
+                                    }));
+                        }));
+    }
+
     private JCTree resolveJumpTarget(JCTree rawTarget) {
         Assertions.checkPrecondition(rawTarget != null, "target must not be null");
         if (rawTarget instanceof JCLabeledStatement labeledStatement) {
@@ -888,6 +1072,17 @@ public final class Transformer extends TreeTranslator {
             JCStatement logMethodCall,
             JCExpression initialMethodInvocation
     ) {
+    }
+
+    // TODO refactor lots of places to use withNewLocal
+    private <T extends JCTree> T withNewLocal(String debugHint, JCExpression valueExpr,
+                                              TriFunction<Symbol.VarSymbol, JCIdent, JCVariableDecl, T> treeProducer) {
+        var type = valueExpr.type;
+        var symbol = new Symbol.VarSymbol(0, m.nextId(debugHint), type, currentMethod());
+        var ident = mk().Ident(symbol);
+        ident.setType(type);
+        var varDecl = mk().VarDef(symbol, valueExpr);
+        return treeProducer.apply(symbol, ident, varDecl);
     }
 
     private JCExpression makeLet(JCExpression invocation, String className, String methodName, CallInstrumentationPieces instrPieces) {
@@ -996,15 +1191,15 @@ public final class Transformer extends TreeTranslator {
                 .setType(currentClass().type);
     }
 
-    private JCExpression withoutParentheses(JCExpression expr){
+    private JCExpression withoutParentheses(JCExpression expr) {
         return (expr instanceof JCParens parentheses) ?
                 withoutParentheses(parentheses.expr) :
                 expr;
     }
 
     // constant folding sometimes causes the codegen to not include the injected logging code into the bytecode
-    private void deleteConstantFolding(JCExpression expr){
-        while (expr.type != null && expr.type.constValue() != null){
+    private void deleteConstantFolding(JCExpression expr) {
+        while (expr.type != null && expr.type.constValue() != null) {
             expr.type = expr.type.baseType();
         }
     }
@@ -1033,12 +1228,17 @@ public final class Transformer extends TreeTranslator {
 
     //</editor-fold>
 
-    //<editor-fold desc="Tuples">
+    //<editor-fold desc="Structs">
 
     private record Pair<A, B>(A _1, B _2) {
     }
 
     private record Triple<A, B, C>(A _1, B _2, C _3) {
+    }
+
+    @FunctionalInterface
+    private interface TriFunction<A, B, C, R> {
+        R apply(A a, B b, C c);
     }
 
     //</editor-fold>

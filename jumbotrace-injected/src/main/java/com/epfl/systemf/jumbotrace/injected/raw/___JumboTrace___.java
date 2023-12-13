@@ -206,6 +206,17 @@ public class ___JumboTrace___ {
         return assignedValue;
     }
 
+    public static void localVarAssignOp(String varName, @Specialize Object newValue,
+                                        @Specialize Object oldValue, String operator, @Specialize Object rhs,
+                                        String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("VAR UPDATE ", varName, " ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     public static @Specialize Object staticFieldAssignment(String className, String fieldName, @Specialize Object assignedValue,
                                                            String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
@@ -215,6 +226,17 @@ public class ___JumboTrace___ {
             enableLogging();
         }
         return assignedValue;
+    }
+
+    public static void staticFieldAssignOp(String className, String fieldName, @Specialize Object newValue,
+                                           @Specialize Object oldValue, String operator, @Specialize Object rhs,
+                                           String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("STATIC FIELD UPDATE ", className, ".", fieldName, " ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
     }
 
     public static @Specialize Object instanceFieldAssignment(String className, Object instance, String fieldName, @Specialize Object assignedValue,
@@ -228,6 +250,17 @@ public class ___JumboTrace___ {
         return assignedValue;
     }
 
+    public static void instanceFieldAssignOp(String className, Object instance, String fieldName, @Specialize Object newValue,
+                                             @Specialize Object oldValue, String operator, @Specialize Object rhs,
+                                             String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("INSTANCE FIELD UPDATE ", instance, ".", className, "::", fieldName, " ", operator, " ", rhs, " : ",
+                    oldValue, " -> ", newValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     public static void arrayElemSet(Object array, int index, @Specialize Object assignedValue,
                                     String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
@@ -238,9 +271,20 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static void arrayElemAssignOp(Object array, int index, @Specialize Object newValue,
+                                         @Specialize Object oldValue, String operator, @Specialize Object rhs,
+                                         String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("ARRAY UPDATE ", array, "[", index, "] ", operator, " ", rhs, " : ", oldValue, " -> ", newValue,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+    }
+
     public static void variableDeclared(String varName, String typeDescr,
-                                        String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                        String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("VAR DECLARED: ", varName, " (of static type ", typeDescr, ") at ",
                     formatPositionInterval(filename, startLine, startCol, endLine, endCol));
@@ -248,8 +292,8 @@ public class ___JumboTrace___ {
         }
     }
 
-    public static void caught(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static void caught(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("CATCH ", throwable, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
@@ -257,8 +301,8 @@ public class ___JumboTrace___ {
     }
 
     public static @Specialize Object castAttempt(@Specialize Object value, String targetTypeDescr, boolean willSucceed,
-                                                 String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+                                                 String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             var resultMsg = willSucceed ? "SUCCEEDED" : "FAILED";
             log("CAST ", value, " to type ", targetTypeDescr, " ", resultMsg, " at ",
@@ -268,8 +312,8 @@ public class ___JumboTrace___ {
         return value;
     }
 
-    public static Throwable throwStat(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static Throwable throwStat(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             log("THROW ", throwable, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
@@ -277,8 +321,8 @@ public class ___JumboTrace___ {
         return throwable;
     }
 
-    public static boolean assertionStat(boolean asserted, String assertionDescr, String filename, int startLine, int startCol, int endLine, int endCol){
-        if (loggingEnabled){
+    public static boolean assertionStat(boolean asserted, String assertionDescr, String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
             disableLogging();
             var successOrFailDescr = asserted ? " SUCCEEDS" : " FAILS";
             log("ASSERTION ", assertionDescr, successOrFailDescr,
