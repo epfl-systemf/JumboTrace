@@ -786,20 +786,20 @@ public final class Transformer extends TreeTranslator {
     private void handleLocalVarAssignOp(JCAssignOp assignOp, JCIdent localVarIdent) {
         var varType = localVarIdent.type;
         this.result =
-                withNewLocal("oldVal", localVarIdent, (oldValueVarSymbol, oldValueVarIdent, oldValueVarDef) ->
+                withNewLocal("oldVal", localVarIdent, (oldValueSymbol, oldValueIdent, oldValueDef) ->
                         withNewLocal("rhs", assignOp.rhs, (rhsVarSymbol, rhsVarIdent, rhsVarDef) -> {
                             assignOp.rhs = rhsVarIdent;
-                            return withNewLocal("result", assignOp, (resultSymbol, resultVarIdent, resultVarDef) ->
+                            return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent), (resultSymbol, resultVarIdent, resultVarDef) ->
                                     mk().LetExpr(
                                             List.of(
-                                                    oldValueVarDef,
+                                                    oldValueDef,
                                                     rhsVarDef,
                                                     resultVarDef,
                                                     mk().Exec(
                                                             instrumentation.logLocalVarAssignOp(
                                                                     localVarIdent.name.toString(),
                                                                     localVarIdent,
-                                                                    oldValueVarIdent,
+                                                                    oldValueIdent,
                                                                     assignOp.operator.name.toString(),
                                                                     rhsVarIdent,
                                                                     currentFilename(),
@@ -832,33 +832,34 @@ public final class Transformer extends TreeTranslator {
     private void handleStaticFieldAssignOp(JCAssignOp assignOp, JCExpression fieldExpr, String className, String fieldName) {
         var fieldType = fieldExpr.type;
         this.result =
-                withNewLocal("oldVal", fieldExpr, (oldValueVarSymbol, oldValueVarIdent, oldValueVarDef) ->
+                withNewLocal("oldVal", fieldExpr, (oldValueSymbol, oldValueIdent, oldValueDef) ->
                         withNewLocal("rhs", assignOp.rhs, (rhsVarSymbol, rhsVarIdent, rhsVarDef) -> {
                             assignOp.rhs = rhsVarIdent;
-                            return withNewLocal("result", assignOp, (resultVarSymbol, resultVarIdent, resultVarDef) ->
-                                    mk().LetExpr(
-                                            List.of(
-                                                    oldValueVarDef,
-                                                    rhsVarDef,
-                                                    resultVarDef,
-                                                    mk().Exec(
-                                                            instrumentation.logStaticFieldAssignOp(
-                                                                    className,
-                                                                    fieldName,
-                                                                    fieldExpr,
-                                                                    oldValueVarIdent,
-                                                                    assignOp.operator.name.toString(),
-                                                                    rhsVarIdent,
-                                                                    currentFilename(),
-                                                                    getStartLine(assignOp),
-                                                                    getStartCol(assignOp),
-                                                                    safeGetEndLine(assignOp),
-                                                                    safeGetEndCol(assignOp)
+                            return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
+                                    (resultSymbol, resultIdent, resultDef) ->
+                                            mk().LetExpr(
+                                                    List.of(
+                                                            oldValueDef,
+                                                            rhsVarDef,
+                                                            resultDef,
+                                                            mk().Exec(
+                                                                    instrumentation.logStaticFieldAssignOp(
+                                                                            className,
+                                                                            fieldName,
+                                                                            resultIdent,
+                                                                            oldValueIdent,
+                                                                            assignOp.operator.name.toString(),
+                                                                            rhsVarIdent,
+                                                                            currentFilename(),
+                                                                            getStartLine(assignOp),
+                                                                            getStartCol(assignOp),
+                                                                            safeGetEndLine(assignOp),
+                                                                            safeGetEndCol(assignOp)
+                                                                    )
                                                             )
-                                                    )
-                                            ),
-                                            resultVarIdent
-                                    ).setType(fieldType)
+                                                    ),
+                                                    resultIdent
+                                            ).setType(fieldType)
                             );
                         }));
     }
@@ -900,35 +901,36 @@ public final class Transformer extends TreeTranslator {
                     return withNewLocal("oldValue", select, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
                             withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
                                 assignOp.rhs = rhsIdent;
-                                return withNewLocal("result", assignOp, (resultSymbol, resultIdent, resultVarDecl) -> mk().LetExpr(
-                                        List.of(
-                                                receiverVarDecl,
-                                                oldValueVarDecl,
-                                                rhsVarDecl,
-                                                resultVarDecl,
-                                                mk().Exec(instrumentation.logInstanceFieldAssignOp(
-                                                        className,
-                                                        receiverIdent,
-                                                        fieldName.toString(),
-                                                        select,
-                                                        oldValueIdent,
-                                                        assignOp.operator.name.toString(),
-                                                        rhsIdent,
-                                                        currentFilename(),
-                                                        getStartLine(assignOp),
-                                                        getStartCol(assignOp),
-                                                        safeGetEndLine(assignOp),
-                                                        safeGetEndCol(assignOp)
-                                                ))
-                                        ),
-                                        resultIdent
-                                ).setType(assignOp.type));
+                                return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
+                                        (resultSymbol, resultIdent, resultVarDecl) ->
+                                                mk().LetExpr(
+                                                        List.of(
+                                                                receiverVarDecl,
+                                                                oldValueVarDecl,
+                                                                rhsVarDecl,
+                                                                resultVarDecl,
+                                                                mk().Exec(instrumentation.logInstanceFieldAssignOp(
+                                                                        className,
+                                                                        receiverIdent,
+                                                                        fieldName.toString(),
+                                                                        resultIdent,
+                                                                        oldValueIdent,
+                                                                        assignOp.operator.name.toString(),
+                                                                        rhsIdent,
+                                                                        currentFilename(),
+                                                                        getStartLine(assignOp),
+                                                                        getStartCol(assignOp),
+                                                                        safeGetEndLine(assignOp),
+                                                                        safeGetEndCol(assignOp)
+                                                                ))
+                                                        ),
+                                                        resultIdent
+                                                ).setType(assignOp.type));
                             }));
                 });
     }
 
     private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
-
         this.result =
                 withNewLocal("array", arrayAccess.indexed, (arrayVarSymbol, arrayIdent, arrayVarDef) ->
                         withNewLocal("index", arrayAccess.index, (indexVarSymbol, indexIdent, indexVarDef) -> {
@@ -963,32 +965,47 @@ public final class Transformer extends TreeTranslator {
                             return withNewLocal("oldValue", arrayAccess, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
                                     withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
                                         assignOp.rhs = rhsIdent;
-                                        return withNewLocal("result", assignOp, (resultSymbol, resultIdent, resultVarDecl) ->
-                                                mk().LetExpr(
-                                                        List.of(
-                                                                arrayVarDecl,
-                                                                indexVarDecl,
-                                                                oldValueVarDecl,
-                                                                rhsVarDecl,
-                                                                resultVarDecl,
-                                                                mk().Exec(instrumentation.logArrayElemAssignOp(
-                                                                        arrayIdent,
-                                                                        indexIdent,
-                                                                        arrayAccess,
-                                                                        oldValueIdent,
-                                                                        assignOp.operator.name.toString(),
-                                                                        rhsIdent,
-                                                                        currentFilename(),
-                                                                        getStartLine(assignOp),
-                                                                        getStartCol(assignOp),
-                                                                        safeGetEndLine(assignOp),
-                                                                        safeGetEndCol(assignOp)
-                                                                ))
-                                                        ),
-                                                        resultIdent
-                                                ).setType(assignOp.type));
+                                        return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
+                                                (resultSymbol, resultIdent, resultVarDecl) ->
+                                                        mk().LetExpr(
+                                                                List.of(
+                                                                        arrayVarDecl,
+                                                                        indexVarDecl,
+                                                                        oldValueVarDecl,
+                                                                        rhsVarDecl,
+                                                                        resultVarDecl,
+                                                                        mk().Exec(instrumentation.logArrayElemAssignOp(
+                                                                                arrayIdent,
+                                                                                indexIdent,
+                                                                                resultIdent,
+                                                                                oldValueIdent,
+                                                                                assignOp.operator.name.toString(),
+                                                                                rhsIdent,
+                                                                                currentFilename(),
+                                                                                getStartLine(assignOp),
+                                                                                getStartCol(assignOp),
+                                                                                safeGetEndLine(assignOp),
+                                                                                safeGetEndCol(assignOp)
+                                                                        ))
+                                                                ),
+                                                                resultIdent
+                                                        ).setType(assignOp.type));
                                     }));
                         }));
+    }
+
+    private JCExpression expandAssignOp(JCAssignOp assignOp, JCExpression savedValueVar) {
+        var type = assignOp.type;
+        return mk().Assign(
+                assignOp.lhs,
+                new JCBinary(
+                        assignOp.getTag().noAssignOp(),
+                        savedValueVar,
+                        assignOp.rhs,
+                        assignOp.operator
+                ) {  // dummy anonymous subclass because constructor is protected...
+                }.setType(type)
+        ).setType(type);
     }
 
     private JCTree resolveJumpTarget(JCTree rawTarget) {
