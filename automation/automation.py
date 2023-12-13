@@ -13,8 +13,7 @@ injectedgen_dir: Final[str] = "../jumbotrace-injectedgen"
 test_excluded_examples: Final[List[str]] = [
     "Chemistry",    # currently no support for tests based on whole projects
     "Counters",     # FIXME this one should work but does not
-    "Exceptions",   # should fail
-    "Casts"         # should fail
+    "Casts"  # FIXME does not work because of a position mismatch, should be enough to set positions on the new nodes
 ]
 
 

@@ -2,9 +2,14 @@
 public final class Main {
 
     public static void main(String[] args) {
-        var res = f(9, -2);
+        double res = f(9, -2);
         System.out.println(res);
-        res = f(0, 42);
+        try {
+            res = f(0, 42);
+            System.out.println("no exception");
+        } catch (ArithmeticException e){
+            System.out.println("array exception caught by handler");
+        }
         System.out.println(res);
     }
 
