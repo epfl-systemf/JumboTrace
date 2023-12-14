@@ -416,6 +416,43 @@ public class ___JumboTrace___ {
         return res;
     }
 
+    public static void arithBinop(
+            @Specialize(numericOnly = true) int lhs,
+            @Specialize(numericOnly = true) int rhs,
+            String operator,
+            @Specialize(numericOnly = true) int result
+    ){
+        if (loggingEnabled){
+            disableLogging();
+            log("ARITH BINOP ", lhs, " ", operator, " ", rhs, " = ", result);
+            enableLogging();
+        }
+    }
+
+    public static void logicalOperator(boolean lhs, boolean rhs, String operator, boolean result){
+        if (loggingEnabled){
+            disableLogging();
+            log("LOGICAL BINOP ", lhs, " ", operator, " ", rhs, " = ", result);
+            enableLogging();
+        }
+    }
+
+    public static void comparisonOperator(@Specialize Object lhs, @Specialize Object rhs, String operator, boolean result){
+        if (loggingEnabled){
+            disableLogging();
+            log("COMPARISON BINOP ", lhs, " ", operator, " ", rhs, " = ", result);
+            enableLogging();
+        }
+    }
+
+    public static void shiftOperator(long lhs, long rhs, String operator, long result){
+        if (loggingEnabled){
+            disableLogging();
+            log("SHIFT BINOP ", lhs, " ", operator, " ", rhs, " = ", result);
+            enableLogging();
+        }
+    }
+
     private static String preOrPost(boolean isPre) {
         return isPre ? "PRE" : "POST";
     }
