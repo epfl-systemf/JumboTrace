@@ -586,84 +586,115 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitAssign(JCAssign assignment) {
+        deleteConstantFolding(assignment);
         /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
          * naive implementation would treat them as reads */
         var effectiveLhs = withoutParentheses(assignment.lhs);
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleLocalVarAssignment(assignment, ident);
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name);
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleStaticFieldAssignment(assignment, fieldAccess.selected.toString(), fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name);
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
             assignment.rhs = translate(assignment.rhs);
-            deleteConstantFolding(assignment);
             handleArrayAssignment(assignment, arrayAccess);
         } else {
-            super.visitAssign(assignment);
-            deleteConstantFolding(assignment);
+            // can be in an annotation
+            this.result = assignment;
         }
     }
 
     @Override
     public void visitAssignop(JCAssignOp assignOp) {
+        deleteConstantFolding(assignOp);
         /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
          * naive implementation would treat them as reads */
         var effectiveLhs = withoutParentheses(assignOp.lhs);
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleLocalVarAssignOp(assignOp, ident);
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleStaticFieldAssignOp(assignOp, ident, currentClass().toString(), ident.name.toString());
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleInstanceFieldAssignOp(assignOp, currentClass().toString(), makeThisExpr(), ident.name);
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleStaticFieldAssignOp(assignOp, fieldAccess, fieldAccess.selected.toString(), fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleInstanceFieldAssignOp(assignOp, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name);
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
             assignOp.rhs = translate(assignOp.rhs);
-            deleteConstantFolding(assignOp);
             handleArrayAssignOp(assignOp, arrayAccess);
         } else {
-            super.visitAssignop(assignOp);
-            deleteConstantFolding(assignOp);
+            throw new AssertionError("unexpected: " + effectiveLhs.getClass());
         }
     }
 
     @Override
     public void visitUnary(JCUnary unary) {
-        super.visitUnary(unary);  // TODO
         deleteConstantFolding(unary);
+        // side-effecting operators have to be handled separately
+        var isPrefixOp = unary.hasTag(Tag.PREINC) || unary.hasTag(Tag.PREDEC);
+        var isPostfixOp = unary.hasTag(Tag.POSTINC) || unary.hasTag(Tag.POSTDEC);
+        var isIncOp = unary.hasTag(Tag.PREINC) || unary.hasTag(Tag.POSTINC);
+        if (isPrefixOp || isPostfixOp) {
+            var effectiveArg = withoutParentheses(unary.arg);
+            if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+                handleLocalVarIncDecOp(unary, ident, isPrefixOp, isIncOp);
+            } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+                handleStaticFieldIncDecOp(unary, currentClass().toString(), ident.name.toString(), isPrefixOp, isIncOp);
+            } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+                handleInstanceFieldIncDecOp(unary, currentClass().toString(), makeThisExpr(), ident.name, isPrefixOp, isIncOp);
+            } else if (effectiveArg instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
+                handleStaticFieldIncDecOp(unary, fieldAccess.selected.toString(), fieldAccess.name.toString(), isPrefixOp, isIncOp);
+            } else if (effectiveArg instanceof JCFieldAccess fieldAccess) {
+                fieldAccess.selected = translate(fieldAccess.selected);
+                handleInstanceFieldIncDecOp(unary, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name, isPrefixOp, isIncOp);
+            } else if (effectiveArg instanceof JCArrayAccess arrayAccess) {
+                arrayAccess.indexed = translate(arrayAccess.indexed);
+                arrayAccess.index = translate(arrayAccess.index);
+                handleArrayIncDecOp(unary, arrayAccess, isPrefixOp, isIncOp);
+            } else {
+                throw new AssertionError("unexpected: " + effectiveArg.getClass());
+            }
+        } else {
+            super.visitUnary(unary);
+            this.result = withNewLocal("unoparg", unary.arg, (argSymbol, argIdent, argVarDecl) -> {
+                unary.arg = argIdent;
+                return mk().LetExpr(
+                        List.of(argVarDecl),
+                        instrumentation.logUnaryOp(
+                                unary,
+                                argIdent,
+                                unary.operator.name.toString(),
+                                currentFilename(),
+                                getStartLine(unary),
+                                getStartCol(unary),
+                                safeGetEndLine(unary),
+                                safeGetEndCol(unary)
+                        )
+                ).setType(unary.type);
+            });
+        }
     }
 
     @Override
@@ -815,6 +846,21 @@ public final class Transformer extends TreeTranslator {
                         }));
     }
 
+    private void handleLocalVarIncDecOp(JCUnary unary, JCIdent ident, boolean isPrefixOp, boolean isIncOp) {
+        this.result =
+                instrumentation.logLocalVarIncDecOp(
+                        ident.name.toString(),
+                        unary,
+                        isPrefixOp,
+                        isIncOp,
+                        currentFilename(),
+                        getStartLine(unary),
+                        getStartCol(unary),
+                        safeGetEndLine(unary),
+                        safeGetEndCol(unary)
+                );
+    }
+
     private void handleStaticFieldAssignment(JCAssign assignment, String className, String fieldName) {
         assignment.rhs = instrumentation.logStaticFieldAssignment(
                 className,
@@ -862,6 +908,22 @@ public final class Transformer extends TreeTranslator {
                                             ).setType(fieldType)
                             );
                         }));
+    }
+
+    private void handleStaticFieldIncDecOp(JCUnary unary, String className, String fieldName, boolean isPrefixOp, boolean isIncOp) {
+        this.result =
+                instrumentation.logStaticFieldIncDecOp(
+                        className,
+                        fieldName,
+                        unary,
+                        isPrefixOp,
+                        isIncOp,
+                        currentFilename(),
+                        getStartLine(unary),
+                        getStartCol(unary),
+                        safeGetEndLine(unary),
+                        safeGetEndCol(unary)
+                );
     }
 
     private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, Name fieldName) {
@@ -930,6 +992,32 @@ public final class Transformer extends TreeTranslator {
                 });
     }
 
+    private void handleInstanceFieldIncDecOp(JCUnary unary, String className, JCExpression selected, Name fieldName,
+                                             boolean isPrefixOp, boolean isIncOp) {
+        this.result = withNewLocal("receiver", selected, (receiverSymbol, receiverIdent, receiverVarDecl) -> {
+            unary.arg = mk().Select(
+                    receiverIdent,
+                    new Symbol.VarSymbol(0, fieldName, unary.type, currentMethod())
+            ).setType(unary.type);
+            return mk().LetExpr(
+                    List.of(receiverVarDecl),
+                    instrumentation.logInstanceFieldIncDecOp(
+                            className,
+                            receiverIdent,
+                            fieldName.toString(),
+                            unary,
+                            isPrefixOp,
+                            isIncOp,
+                            currentFilename(),
+                            getStartLine(unary),
+                            getStartCol(unary),
+                            safeGetEndLine(unary),
+                            safeGetEndCol(unary)
+                    )
+            ).setType(unary.type);
+        });
+    }
+
     private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
         this.result =
                 withNewLocal("array", arrayAccess.indexed, (arrayVarSymbol, arrayIdent, arrayVarDef) ->
@@ -991,6 +1079,33 @@ public final class Transformer extends TreeTranslator {
                                                                 resultIdent
                                                         ).setType(assignOp.type));
                                     }));
+                        }));
+    }
+
+    private void handleArrayIncDecOp(JCUnary unary, JCArrayAccess arrayAccess, boolean isPrefixOp, boolean isIncOp) {
+        this.result =
+                withNewLocal("array", arrayAccess.indexed, (arraySymbol, arrayIdent, arrayVarDecl) ->
+                        withNewLocal("index", arrayAccess.index, (indexSymbol, indexIdent, indexVarDecl) -> {
+                            arrayAccess.indexed = arrayIdent;
+                            arrayAccess.index = indexIdent;
+                            return mk().LetExpr(
+                                    List.of(
+                                            arrayVarDecl,
+                                            indexVarDecl
+                                    ),
+                                    instrumentation.logArrayIncDecOp(
+                                            arrayIdent,
+                                            indexIdent,
+                                            unary,
+                                            isPrefixOp,
+                                            isIncOp,
+                                            currentFilename(),
+                                            getStartLine(unary),
+                                            getStartCol(unary),
+                                            safeGetEndLine(unary),
+                                            safeGetEndCol(unary)
+                                    )
+                            ).setType(unary.type);
                         }));
     }
 

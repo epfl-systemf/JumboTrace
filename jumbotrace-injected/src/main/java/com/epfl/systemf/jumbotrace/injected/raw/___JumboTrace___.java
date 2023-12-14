@@ -217,6 +217,24 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize(numericOnly = true) int localVarIncDecOp(
+            String varName, @Specialize(numericOnly = true) int result,
+            boolean isPrefixOp, boolean isIncOp,
+            String filename, int startLine, int startCol, int endLine, int endCol
+    ) {
+        if (loggingEnabled) {
+            disableLogging();
+            var newValue = isPrefixOp ? result :
+                    isIncOp ? (result + 1) : (result - 1);
+            var oldValue = isIncOp ? (newValue - 1) : (newValue + 1);
+            log("VAR ", preOrPost(isPrefixOp), "-", incOrDec(isIncOp), " ", varName, " : ",
+                    oldValue, " -> ", newValue, " with result ", result,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return result;
+    }
+
     public static @Specialize Object staticFieldAssignment(String className, String fieldName, @Specialize Object assignedValue,
                                                            String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
@@ -237,6 +255,24 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
+    }
+
+    public static @Specialize(numericOnly = true) int staticFieldIncDecOp(
+            String className, String fieldName, @Specialize(numericOnly = true) int result,
+            boolean isPrefixOp, boolean isIncOp,
+            String filename, int startLine, int startCol, int endLine, int endCol
+    ) {
+        if (loggingEnabled) {
+            disableLogging();
+            var newValue = isPrefixOp ? result :
+                    isIncOp ? (result + 1) : (result - 1);
+            var oldValue = isIncOp ? (newValue - 1) : (newValue + 1);
+            log("STATIC FIELD ", preOrPost(isPrefixOp), "-", incOrDec(isIncOp), " ", className, ".", fieldName,
+                    " : ", oldValue, " -> ", newValue, " with result ", result,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return result;
     }
 
     public static @Specialize Object instanceFieldAssignment(String className, Object instance, String fieldName, @Specialize Object assignedValue,
@@ -261,6 +297,24 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize(numericOnly = true) int instanceFieldIncDecOp(
+            String className, Object instance, String fieldName, @Specialize(numericOnly = true) int result,
+            boolean isPrefixOp, boolean isIncOp,
+            String filename, int startLine, int startCol, int endLine, int endCol
+    ) {
+        if (loggingEnabled) {
+            disableLogging();
+            var newValue = isPrefixOp ? result :
+                    isIncOp ? (result + 1) : (result - 1);
+            var oldValue = isIncOp ? (newValue - 1) : (newValue + 1);
+            log("INSTANCE FIELD ", preOrPost(isPrefixOp), "-", incOrDec(isIncOp), " ", className, "::", fieldName,
+                    " : ", oldValue, " -> ", newValue, " with result ", result,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return result;
+    }
+
     public static void arrayElemSet(Object array, int index, @Specialize Object assignedValue,
                                     String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
@@ -280,6 +334,24 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
+    }
+
+    public static @Specialize(numericOnly = true) int arrayElemIncDecOp(
+            Object array, int index, @Specialize(numericOnly = true) int result,
+            boolean isPrefixOp, boolean isIncOp,
+            String filename, int startLine, int startCol, int endLine, int endCol
+    ) {
+        if (loggingEnabled) {
+            disableLogging();
+            var newValue = isPrefixOp ? result :
+                    isIncOp ? (result + 1) : (result - 1);
+            var oldValue = isIncOp ? (newValue - 1) : (newValue + 1);
+            log("ARRAY ", preOrPost(isPrefixOp), "-", incOrDec(isIncOp), " ", array, "[", index, "] ",
+                    " : ", oldValue, " -> ", newValue, " with result ", result,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return result;
     }
 
     public static void variableDeclared(String varName, String typeDescr,
@@ -321,7 +393,8 @@ public class ___JumboTrace___ {
         return throwable;
     }
 
-    public static boolean assertionStat(boolean asserted, String assertionDescr, String filename, int startLine, int startCol, int endLine, int endCol) {
+    public static boolean assertionStat(boolean asserted, String assertionDescr,
+                                        String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
             var successOrFailDescr = asserted ? " SUCCEEDS" : " FAILS";
@@ -330,6 +403,25 @@ public class ___JumboTrace___ {
             enableLogging();
         }
         return asserted;
+    }
+
+    public static @Specialize Object unaryOp(@Specialize Object res, @Specialize Object arg, String operator,
+                                             String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("UNARY ", operator, " ", arg, " = ", res,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return res;
+    }
+
+    private static String preOrPost(boolean isPre) {
+        return isPre ? "PRE" : "POST";
+    }
+
+    private static String incOrDec(boolean isInc) {
+        return isInc ? "INCREMENT" : "DECREMENT";
     }
 
     private static String formatPositionInterval(String filename, int startLine, int startCol, int endLine, int endCol) {

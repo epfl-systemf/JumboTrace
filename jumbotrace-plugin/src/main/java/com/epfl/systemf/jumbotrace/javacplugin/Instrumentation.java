@@ -203,6 +203,22 @@ public final class Instrumentation {
         );
     }
 
+    public JCExpression logLocalVarIncDecOp(String varName, JCExpression result,
+                                            boolean isPrefixOp, boolean isIncOp,
+                                            String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
+        return makeLogMethodCall(
+                "localVarIncDecOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(varName)),
+                        new Argument(type, result),
+                        new Argument(st().booleanType, mk().Literal(isPrefixOp)),
+                        new Argument(st().booleanType, mk().Literal(isIncOp))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                type
+        );
+    }
+
     public JCExpression logStaticFieldAssignment(String className, String fieldName, JCExpression rhs,
                                                  String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
@@ -233,6 +249,23 @@ public final class Instrumentation {
                         new Argument(higherType, rhs)
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType
+        );
+    }
+
+    public JCExpression logStaticFieldIncDecOp(String className, String fieldName, JCExpression result,
+                                               boolean isPrefixOp, boolean isIncOp,
+                                               String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
+        return makeLogMethodCall(
+                "staticFieldIncDecOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(type, result),
+                        new Argument(st().booleanType, mk().Literal(isPrefixOp)),
+                        new Argument(st().booleanType, mk().Literal(isIncOp))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                type
         );
     }
 
@@ -271,6 +304,24 @@ public final class Instrumentation {
         );
     }
 
+    public JCExpression logInstanceFieldIncDecOp(String className, JCExpression instance, String fieldName, JCExpression result,
+                                                 boolean isPrefixOp, boolean isIncOp,
+                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
+        return makeLogMethodCall(
+                "instanceFieldIncDecOp",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().objectType, instance),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(type, result),
+                        new Argument(st().booleanType, mk().Literal(isPrefixOp)),
+                        new Argument(st().booleanType, mk().Literal(isIncOp))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                type
+        );
+    }
+
     public JCExpression logArrayElemSet(JCExpression array, JCExpression index, JCExpression rhs,
                                         String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(rhs.type);
@@ -301,6 +352,42 @@ public final class Instrumentation {
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType
         );
+    }
+
+    public JCExpression logArrayIncDecOp(JCExpression array, JCExpression index, JCExpression result,
+                                         boolean isPrefixOp, boolean isIncOp,
+                                         String filename, int startLine, int startCol, int endLine, int endCol){
+        var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
+        return makeLogMethodCall(
+                "arrayElemIncDecOp",
+                List.of(
+                        new Argument(st().objectType, array),
+                        new Argument(st().intType, index),
+                        new Argument(type, result),
+                        new Argument(st().booleanType, mk().Literal(isPrefixOp)),
+                        new Argument(st().booleanType, mk().Literal(isIncOp))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                type
+        );
+    }
+
+    //</editor-fold>
+
+    //<editor-fold desc="Expressions">
+
+    public JCExpression logUnaryOp(JCExpression resultExpr, JCExpression argExpr, String operator,
+                                   String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(resultExpr.type);
+        var apply = makeLogMethodCall(
+                "unaryOp",
+                List.of(
+                        new Argument(higherType, resultExpr),
+                        new Argument(higherType, argExpr),
+                        new Argument(st().stringType, mk().Literal(operator))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(higherType, apply);
     }
 
     //</editor-fold>

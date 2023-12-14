@@ -17,19 +17,24 @@ import com.github.javaparser.ast.visitor.VoidVisitor;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static com.github.javaparser.ast.type.PrimitiveType.*;
 
 public final class Transformer extends ModifierVisitor<Void> {
 
     private static final String TARGET_ANNOTATION_NAME = "Specialize";
+    private static final String RESTRICT_TO_NUM_TYPES_KEY = "numericOnly";
     private static final String MODIFIED_METH_ANNOTATION_NAME = "Specialized";
     private static final String MODIFIED_METH_ANNOT_FLD_KEY = "typeName";
 
-    private static final List<Type> TOPMOST_TYPES = List.of(
-            intType(), shortType(), longType(), floatType(), doubleType(), booleanType(), charType(), byteType(),
-            StaticJavaParser.parseType("java.lang.Object")
+    private static final List<Type> NUMERIC_TOPMOST_TYPES = List.of(
+            intType(), shortType(), longType(), floatType(), doubleType(), charType(), byteType()
     );
+    private static final List<Type> TOPMOST_TYPES = Stream.concat(
+            NUMERIC_TOPMOST_TYPES.stream(),
+            Stream.of(booleanType(), StaticJavaParser.parseType("java.lang.Object"))
+    ).toList();
 
     private static final String RAW_PACKAGE_NAME = "raw";
     private static final String PROCESSED_PACKAGE_NAME = "processed";
@@ -56,13 +61,18 @@ public final class Transformer extends ModifierVisitor<Void> {
         super.visit(classOrInterfaceDecl, arg);
         var newMembersList = new NodeList<BodyDeclaration<?>>();
         for (var member : classOrInterfaceDecl.getMembers()) {
-            boolean specializeRetType;
-            if (member instanceof MethodDeclaration methodDeclaration && (
-                    (specializeRetType = checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations())) ||
-                            methodDeclaration.getParameters().stream()
-                                    .anyMatch(param -> param.isAnnotationPresent(TARGET_ANNOTATION_NAME)))
+            if (member instanceof MethodDeclaration methodDeclaration
+                    && methodDeclaration.getParameters().stream().anyMatch(param -> param.isAnnotationPresent(TARGET_ANNOTATION_NAME))
             ) {
-                var replicated = replicate(methodDeclaration, specializeRetType);
+                var maybeAnnot = checkAndDeleteTargetAnnotation(methodDeclaration.getAnnotations());
+                var specializeRetType = maybeAnnot != null;
+                var restrictToNumericTypes = specializeRetType &&
+                        maybeAnnot instanceof NormalAnnotationExpr annot &&
+                        annot.getPairs().stream().anyMatch(
+                                p -> p.getName().getIdentifier().equals(RESTRICT_TO_NUM_TYPES_KEY) &&
+                                        p.getValue() instanceof BooleanLiteralExpr literalExpr && literalExpr.getValue()
+                        );
+                var replicated = replicate(methodDeclaration, specializeRetType, restrictToNumericTypes);
                 newMembersList.addAll(replicated);
             } else {
                 newMembersList.add(member);
@@ -75,16 +85,17 @@ public final class Transformer extends ModifierVisitor<Void> {
     @Override
     public Visitable visit(FieldDeclaration n, Void arg) {
         super.visit(n, arg);
-        if (testMode && n.getVariables().size() == 1 && n.getVariables().get(0).getName().getIdentifier().equals(OUTPUT_PRINT_STREAM_NAME)){
+        if (testMode && n.getVariables().size() == 1 && n.getVariables().get(0).getName().getIdentifier().equals(OUTPUT_PRINT_STREAM_NAME)) {
             n.getVariables().get(0).setInitializer(new NullLiteralExpr());
         }
         return n;
     }
 
-    private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration, boolean specializeReturnType) {
+    private List<MethodDeclaration> replicate(MethodDeclaration methodDeclaration, boolean specializeReturnType, boolean restrictToNumericTypes) {
         var specializedMethods = new LinkedList<MethodDeclaration>();
         specializedMethods.add(new CommentMethodDeclaration("<editor-fold desc=\"" + methodDeclaration.getName().getIdentifier() + "\">"));
-        for (var type : TOPMOST_TYPES) {
+        var types = restrictToNumericTypes ? NUMERIC_TOPMOST_TYPES : TOPMOST_TYPES;
+        for (var type : types) {
             specializedMethods.add(copyWithType(methodDeclaration, type, specializeReturnType));
         }
         specializedMethods.add(new CommentMethodDeclaration("</editor-fold>"));
@@ -93,11 +104,11 @@ public final class Transformer extends ModifierVisitor<Void> {
 
     private MethodDeclaration copyWithType(MethodDeclaration methodDeclaration, Type type, boolean specializeReturnType) {
         var copy = methodDeclaration.clone();
-        if (specializeReturnType){
+        if (specializeReturnType) {
             copy.setType(type);
         }
         copy.getParameters().forEach(parameter -> {
-            var mustReplicate = checkAndDeleteTargetAnnotation(parameter.getAnnotations());
+            var mustReplicate = checkAndDeleteTargetAnnotation(parameter.getAnnotations()) != null;
             if (mustReplicate) {
                 parameter.setType(type);
             }
@@ -109,12 +120,12 @@ public final class Transformer extends ModifierVisitor<Void> {
         return copy;
     }
 
-    private boolean checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations) {
+    private AnnotationExpr checkAndDeleteTargetAnnotation(NodeList<AnnotationExpr> annotations) {
         AnnotationExpr found = null;
         for (var annot : annotations) {
-            switch (annot.getName().getIdentifier()){
+            switch (annot.getName().getIdentifier()) {
                 case Transformer.MODIFIED_METH_ANNOTATION_NAME ->
-                        throw new AssertionError( "\"@" + Transformer.MODIFIED_METH_ANNOTATION_NAME + "\" should not be used in input files");
+                        throw new AssertionError("\"@" + Transformer.MODIFIED_METH_ANNOTATION_NAME + "\" should not be used in input files");
                 case Transformer.TARGET_ANNOTATION_NAME -> {
                     if (found == null) {
                         found = annot;
@@ -124,12 +135,10 @@ public final class Transformer extends ModifierVisitor<Void> {
                 }
             }
         }
-        if (found == null) {
-            return false;
-        } else {
+        if (found != null){
             annotations.remove(found);
-            return true;
         }
+        return found;
     }
 
     private static void replacePackageName(CompilationUnit n) {
@@ -157,7 +166,7 @@ public final class Transformer extends ModifierVisitor<Void> {
     private static final class CommentMethodDeclaration extends MethodDeclaration {
         private final Comment comment;
 
-        CommentMethodDeclaration(String comment){
+        CommentMethodDeclaration(String comment) {
             this.comment = new LineComment(comment);
         }
 
