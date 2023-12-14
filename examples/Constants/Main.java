@@ -7,6 +7,8 @@ public class Main {
         x = I_AM_A_CONSTANT;
         System.out.println(x);
         System.out.println(Util.HELLO_WORLD);
+        Util.HELLO_WORLD += '!';
+        System.out.println(Util.HELLO_WORLD);
         var s = Util.JAVA_TRACER;
         s += ": JumboTrace";
         System.out.println(s);
