@@ -186,6 +186,7 @@ public final class Instrumentation {
         return castIfNeeded(rhs.type, apply);
     }
 
+    // TODO check what happens in the following situation: int i = ...; long l = ...; int res = i << l
     public JCExpression logLocalVarAssignOp(String varName, JCExpression newValue,
                                             JCExpression oldValue, String operator, JCExpression rhs,
                                             String filename, int startLine, int startCol, int endLine, int endCol){
