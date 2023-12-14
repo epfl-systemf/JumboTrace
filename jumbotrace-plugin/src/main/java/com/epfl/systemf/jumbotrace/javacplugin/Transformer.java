@@ -80,7 +80,7 @@ public final class Transformer extends TreeTranslator {
                 methodsStack.getFirst() :
                 new Symbol.MethodSymbol(
                         Flags.PUBLIC | Flags.STATIC,
-                        n().clinit,
+                        n().fromString("<no-method>"),
                         new Type.MethodType(List.nil(), st().voidType, List.nil(), currentClass().type.tsym),
                         currentClass()
                 );
