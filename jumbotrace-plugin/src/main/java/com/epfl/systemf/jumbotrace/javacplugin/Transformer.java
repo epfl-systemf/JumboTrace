@@ -13,10 +13,7 @@ import javax.lang.model.element.ElementKind;
 import java.util.Deque;
 import java.util.LinkedList;
 
-// TODO set positions in generated nodes to avoid ping-pong with line 1 in generated code
-// (this may cause error messages to wrongly be reported on line 1)
-
-// TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null"
+// TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null". Also be careful with line numbers in error reporting
 
 // TODO keep in mind to use null in tests (and probably add nulls to existing tests). null seems to be a dangerous edge case for types handling
 
@@ -122,6 +119,7 @@ public final class Transformer extends TreeTranslator {
         // iterating in reverse order to keep complexity linear
         for (var remStats = block.stats.reverse(); remStats.nonEmpty(); remStats = remStats.tail) {
             var currStat = remStats.head;
+            mk().at(currStat.pos);
             if (currStat instanceof JCVariableDecl variableDecl && variableDecl.init != null) {
                 variableDecl.init = instrumentation.logLocalVarAssignment(
                         variableDecl.name.toString(),
@@ -155,6 +153,7 @@ public final class Transformer extends TreeTranslator {
         super.visitMethodDef(method);
         var body = method.getBody();
         if (body != null) {
+            mk().at(body.pos);
             body.stats = body.stats.prepend(mk().Exec(
                     instrumentation.logMethodEnter(
                             method.sym.owner.name.toString(),
@@ -168,6 +167,7 @@ public final class Transformer extends TreeTranslator {
                     )
             ));
             if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID) {
+                mk().at(body.stats.isEmpty() ? body.pos : body.stats.last().pos);
                 body.stats = body.stats.append(mk().Exec(
                         instrumentation.logImplicitReturn(
                                 method.name.toString(),
@@ -192,15 +192,17 @@ public final class Transformer extends TreeTranslator {
         if (exprStat.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.contentEquals(CONSTRUCTOR_NAME)
                 && invocation.meth.toString().equals("super")) {
-            // TODO maybe try to still save the information when control-flow enters a superclass constructor
             invocation.args = translate(invocation.args);
+            mk().at(invocation.pos);
             this.result = exprStat;
         } else if (exprStat.expr instanceof JCNewClass newClass) {
             newClass.args = translate(newClass.args);
+            mk().at(newClass.pos);
             var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
             this.result = makeBlock(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
         } else if (exprStat.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             invocation.args = translate(invocation.args);
+            mk().at(invocation.pos);
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
             this.result = makeBlock(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
         } else {
@@ -212,7 +214,7 @@ public final class Transformer extends TreeTranslator {
     public void visitLambda(JCLambda lambda) {
         // TODO
         if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID) {
-            lambda.body = mk().Exec(bodyExpr);
+            lambda.body = mk().at(lambda.pos).Exec(bodyExpr);
         }
         super.visitLambda(lambda);
     }
@@ -220,6 +222,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitApply(JCMethodInvocation invocation) {
         super.visitApply(invocation);
+        mk().at(invocation.pos);
         deleteConstantFolding(invocation);
         if (invocation.type.getTag() == TypeTag.VOID) {
             throw new IllegalArgumentException("unexpected VOID tag for invocation at " + invocation.pos());
@@ -231,6 +234,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitNewClass(JCNewClass newClass) {
         super.visitNewClass(newClass);
+        mk().at(newClass.pos);
         deleteConstantFolding(newClass);
         var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
         this.result = makeLet(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
@@ -241,6 +245,7 @@ public final class Transformer extends TreeTranslator {
         final var loopType = "do-while";
         super.visitDoLoop(doWhileLoop);
         var filename = currentFilename();
+        mk().at(doWhileLoop.cond.pos);
         doWhileLoop.cond = instrumentation.logLoopCondition(
                 doWhileLoop.cond,
                 loopType,
@@ -254,6 +259,7 @@ public final class Transformer extends TreeTranslator {
         var loopStartCol = getStartCol(doWhileLoop);
         var loopEndLine = safeGetEndLine(doWhileLoop);
         var loopEndCol = safeGetEndCol(doWhileLoop);
+        mk().at(doWhileLoop.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logLoopEnter(
                         loopType,
@@ -280,6 +286,7 @@ public final class Transformer extends TreeTranslator {
         final var loopType = "while";
         super.visitWhileLoop(whileLoop);
         var filename = currentFilename();
+        mk().at(whileLoop.cond.pos);
         whileLoop.cond = instrumentation.logLoopCondition(
                 whileLoop.cond,
                 loopType,
@@ -293,6 +300,7 @@ public final class Transformer extends TreeTranslator {
         var loopStartCol = getStartCol(whileLoop);
         var loopEndLine = safeGetEndLine(whileLoop);
         var loopEndCol = safeGetEndCol(whileLoop);
+        mk().at(whileLoop.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logLoopEnter(
                         loopType,
@@ -323,6 +331,7 @@ public final class Transformer extends TreeTranslator {
         var loopStartCol = getStartCol(forLoop);
         var loopEndLine = safeGetEndLine(forLoop);
         var loopEndCol = safeGetEndCol(forLoop);
+        mk().at(forLoop.cond.pos);
         forLoop.cond = instrumentation.logLoopCondition(
                 forLoop.cond,
                 loopType,
@@ -332,6 +341,7 @@ public final class Transformer extends TreeTranslator {
                 safeGetEndLine(forLoop.cond),
                 safeGetEndCol(forLoop.cond)
         );
+        mk().at(forLoop.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logLoopEnter(
                         loopType,
@@ -357,6 +367,7 @@ public final class Transformer extends TreeTranslator {
     public void visitForeachLoop(JCEnhancedForLoop foreachLoop) {
         final var loopType = "for-each";
         super.visitForeachLoop(foreachLoop);
+        mk().at(foreachLoop.pos);
         var filename = currentFilename();
         var loopStartLine = getStartLine(foreachLoop);
         var loopStartCol = getStartCol(foreachLoop);
@@ -371,6 +382,7 @@ public final class Transformer extends TreeTranslator {
                 loopEndLine,
                 loopEndCol
         )));
+        mk().at(foreachLoop.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logLoopEnter(
                         loopType,
@@ -395,6 +407,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitSwitch(JCSwitch switchStat) {
         super.visitSwitch(switchStat);
+        mk().at(switchStat.pos);
         switchStat.selector = instrumentation.logSwitchConstruct(
                 switchStat.selector,
                 false,
@@ -410,12 +423,14 @@ public final class Transformer extends TreeTranslator {
     public void visitCase(JCCase switchCase) {
         // do not propagate the modifications to the labels, because it would erase their constant-containing type
         switchCase.stats = translate(switchCase.stats);
+        mk().at(switchCase.pos);
         this.result = switchCase;
     }
 
     @Override
     public void visitSwitchExpression(JCSwitchExpression switchExpr) {
         super.visitSwitchExpression(switchExpr);
+        mk().at(switchExpr.pos);
         deleteConstantFolding(switchExpr);
         switchExpr.selector = instrumentation.logSwitchConstruct(
                 switchExpr.selector,
@@ -432,6 +447,7 @@ public final class Transformer extends TreeTranslator {
     public void visitCatch(JCCatch catchClause) {
         super.visitCatch(catchClause);
         var body = catchClause.body;
+        mk().at(body.pos);
         body.stats = body.stats.prepend(mk().Exec(instrumentation.logCaught(
                 mk().Ident(catchClause.param.sym),
                 currentFilename(),
@@ -445,12 +461,14 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitConditional(JCConditional conditional) {
         super.visitConditional(conditional);  // TODO
+        mk().at(conditional.pos);
         deleteConstantFolding(conditional);
     }
 
     @Override
     public void visitIf(JCIf ifStat) {
         super.visitIf(ifStat);
+        mk().at(ifStat.cond.pos);
         ifStat.cond = instrumentation.logIfCond(
                 ifStat.cond,
                 currentFilename(),
@@ -466,6 +484,7 @@ public final class Transformer extends TreeTranslator {
         super.visitBreak(breakStat);
         var target = resolveJumpTarget(breakStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
+        mk().at(breakStat.pos);
         this.result = mk().Block(0, List.of(
                         mk().Exec(instrumentation.logBreak(
                                 targetDescr,
@@ -487,6 +506,7 @@ public final class Transformer extends TreeTranslator {
         super.visitYield(yieldStat);
         var target = yieldStat.target;
         var targetDescr = target.getTag().toString().toLowerCase();
+        mk().at(yieldStat.pos);
         this.result = withNewLocalForceType("yielded", yieldStat.value, yieldStat.target.type,
                 (varSymbol, valueIdent, valueVarDecl) -> {
                     yieldStat.value = valueIdent;
@@ -513,6 +533,7 @@ public final class Transformer extends TreeTranslator {
         super.visitContinue(continueStat);
         var target = resolveJumpTarget(continueStat.target);
         var targetDescr = target.getTag().toString().toLowerCase();
+        mk().at(continueStat.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logContinue(
                         targetDescr,
@@ -531,6 +552,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitReturn(JCReturn returnStat) {
         super.visitReturn(returnStat);
+        mk().at(returnStat.pos);
         this.result = mk().Block(0, List.of(
                 mk().Exec(instrumentation.logReturnStat(
                         currentMethod().name.toString(),
@@ -547,6 +569,7 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitThrow(JCThrow throwStat) {
         super.visitThrow(throwStat);
+        mk().at(throwStat.pos);
         this.result = mk().Throw(instrumentation.logThrowStat(
                 throwStat.expr,
                 currentFilename(),
@@ -561,6 +584,7 @@ public final class Transformer extends TreeTranslator {
     public void visitAssert(JCAssert assertStat) {
         var assertionDescr = assertStat.toString(); // save this BEFORE transforming the subtrees
         super.visitAssert(assertStat);
+        mk().at(assertStat.pos);
         this.result = withNewLocal("asserted", assertStat.cond, (assertedVarSymbol, assertedVarIdent, assertedVarDecl) -> {
             assertStat.cond = assertedVarIdent;
             return mk().Block(0, List.of(
@@ -580,8 +604,9 @@ public final class Transformer extends TreeTranslator {
     }
 
     @Override
-    public void visitNewArray(JCNewArray tree) {
-        super.visitNewArray(tree);  // TODO
+    public void visitNewArray(JCNewArray newArray) {
+        super.visitNewArray(newArray);  // TODO
+        mk().at(newArray.pos);
     }
 
     @Override
@@ -592,24 +617,30 @@ public final class Transformer extends TreeTranslator {
         var effectiveLhs = withoutParentheses(assignment.lhs);
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleLocalVarAssignment(assignment, ident);
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name);
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleStaticFieldAssignment(assignment, fieldAccess.selected.toString(), fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleInstanceFieldAssignment(assignment, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name);
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
             assignment.rhs = translate(assignment.rhs);
+            mk().at(assignment.pos);
             handleArrayAssignment(assignment, arrayAccess);
         } else {
             // can be in an annotation
@@ -625,24 +656,30 @@ public final class Transformer extends TreeTranslator {
         var effectiveLhs = withoutParentheses(assignOp.lhs);
         if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleLocalVarAssignOp(assignOp, ident);
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleStaticFieldAssignOp(assignOp, ident, currentClass().toString(), ident.name.toString());
         } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleInstanceFieldAssignOp(assignOp, currentClass().toString(), makeThisExpr(), ident.name);
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleStaticFieldAssignOp(assignOp, fieldAccess, fieldAccess.selected.toString(), fieldAccess.name.toString());
         } else if (effectiveLhs instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleInstanceFieldAssignOp(assignOp, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name);
         } else if (effectiveLhs instanceof JCArrayAccess arrayAccess) {
             arrayAccess.indexed = translate(arrayAccess.indexed);
             arrayAccess.index = translate(arrayAccess.index);
             assignOp.rhs = translate(assignOp.rhs);
+            mk().at(assignOp.pos);
             handleArrayAssignOp(assignOp, arrayAccess);
         } else {
             throw new AssertionError("unexpected: " + effectiveLhs.getClass());
@@ -659,25 +696,32 @@ public final class Transformer extends TreeTranslator {
         if (isPrefixOp || isPostfixOp) {
             var effectiveArg = withoutParentheses(unary.arg);
             if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+                mk().at(unary.pos);
                 handleLocalVarIncDecOp(unary, ident, isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+                mk().at(unary.pos);
                 handleStaticFieldIncDecOp(unary, currentClass().toString(), ident.name.toString(), isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+                mk().at(unary.pos);
                 handleInstanceFieldIncDecOp(unary, currentClass().toString(), makeThisExpr(), ident.name, isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
+                mk().at(unary.pos);
                 handleStaticFieldIncDecOp(unary, fieldAccess.selected.toString(), fieldAccess.name.toString(), isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCFieldAccess fieldAccess) {
                 fieldAccess.selected = translate(fieldAccess.selected);
+                mk().at(unary.pos);
                 handleInstanceFieldIncDecOp(unary, fieldAccess.sym.owner.toString(), fieldAccess.selected, fieldAccess.name, isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCArrayAccess arrayAccess) {
                 arrayAccess.indexed = translate(arrayAccess.indexed);
                 arrayAccess.index = translate(arrayAccess.index);
+                mk().at(unary.pos);
                 handleArrayIncDecOp(unary, arrayAccess, isPrefixOp, isIncOp);
             } else {
                 throw new AssertionError("unexpected: " + effectiveArg.getClass());
             }
         } else {
             super.visitUnary(unary);
+            mk().at(unary.pos);
             this.result = withNewLocal("unoparg", unary.arg, (argSymbol, argIdent, argVarDecl) -> {
                 unary.arg = argIdent;
                 return mk().LetExpr(
@@ -700,12 +744,14 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitBinary(JCBinary binary) {
         super.visitBinary(binary);  // TODO
+        mk().at(binary.pos);
         deleteConstantFolding(binary);
     }
 
     @Override
     public void visitTypeCast(JCTypeCast typeCast) {
         super.visitTypeCast(typeCast);
+        mk().at(typeCast.pos);
         deleteConstantFolding(typeCast);
         if (!typeCast.clazz.type.isPrimitive()) {
             this.result =
@@ -736,33 +782,39 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitTypeTest(JCInstanceOf instanceOf) {
         super.visitTypeTest(instanceOf);  // TODO
+        mk().at(instanceOf.pos);
         deleteConstantFolding(instanceOf);
     }
 
     @Override
-    public void visitBindingPattern(JCBindingPattern tree) {
-        super.visitBindingPattern(tree);  // TODO
+    public void visitBindingPattern(JCBindingPattern bindingPattern) {
+        super.visitBindingPattern(bindingPattern);  // TODO
+        mk().at(bindingPattern.pos);
     }
 
     @Override
-    public void visitDefaultCaseLabel(JCDefaultCaseLabel tree) {
-        super.visitDefaultCaseLabel(tree);  // TODO
+    public void visitDefaultCaseLabel(JCDefaultCaseLabel defaultCaseLabel) {
+        super.visitDefaultCaseLabel(defaultCaseLabel);  // TODO
+        mk().at(defaultCaseLabel.pos);
     }
 
     @Override
-    public void visitGuardPattern(JCGuardPattern tree) {
-        super.visitGuardPattern(tree);  // TODO
+    public void visitGuardPattern(JCGuardPattern guardPattern) {
+        super.visitGuardPattern(guardPattern);  // TODO
+        mk().at(guardPattern.pos);
     }
 
     @Override
     public void visitIndexed(JCArrayAccess arrayAccess) {
         super.visitIndexed(arrayAccess);  // TODO
+        mk().at(arrayAccess.pos);
         deleteConstantFolding(arrayAccess);
     }
 
     @Override
     public void visitSelect(JCFieldAccess fieldAccess) {
         super.visitSelect(fieldAccess);  // TODO
+        mk().at(fieldAccess.pos);
         deleteConstantFolding(fieldAccess);
     }
 
@@ -770,30 +822,35 @@ public final class Transformer extends TreeTranslator {
     public void visitReference(JCMemberReference memberReference) {
         // things like Foo::bar
         super.visitReference(memberReference);  // TODO
+        mk().at(memberReference.pos);
         deleteConstantFolding(memberReference);
     }
 
     @Override
     public void visitIdent(JCIdent ident) {
         super.visitIdent(ident);  // TODO
+        mk().at(ident.pos);
         deleteConstantFolding(ident);
     }
 
     @Override
     public void visitLiteral(JCLiteral literal) {
         super.visitLiteral(literal);
+        mk().at(literal.pos);
         deleteConstantFolding(literal);
     }
 
     @Override
     public void visitParens(JCParens parens) {
         super.visitParens(parens);
+        mk().at(parens.pos);
         deleteConstantFolding(parens);
     }
 
     @Override
     public void visitLetExpr(LetExpr letExpr) {
         super.visitLetExpr(letExpr);
+        mk().at(letExpr.pos);
         deleteConstantFolding(letExpr);
     }
 
