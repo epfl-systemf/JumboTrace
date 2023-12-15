@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.lang.model.element.ElementKind;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.function.BiFunction;
 
 // TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null". Also be careful with line numbers in error reporting
 
@@ -508,12 +509,12 @@ public final class Transformer extends TreeTranslator {
         var targetDescr = target.getTag().toString().toLowerCase();
         mk().at(yieldStat.pos);
         this.result = withNewLocalForceType("yielded", yieldStat.value, yieldStat.target.type,
-                (varSymbol, valueIdent, valueVarDecl) -> {
-                    yieldStat.value = valueIdent;
+                (valueAtom, valueVarDecl) -> {
+                    yieldStat.value = valueAtom;
                     return mk().Block(0, List.of(
                             valueVarDecl,
                             mk().Exec(instrumentation.logYield(
-                                    valueIdent,
+                                    valueAtom,
                                     targetDescr,
                                     getStartLine(target),
                                     getStartCol(target),
@@ -585,12 +586,12 @@ public final class Transformer extends TreeTranslator {
         var assertionDescr = assertStat.toString(); // save this BEFORE transforming the subtrees
         super.visitAssert(assertStat);
         mk().at(assertStat.pos);
-        this.result = withNewLocal("asserted", assertStat.cond, (assertedVarSymbol, assertedVarIdent, assertedVarDecl) -> {
-            assertStat.cond = assertedVarIdent;
+        this.result = withNewLocal("asserted", assertStat.cond, (assertedVarAtom, assertedVarDecl) -> {
+            assertStat.cond = assertedVarAtom;
             return mk().Block(0, List.of(
                     assertedVarDecl,
                     mk().Exec(instrumentation.logAssertion(
-                            assertedVarIdent,
+                            assertedVarAtom,
                             assertionDescr,
                             currentFilename(),
                             getStartLine(assertStat),
@@ -722,13 +723,13 @@ public final class Transformer extends TreeTranslator {
         } else {
             super.visitUnary(unary);
             mk().at(unary.pos);
-            this.result = withNewLocal("unoparg", unary.arg, (argSymbol, argIdent, argVarDecl) -> {
-                unary.arg = argIdent;
+            this.result = withNewLocal("unoparg", unary.arg, (argAtom, argVarDecl) -> {
+                unary.arg = argAtom;
                 return mk().LetExpr(
                         List.of(argVarDecl),
                         instrumentation.logUnaryOp(
                                 unary,
-                                argIdent,
+                                argAtom,
                                 unary.operator.name.toString(),
                                 currentFilename(),
                                 getStartLine(unary),
@@ -755,17 +756,17 @@ public final class Transformer extends TreeTranslator {
         deleteConstantFolding(typeCast);
         if (!typeCast.clazz.type.isPrimitive()) {
             this.result =
-                    withNewLocal("casted", typeCast.expr, (castedVarSymbol, castedVarIdent, castedVarDef) -> {
-                        typeCast.expr = castedVarIdent;
-                        return withNewLocal("castWillSucceed", mk().TypeTest(castedVarIdent, typeCast.clazz).setType(st().booleanType),
-                                (successVarSymbol, successVarIdent, successVarDef) -> mk().LetExpr(
+                    withNewLocal("casted", typeCast.expr, (castedVarAtom, castedVarDef) -> {
+                        typeCast.expr = castedVarAtom;
+                        return withNewLocal("castWillSucceed", mk().TypeTest(castedVarAtom, typeCast.clazz).setType(st().booleanType),
+                                (successVarAtom, successVarDef) -> mk().LetExpr(
                                         List.of(
                                                 castedVarDef,
                                                 successVarDef,
                                                 mk().Exec(instrumentation.logCastAttempt(
-                                                        castedVarIdent,
+                                                        castedVarAtom,
                                                         typeCast.clazz.toString(),
-                                                        successVarIdent,
+                                                        successVarAtom,
                                                         currentFilename(),
                                                         getStartLine(typeCast),
                                                         getStartCol(typeCast),
@@ -874,32 +875,33 @@ public final class Transformer extends TreeTranslator {
     private void handleLocalVarAssignOp(JCAssignOp assignOp, JCIdent localVarIdent) {
         var varType = localVarIdent.type;
         this.result =
-                withNewLocal("oldVal", localVarIdent, (oldValueSymbol, oldValueIdent, oldValueDef) ->
-                        withNewLocal("rhs", assignOp.rhs, (rhsVarSymbol, rhsVarIdent, rhsVarDef) -> {
-                            assignOp.rhs = rhsVarIdent;
-                            return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent), (resultSymbol, resultVarIdent, resultVarDef) ->
-                                    mk().LetExpr(
-                                            List.of(
-                                                    oldValueDef,
-                                                    rhsVarDef,
-                                                    resultVarDef,
-                                                    mk().Exec(
-                                                            instrumentation.logLocalVarAssignOp(
-                                                                    localVarIdent.name.toString(),
-                                                                    localVarIdent,
-                                                                    oldValueIdent,
-                                                                    assignOp.operator.name.toString(),
-                                                                    rhsVarIdent,
-                                                                    currentFilename(),
-                                                                    getStartLine(assignOp),
-                                                                    getStartCol(assignOp),
-                                                                    safeGetEndLine(assignOp),
-                                                                    safeGetEndCol(assignOp)
+                withNewLocal("oldVal", localVarIdent, (oldValueAtom, oldValueDef) ->
+                        withNewLocal("rhs", assignOp.rhs, (rhsVarAtom, rhsVarDef) -> {
+                            assignOp.rhs = rhsVarAtom;
+                            return withNewLocal("result", expandAssignOp(assignOp, oldValueAtom),
+                                    (resultVarAtom, resultVarDef) ->
+                                            mk().LetExpr(
+                                                    List.of(
+                                                            oldValueDef,
+                                                            rhsVarDef,
+                                                            resultVarDef,
+                                                            mk().Exec(
+                                                                    instrumentation.logLocalVarAssignOp(
+                                                                            localVarIdent.name.toString(),
+                                                                            localVarIdent,
+                                                                            oldValueAtom,
+                                                                            assignOp.operator.name.toString(),
+                                                                            rhsVarAtom,
+                                                                            currentFilename(),
+                                                                            getStartLine(assignOp),
+                                                                            getStartCol(assignOp),
+                                                                            safeGetEndLine(assignOp),
+                                                                            safeGetEndCol(assignOp)
+                                                                    )
                                                             )
-                                                    )
-                                            ),
-                                            resultVarIdent
-                                    ).setType(varType));
+                                                    ),
+                                                    resultVarAtom
+                                            ).setType(varType));
                         }));
     }
 
@@ -935,11 +937,11 @@ public final class Transformer extends TreeTranslator {
     private void handleStaticFieldAssignOp(JCAssignOp assignOp, JCExpression fieldExpr, String className, String fieldName) {
         var fieldType = fieldExpr.type;
         this.result =
-                withNewLocal("oldVal", fieldExpr, (oldValueSymbol, oldValueIdent, oldValueDef) ->
-                        withNewLocal("rhs", assignOp.rhs, (rhsVarSymbol, rhsVarIdent, rhsVarDef) -> {
-                            assignOp.rhs = rhsVarIdent;
-                            return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
-                                    (resultSymbol, resultIdent, resultDef) ->
+                withNewLocal("oldVal", fieldExpr, (oldValueAtom, oldValueDef) ->
+                        withNewLocal("rhs", assignOp.rhs, (rhsVarAtom, rhsVarDef) -> {
+                            assignOp.rhs = rhsVarAtom;
+                            return withNewLocal("result", expandAssignOp(assignOp, oldValueAtom),
+                                    (resultAtom, resultDef) ->
                                             mk().LetExpr(
                                                     List.of(
                                                             oldValueDef,
@@ -949,10 +951,10 @@ public final class Transformer extends TreeTranslator {
                                                                     instrumentation.logStaticFieldAssignOp(
                                                                             className,
                                                                             fieldName,
-                                                                            resultIdent,
-                                                                            oldValueIdent,
+                                                                            resultAtom,
+                                                                            oldValueAtom,
                                                                             assignOp.operator.name.toString(),
-                                                                            rhsVarIdent,
+                                                                            rhsVarAtom,
                                                                             currentFilename(),
                                                                             getStartLine(assignOp),
                                                                             getStartCol(assignOp),
@@ -961,7 +963,7 @@ public final class Transformer extends TreeTranslator {
                                                                     )
                                                             )
                                                     ),
-                                                    resultIdent
+                                                    resultAtom
                                             ).setType(fieldType)
                             );
                         }));
@@ -985,14 +987,14 @@ public final class Transformer extends TreeTranslator {
 
     private void handleInstanceFieldAssignment(JCAssign assignment, String className, JCExpression selected, Name fieldName) {
         this.result =
-                withNewLocal("receiver", selected, (receiverVarSymbol, receiverVarIdent, receiverVarDef) -> {
+                withNewLocal("receiver", selected, (receiverVarAtom, receiverVarDef) -> {
                     assignment.lhs = mk().Select(
-                            receiverVarIdent,
+                            receiverVarAtom,
                             new Symbol.VarSymbol(0, fieldName, assignment.lhs.type, currentMethod())
                     ).setType(assignment.lhs.type);
                     assignment.rhs = instrumentation.logInstanceFieldAssignment(
                             className,
-                            receiverVarIdent,
+                            receiverVarAtom,
                             fieldName.toString(),
                             assignment.rhs,
                             currentFilename(),
@@ -1010,18 +1012,18 @@ public final class Transformer extends TreeTranslator {
 
     private void handleInstanceFieldAssignOp(JCAssignOp assignOp, String className, JCExpression selected, Name fieldName) {
         this.result =
-                withNewLocal("receiver", selected, (receiverSymbol, receiverIdent, receiverVarDecl) -> {
+                withNewLocal("receiver", selected, (receiverAtom, receiverVarDecl) -> {
                     var select = mk().Select(
-                            receiverIdent,
+                            receiverAtom,
                             new Symbol.VarSymbol(0, fieldName,
                                     assignOp.lhs.type, currentMethod())
                     ).setType(assignOp.lhs.type);
                     assignOp.lhs = select;
-                    return withNewLocal("oldValue", select, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
-                            withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
-                                assignOp.rhs = rhsIdent;
-                                return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
-                                        (resultSymbol, resultIdent, resultVarDecl) ->
+                    return withNewLocal("oldValue", select, (oldValueAtom, oldValueVarDecl) ->
+                            withNewLocal("rhs", assignOp.rhs, (rhsAtom, rhsVarDecl) -> {
+                                assignOp.rhs = rhsAtom;
+                                return withNewLocal("result", expandAssignOp(assignOp, oldValueAtom),
+                                        (resultAtom, resultVarDecl) ->
                                                 mk().LetExpr(
                                                         List.of(
                                                                 receiverVarDecl,
@@ -1030,12 +1032,12 @@ public final class Transformer extends TreeTranslator {
                                                                 resultVarDecl,
                                                                 mk().Exec(instrumentation.logInstanceFieldAssignOp(
                                                                         className,
-                                                                        receiverIdent,
+                                                                        receiverAtom,
                                                                         fieldName.toString(),
-                                                                        resultIdent,
-                                                                        oldValueIdent,
+                                                                        resultAtom,
+                                                                        oldValueAtom,
                                                                         assignOp.operator.name.toString(),
-                                                                        rhsIdent,
+                                                                        rhsAtom,
                                                                         currentFilename(),
                                                                         getStartLine(assignOp),
                                                                         getStartCol(assignOp),
@@ -1043,7 +1045,7 @@ public final class Transformer extends TreeTranslator {
                                                                         safeGetEndCol(assignOp)
                                                                 ))
                                                         ),
-                                                        resultIdent
+                                                        resultAtom
                                                 ).setType(assignOp.type));
                             }));
                 });
@@ -1051,16 +1053,16 @@ public final class Transformer extends TreeTranslator {
 
     private void handleInstanceFieldIncDecOp(JCUnary unary, String className, JCExpression selected, Name fieldName,
                                              boolean isPrefixOp, boolean isIncOp) {
-        this.result = withNewLocal("receiver", selected, (receiverSymbol, receiverIdent, receiverVarDecl) -> {
+        this.result = withNewLocal("receiver", selected, (receiverAtom, receiverVarDecl) -> {
             unary.arg = mk().Select(
-                    receiverIdent,
+                    receiverAtom,
                     new Symbol.VarSymbol(0, fieldName, unary.type, currentMethod())
             ).setType(unary.type);
             return mk().LetExpr(
                     List.of(receiverVarDecl),
                     instrumentation.logInstanceFieldIncDecOp(
                             className,
-                            receiverIdent,
+                            receiverAtom,
                             fieldName.toString(),
                             unary,
                             isPrefixOp,
@@ -1077,17 +1079,17 @@ public final class Transformer extends TreeTranslator {
 
     private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
         this.result =
-                withNewLocal("array", arrayAccess.indexed, (arrayVarSymbol, arrayIdent, arrayVarDef) ->
-                        withNewLocal("index", arrayAccess.index, (indexVarSymbol, indexIdent, indexVarDef) -> {
-                            arrayAccess.indexed = arrayIdent;
-                            arrayAccess.index = indexIdent;
+                withNewLocal("array", arrayAccess.indexed, (arrayAtom, arrayVarDef) ->
+                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDef) -> {
+                            arrayAccess.indexed = arrayAtom;
+                            arrayAccess.index = indexAtom;
                             return mk().LetExpr(
                                     List.of(
                                             arrayVarDef,
                                             indexVarDef,
                                             mk().Exec(instrumentation.logArrayElemSet(
-                                                    arrayIdent,
-                                                    indexIdent,
+                                                    arrayAtom,
+                                                    indexAtom,
                                                     assignment.rhs,
                                                     currentFilename(),
                                                     getStartLine(assignment),
@@ -1103,15 +1105,15 @@ public final class Transformer extends TreeTranslator {
 
     private void handleArrayAssignOp(JCAssignOp assignOp, JCArrayAccess arrayAccess) {
         this.result =
-                withNewLocal("array", arrayAccess.indexed, (arraySymbol, arrayIdent, arrayVarDecl) ->
-                        withNewLocal("index", arrayAccess.index, (indexSymbol, indexIdent, indexVarDecl) -> {
-                            arrayAccess.indexed = arrayIdent;
-                            arrayAccess.index = indexIdent;
-                            return withNewLocal("oldValue", arrayAccess, (oldValueSymbol, oldValueIdent, oldValueVarDecl) ->
-                                    withNewLocal("rhs", assignOp.rhs, (rhsSymbol, rhsIdent, rhsVarDecl) -> {
-                                        assignOp.rhs = rhsIdent;
-                                        return withNewLocal("result", expandAssignOp(assignOp, oldValueIdent),
-                                                (resultSymbol, resultIdent, resultVarDecl) ->
+                withNewLocal("array", arrayAccess.indexed, (arrayAtom, arrayVarDecl) ->
+                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDecl) -> {
+                            arrayAccess.indexed = arrayAtom;
+                            arrayAccess.index = indexAtom;
+                            return withNewLocal("oldValue", arrayAccess, (oldValueAtom, oldValueVarDecl) ->
+                                    withNewLocal("rhs", assignOp.rhs, (rhsAtom, rhsVarDecl) -> {
+                                        assignOp.rhs = rhsAtom;
+                                        return withNewLocal("result", expandAssignOp(assignOp, oldValueAtom),
+                                                (resultAtom, resultVarDecl) ->
                                                         mk().LetExpr(
                                                                 List.of(
                                                                         arrayVarDecl,
@@ -1120,12 +1122,12 @@ public final class Transformer extends TreeTranslator {
                                                                         rhsVarDecl,
                                                                         resultVarDecl,
                                                                         mk().Exec(instrumentation.logArrayElemAssignOp(
-                                                                                arrayIdent,
-                                                                                indexIdent,
-                                                                                resultIdent,
-                                                                                oldValueIdent,
+                                                                                arrayAtom,
+                                                                                indexAtom,
+                                                                                resultAtom,
+                                                                                oldValueAtom,
                                                                                 assignOp.operator.name.toString(),
-                                                                                rhsIdent,
+                                                                                rhsAtom,
                                                                                 currentFilename(),
                                                                                 getStartLine(assignOp),
                                                                                 getStartCol(assignOp),
@@ -1133,7 +1135,7 @@ public final class Transformer extends TreeTranslator {
                                                                                 safeGetEndCol(assignOp)
                                                                         ))
                                                                 ),
-                                                                resultIdent
+                                                                resultAtom
                                                         ).setType(assignOp.type));
                                     }));
                         }));
@@ -1141,18 +1143,18 @@ public final class Transformer extends TreeTranslator {
 
     private void handleArrayIncDecOp(JCUnary unary, JCArrayAccess arrayAccess, boolean isPrefixOp, boolean isIncOp) {
         this.result =
-                withNewLocal("array", arrayAccess.indexed, (arraySymbol, arrayIdent, arrayVarDecl) ->
-                        withNewLocal("index", arrayAccess.index, (indexSymbol, indexIdent, indexVarDecl) -> {
-                            arrayAccess.indexed = arrayIdent;
-                            arrayAccess.index = indexIdent;
+                withNewLocal("array", arrayAccess.indexed, (arrayAtom, arrayVarDecl) ->
+                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDecl) -> {
+                            arrayAccess.indexed = arrayAtom;
+                            arrayAccess.index = indexAtom;
                             return mk().LetExpr(
                                     List.of(
                                             arrayVarDecl,
                                             indexVarDecl
                                     ),
                                     instrumentation.logArrayIncDecOp(
-                                            arrayIdent,
-                                            indexIdent,
+                                            arrayAtom,
+                                            indexAtom,
                                             unary,
                                             isPrefixOp,
                                             isIncOp,
@@ -1265,17 +1267,17 @@ public final class Transformer extends TreeTranslator {
     }
 
     private <T extends JCTree> T withNewLocal(String debugHint, JCExpression valueExpr,
-                                              TriFunction<Symbol.VarSymbol, JCIdent, JCVariableDecl, T> treeProducer) {
+                                              BiFunction<JCIdent, JCVariableDecl, T> treeProducer) {
         return withNewLocalForceType(debugHint, valueExpr, valueExpr.type, treeProducer);
     }
 
     private <T extends JCTree> T withNewLocalForceType(String debugHint, JCExpression valueExpr, Type type,
-                                                       TriFunction<Symbol.VarSymbol, JCIdent, JCVariableDecl, T> treeProducer) {
+                                                       BiFunction<JCIdent, JCVariableDecl, T> treeProducer) {
         var symbol = new Symbol.VarSymbol(0, m.nextId(debugHint), type, currentMethod());
         var ident = mk().Ident(symbol);
         ident.setType(type);
         var varDecl = mk().VarDef(symbol, valueExpr);
-        return treeProducer.apply(symbol, ident, varDecl);
+        return treeProducer.apply(ident, varDecl);
     }
 
     private JCExpression makeLet(JCExpression invocation, String className, String methodName, CallInstrumentationPieces instrPieces) {
@@ -1427,11 +1429,6 @@ public final class Transformer extends TreeTranslator {
     }
 
     private record Triple<A, B, C>(A _1, B _2, C _3) {
-    }
-
-    @FunctionalInterface
-    private interface TriFunction<A, B, C, R> {
-        R apply(A a, B b, C c);
     }
 
     //</editor-fold>
