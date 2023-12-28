@@ -161,7 +161,7 @@ public final class Instrumentation {
     //<editor-fold desc="Assignments and variable declaration">
 
     public JCExpression logVariableDeclaration(String varName, String typeDescr,
-                                               String filename, int startLine, int startCol, int endLine, int endCol){
+                                               String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "variableDeclared",
                 List.of(
@@ -189,7 +189,7 @@ public final class Instrumentation {
     // TODO check what happens in the following situation: int i = ...; long l = ...; int res = i << l
     public JCExpression logLocalVarAssignOp(String varName, JCExpression newValue,
                                             JCExpression oldValue, String operator, JCExpression rhs,
-                                            String filename, int startLine, int startCol, int endLine, int endCol){
+                                            String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(newValue.type);
         return makeLogMethodCall(
                 "localVarAssignOp",
@@ -206,7 +206,7 @@ public final class Instrumentation {
 
     public JCExpression logLocalVarIncDecOp(String varName, JCExpression result,
                                             boolean isPrefixOp, boolean isIncOp,
-                                            String filename, int startLine, int startCol, int endLine, int endCol){
+                                            String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
         return makeLogMethodCall(
                 "localVarIncDecOp",
@@ -237,7 +237,7 @@ public final class Instrumentation {
 
     public JCExpression logStaticFieldAssignOp(String className, String fieldName, JCExpression newValue,
                                                JCExpression oldValue, String operator, JCExpression rhs,
-                                               String filename, int startLine, int startCol, int endLine, int endCol){
+                                               String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(newValue.type);
         return makeLogMethodCall(
                 "staticFieldAssignOp",
@@ -255,7 +255,7 @@ public final class Instrumentation {
 
     public JCExpression logStaticFieldIncDecOp(String className, String fieldName, JCExpression result,
                                                boolean isPrefixOp, boolean isIncOp,
-                                               String filename, int startLine, int startCol, int endLine, int endCol){
+                                               String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
         return makeLogMethodCall(
                 "staticFieldIncDecOp",
@@ -288,7 +288,7 @@ public final class Instrumentation {
 
     public JCExpression logInstanceFieldAssignOp(String className, JCExpression instance, String fieldName, JCExpression newValue,
                                                  JCExpression oldValue, String operator, JCExpression rhs,
-                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+                                                 String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(newValue.type);
         return makeLogMethodCall(
                 "instanceFieldAssignOp",
@@ -307,7 +307,7 @@ public final class Instrumentation {
 
     public JCExpression logInstanceFieldIncDecOp(String className, JCExpression instance, String fieldName, JCExpression result,
                                                  boolean isPrefixOp, boolean isIncOp,
-                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+                                                 String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
         return makeLogMethodCall(
                 "instanceFieldIncDecOp",
@@ -339,7 +339,7 @@ public final class Instrumentation {
 
     public JCExpression logArrayElemAssignOp(JCExpression array, JCExpression index, JCExpression newValue,
                                              JCExpression oldValue, String operator, JCExpression rhs,
-                                             String filename, int startLine, int startCol, int endLine, int endCol){
+                                             String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(newValue.type);
         return makeLogMethodCall(
                 "arrayElemAssignOp",
@@ -357,7 +357,7 @@ public final class Instrumentation {
 
     public JCExpression logArrayIncDecOp(JCExpression array, JCExpression index, JCExpression result,
                                          boolean isPrefixOp, boolean isIncOp,
-                                         String filename, int startLine, int startCol, int endLine, int endCol){
+                                         String filename, int startLine, int startCol, int endLine, int endCol) {
         var type = result.type;   // no need to call topmostTypeFor as this method only handles numeric types
         return makeLogMethodCall(
                 "arrayElemIncDecOp",
@@ -376,8 +376,67 @@ public final class Instrumentation {
 
     //<editor-fold desc="Expressions">
 
+    public JCExpression logLocalRead(JCExpression value, String varName, String filename, int startLine, int startCol, int endLine, int endCol) {
+        var higherType = topmostTypeFor(value.type);
+        var apply = makeLogMethodCall(
+                "localVarRead",
+                List.of(
+                        new Argument(higherType, value),
+                        new Argument(st().stringType, mk().Literal(varName))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(value.type, apply);
+    }
+
+    public JCExpression logStaticFieldRead(JCExpression value, String className, String fieldName,
+                                           String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(value.type);
+        var apply = makeLogMethodCall(
+                "staticFieldRead",
+                List.of(
+                        new Argument(higherType, value),
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(value.type, apply);
+    }
+
+    public JCExpression logInstanceFieldRead(JCExpression value, JCExpression owner, String className, String fieldName,
+                                             String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(value.type);
+        var apply = makeLogMethodCall(
+                "instanceFieldRead",
+                List.of(
+                        new Argument(higherType, value),
+                        new Argument(st().objectType, owner),
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(value.type, apply);
+    }
+
+    public JCExpression logArrayAccess(JCExpression value, JCExpression array, JCExpression index,
+                                    String filename, int startLine, int startCol, int endLine, int endCol){
+        var higherType = topmostTypeFor(value.type);
+        var apply = makeLogMethodCall(
+                "arrayAccess",
+                List.of(
+                        new Argument(higherType, value),
+                        new Argument(st().objectType, array),
+                        new Argument(st().intType, index)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(value.type, apply);
+    }
+
     public JCExpression logUnaryOp(JCExpression resultExpr, JCExpression argExpr, String operator,
-                                   String filename, int startLine, int startCol, int endLine, int endCol){
+                                   String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(resultExpr.type);
         var apply = makeLogMethodCall(
                 "unaryOp",
@@ -392,7 +451,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logBinaryOp(JCExpression lhs, JCExpression rhs, String operator, JCExpression result,
-                                    String filename, int startLine, int startCol, int endLine, int endCol){
+                                    String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "binaryOperator",
                 List.of(
@@ -454,7 +513,7 @@ public final class Instrumentation {
     //<editor-fold desc="Exceptions, casts, assertions">
 
     public JCExpression logCaught(JCExpression exprYieldingThrowable,
-                                  String filename, int startLine, int startCol, int endLine, int endCol){
+                                  String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "caught",
                 List.of(
@@ -465,7 +524,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logCastAttempt(JCExpression castedExpr, String targetTypeDescr, JCExpression successExpr,
-                                       String filename, int startLine, int startCol, int endLine, int endCol){
+                                       String filename, int startLine, int startCol, int endLine, int endCol) {
         var highestType = topmostTypeFor(castedExpr.type);
         var apply = makeLogMethodCall(
                 "castAttempt",
@@ -479,7 +538,7 @@ public final class Instrumentation {
         return mk().TypeCast(castedExpr.type, apply);
     }
 
-    public JCExpression logThrowStat(JCExpression throwable, String filename, int startLine, int startCol, int endLine, int endCol){
+    public JCExpression logThrowStat(JCExpression throwable, String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "throwStat",
                 List.of(
@@ -490,7 +549,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logAssertion(JCExpression asserted, String assertedDescr,
-                                     String filename, int startLine, int startCol, int endLine, int endCol){
+                                     String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "assertionStat",
                 List.of(

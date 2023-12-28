@@ -426,6 +426,49 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize Object localVarRead(@Specialize Object value, String varName,
+                                                  String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("VAR READ ", varName, " : ", value, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return value;
+    }
+
+    public static @Specialize Object staticFieldRead(@Specialize Object value, String className, String fieldName,
+                                                     String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("STATIC FIELD READ ", className, ".", fieldName, " : ", value,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return value;
+    }
+
+    public static @Specialize Object instanceFieldRead(@Specialize Object value, Object owner, String className, String fieldName,
+                                                       String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("INSTANCE FIELD READ ", owner, ".", className, "::", fieldName, " : ", value,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return value;
+    }
+
+    public static @Specialize Object arrayAccess(@Specialize Object value, Object array, int index,
+                                                 String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("ARRAY ACCESS ", array, "[", index, "] : ", value,
+                    " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return value;
+    }
+
     private static String preOrPost(boolean isPre) {
         return isPre ? "PRE" : "POST";
     }

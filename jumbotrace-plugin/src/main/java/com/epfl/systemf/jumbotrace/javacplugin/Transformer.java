@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.lang.model.element.ElementKind;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.function.BiFunction;
 
 // TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null". Also be careful with line numbers in error reporting
@@ -222,7 +223,10 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitApply(JCMethodInvocation invocation) {
-        super.visitApply(invocation);
+        if (!invocation.meth.type.getTag().equals(TypeTag.METHOD)){  // for functional interfaces  TODO test with functional interface
+            invocation.meth = translate(invocation.meth);
+        }
+        invocation.args = translate(invocation.args);
         mk().at(invocation.pos);
         deleteConstantFolding(invocation);
         if (invocation.type.getTag() == TypeTag.VOID) {
@@ -616,15 +620,15 @@ public final class Transformer extends TreeTranslator {
         /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
          * naive implementation would treat them as reads */
         var effectiveLhs = withoutParentheses(assignment.lhs);
-        if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+        if (effectiveLhs instanceof JCIdent ident && isLocalVar(ident)) {
             assignment.rhs = translate(assignment.rhs);
             mk().at(assignment.pos);
             handleLocalVarAssignment(assignment, ident);
-        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+        } else if (effectiveLhs instanceof JCIdent ident && isStaticField(ident)) {
             assignment.rhs = translate(assignment.rhs);
             mk().at(assignment.pos);
             handleStaticFieldAssignment(assignment, currentClass().toString(), ident.name.toString());
-        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+        } else if (effectiveLhs instanceof JCIdent ident && isInstanceField(ident)) {
             assignment.rhs = translate(assignment.rhs);
             mk().at(assignment.pos);
             handleInstanceFieldAssignment(assignment, currentClass().toString(), makeThisExpr(), ident.name);
@@ -655,15 +659,15 @@ public final class Transformer extends TreeTranslator {
         /* Do not call super.visitAssign. One needs to be careful when recursing on the LHS: a
          * naive implementation would treat them as reads */
         var effectiveLhs = withoutParentheses(assignOp.lhs);
-        if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+        if (effectiveLhs instanceof JCIdent ident && isLocalVar(ident)) {
             assignOp.rhs = translate(assignOp.rhs);
             mk().at(assignOp.pos);
             handleLocalVarAssignOp(assignOp, ident);
-        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+        } else if (effectiveLhs instanceof JCIdent ident && isStaticField(ident)) {
             assignOp.rhs = translate(assignOp.rhs);
             mk().at(assignOp.pos);
             handleStaticFieldAssignOp(assignOp, ident, currentClass().toString(), ident.name.toString());
-        } else if (effectiveLhs instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+        } else if (effectiveLhs instanceof JCIdent ident && isInstanceField(ident)) {
             assignOp.rhs = translate(assignOp.rhs);
             mk().at(assignOp.pos);
             handleInstanceFieldAssignOp(assignOp, currentClass().toString(), makeThisExpr(), ident.name);
@@ -696,13 +700,13 @@ public final class Transformer extends TreeTranslator {
         var isIncOp = unary.hasTag(Tag.PREINC) || unary.hasTag(Tag.POSTINC);
         if (isPrefixOp || isPostfixOp) {
             var effectiveArg = withoutParentheses(unary.arg);
-            if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.METHOD)) {
+            if (effectiveArg instanceof JCIdent ident && isLocalVar(ident)) {
                 mk().at(unary.pos);
                 handleLocalVarIncDecOp(unary, ident, isPrefixOp, isIncOp);
-            } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS) && ident.sym.isStatic()) {
+            } else if (effectiveArg instanceof JCIdent ident && isStaticField(ident)) {
                 mk().at(unary.pos);
                 handleStaticFieldIncDecOp(unary, currentClass().toString(), ident.name.toString(), isPrefixOp, isIncOp);
-            } else if (effectiveArg instanceof JCIdent ident && ident.sym.owner.getKind().equals(ElementKind.CLASS)) {
+            } else if (effectiveArg instanceof JCIdent ident && isInstanceField(ident)) {
                 mk().at(unary.pos);
                 handleInstanceFieldIncDecOp(unary, currentClass().toString(), makeThisExpr(), ident.name, isPrefixOp, isIncOp);
             } else if (effectiveArg instanceof JCFieldAccess fieldAccess && fieldAccess.sym.isStatic()) {
@@ -833,16 +837,71 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitIndexed(JCArrayAccess arrayAccess) {
-        super.visitIndexed(arrayAccess);  // TODO
+        super.visitIndexed(arrayAccess);
         mk().at(arrayAccess.pos);
         deleteConstantFolding(arrayAccess);
+        this.result =
+                withNewLocal("array", arrayAccess.indexed, (arrayAtom, arrayVarDecl) ->
+                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDecl) -> {
+                            arrayAccess.indexed = arrayAtom;
+                            arrayAccess.index = indexAtom;
+                            return mk().LetExpr(
+                                    List.of(
+                                            arrayVarDecl,
+                                            indexVarDecl
+                                    ),
+                                    instrumentation.logArrayAccess(
+                                            arrayAccess,
+                                            arrayAtom,
+                                            indexAtom,
+                                            currentFilename(),
+                                            getStartLine(arrayAccess),
+                                            getStartCol(arrayAccess),
+                                            safeGetEndLine(arrayAccess),
+                                            safeGetEndCol(arrayAccess)
+                                    )
+                            ).setType(arrayAccess.type);
+                        })
+                );
     }
 
     @Override
     public void visitSelect(JCFieldAccess fieldAccess) {
-        super.visitSelect(fieldAccess);  // TODO
+        super.visitSelect(fieldAccess);
         mk().at(fieldAccess.pos);
         deleteConstantFolding(fieldAccess);
+        var isField = fieldAccess.sym != null && Objects.equals(fieldAccess.sym.owner.getKind(), ElementKind.CLASS);
+        var isStaticField = isField && fieldAccess.sym.isStatic();
+        if (isStaticField) {
+            this.result = instrumentation.logStaticFieldRead(
+                    fieldAccess,
+                    fieldAccess.selected.toString(),
+                    fieldAccess.name.toString(),
+                    currentFilename(),
+                    getStartLine(fieldAccess),
+                    getStartCol(fieldAccess),
+                    safeGetEndLine(fieldAccess),
+                    safeGetEndCol(fieldAccess)
+            );
+        } else if (isField) {
+            this.result = withNewLocal("owner", fieldAccess.selected, (ownerAtom, ownerVarDecl) -> {
+                fieldAccess.selected = ownerAtom;
+                return mk().LetExpr(
+                        List.of(ownerVarDecl),
+                        instrumentation.logInstanceFieldRead(
+                                fieldAccess,
+                                ownerAtom,
+                                fieldAccess.sym.owner.toString(),
+                                fieldAccess.name.toString(),
+                                currentFilename(),
+                                getStartLine(fieldAccess),
+                                getStartCol(fieldAccess),
+                                safeGetEndLine(fieldAccess),
+                                safeGetEndCol(fieldAccess)
+                        )
+                ).setType(fieldAccess.type);
+            });
+        }
     }
 
     @Override
@@ -855,9 +914,43 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitIdent(JCIdent ident) {
-        super.visitIdent(ident);  // TODO
+        super.visitIdent(ident);
         mk().at(ident.pos);
         deleteConstantFolding(ident);
+        if (isLocalVar(ident)) {
+            this.result = instrumentation.logLocalRead(
+                    ident,
+                    ident.name.toString(),
+                    currentFilename(),
+                    getStartLine(ident),
+                    getStartCol(ident),
+                    safeGetEndLine(ident),
+                    safeGetEndCol(ident)
+            );
+        } else if (isStaticField(ident)) {
+            this.result = instrumentation.logStaticFieldRead(
+                    ident,
+                    currentClass().name.toString(),
+                    ident.name.toString(),
+                    currentFilename(),
+                    getStartLine(ident),
+                    getStartCol(ident),
+                    safeGetEndLine(ident),
+                    safeGetEndCol(ident)
+            );
+        } else if (isInstanceField(ident)) {
+            this.result = instrumentation.logInstanceFieldRead(
+                    ident,
+                    makeThisExpr(),
+                    currentClass().name.toString(),
+                    ident.name.toString(),
+                    currentFilename(),
+                    getStartLine(ident),
+                    getStartCol(ident),
+                    safeGetEndLine(ident),
+                    safeGetEndCol(ident)
+            );
+        }
     }
 
     @Override
@@ -1429,6 +1522,22 @@ public final class Transformer extends TreeTranslator {
         return type.equalsIgnoreMetadata(st().botType) ? st().objectType : type;
     }
 
+    private boolean isLocalVar(JCIdent ident){
+        return ident.sym != null && ident.sym.getKind().equals(ElementKind.LOCAL_VARIABLE);
+    }
+
+    private boolean isField(JCIdent ident){
+        return ident.sym != null && ident.sym.getKind().equals(ElementKind.FIELD);
+    }
+
+    private boolean isInstanceField(JCIdent ident){
+        return isField(ident) && !ident.sym.isStatic();
+    }
+
+    private boolean isStaticField(JCIdent ident){
+        return isField(ident) && ident.sym.isStatic();
+    }
+
     private int getStartLine(JCTree tree) {
         var lineMap = cu.getLineMap();
         return lineMap.getLineNumber(tree.pos);
@@ -1436,7 +1545,12 @@ public final class Transformer extends TreeTranslator {
 
     private int getStartCol(JCTree tree) {
         var lineMap = cu.getLineMap();
-        return lineMap.getColumnNumber(tree.pos);
+        try {
+            return lineMap.getColumnNumber(tree.pos);
+        } catch (ArrayIndexOutOfBoundsException e){
+            // for an unknown reason, getColumnNumber sometimes throws an exception
+            return Position.NOPOS;
+        }
     }
 
     private int safeGetEndLine(JCTree tree) {
