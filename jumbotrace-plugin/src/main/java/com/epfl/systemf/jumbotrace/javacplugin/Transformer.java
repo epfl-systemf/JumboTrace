@@ -744,9 +744,35 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitBinary(JCBinary binary) {
-        super.visitBinary(binary);  // TODO
+        super.visitBinary(binary);
         mk().at(binary.pos);
         deleteConstantFolding(binary);
+        this.result =
+                withNewLocalForceType("lhs", binary.lhs, makeNonNullType(binary.lhs.type), (lhsAtom, lhsVarDef) ->
+                        withNewLocalForceType("rhs", binary.rhs, makeNonNullType(binary.rhs.type), (rhsAtom, rhsVarDef) -> {
+                            binary.lhs = lhsAtom;
+                            binary.rhs = rhsAtom;
+                            return withNewLocal("binopres", binary, (resAtom, resVarDecl) ->
+                                    mk().LetExpr(
+                                            List.of(
+                                                    lhsVarDef,
+                                                    rhsVarDef,
+                                                    resVarDecl,
+                                                    mk().Exec(instrumentation.logBinaryOp(
+                                                            lhsAtom,
+                                                            rhsAtom,
+                                                            binary.operator.name.toString(),
+                                                            resAtom,
+                                                            currentFilename(),
+                                                            getStartLine(binary),
+                                                            getStartCol(binary),
+                                                            safeGetEndLine(binary),
+                                                            safeGetEndCol(binary)
+                                                    ))
+                                            ),
+                                            resAtom
+                                    ).setType(binary.type));
+                        }));
     }
 
     @Override
@@ -1397,6 +1423,10 @@ public final class Transformer extends TreeTranslator {
         while (expr.type != null && expr.type.constValue() != null) {
             expr.type = expr.type.baseType();
         }
+    }
+
+    private Type makeNonNullType(Type type) {
+        return type.equalsIgnoreMetadata(st().botType) ? st().objectType : type;
     }
 
     private int getStartLine(JCTree tree) {

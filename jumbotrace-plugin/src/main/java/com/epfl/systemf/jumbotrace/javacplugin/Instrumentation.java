@@ -388,7 +388,21 @@ public final class Instrumentation {
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 higherType
         );
-        return castIfNeeded(higherType, apply);
+        return castIfNeeded(resultExpr.type, apply);
+    }
+
+    public JCExpression logBinaryOp(JCExpression lhs, JCExpression rhs, String operator, JCExpression result,
+                                    String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "binaryOperator",
+                List.of(
+                        new Argument(st().objectType, lhs),
+                        new Argument(st().objectType, rhs),
+                        new Argument(st().stringType, mk().Literal(operator)),
+                        new Argument(st().objectType, result)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().voidType
+        );
     }
 
     //</editor-fold>
