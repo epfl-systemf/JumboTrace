@@ -54,7 +54,6 @@ public class ___JumboTrace___ {
             disableLogging();
             log("CALL: ", className, ".", methodName, methodSig, " args=", Arrays.toString(args),
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
-            indent += 1;
             enableLogging();
         }
     }
@@ -65,7 +64,6 @@ public class ___JumboTrace___ {
             disableLogging();
             log("CALL: ", className, ".", methodName, methodSig, " receiver='", receiver, "' args=", Arrays.toString(args),
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
-            indent += 1;
             enableLogging();
         }
     }
@@ -73,7 +71,17 @@ public class ___JumboTrace___ {
     public static void methodEnter(String className, String methodName, String methodSig, String filename, int line, int col) {
         if (loggingEnabled) {
             disableLogging();
+            indent += 1;
             log("ENTER: ", className, ".", methodName, methodSig, " at ", formatPosition(filename, line, col));
+            enableLogging();
+        }
+    }
+
+    public static void methodExit(String methodName, String filename, int line, int col){
+        if (loggingEnabled){
+            disableLogging();
+            log("METHOD EXIT ", methodName, " at ", formatPosition(filename, line, col));
+            indent -= 1;
             enableLogging();
         }
     }
@@ -82,7 +90,6 @@ public class ___JumboTrace___ {
                                                String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            indent -= 1;
             log(className, ".", methodName, " RETURNS '", retValue, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }
@@ -92,7 +99,6 @@ public class ___JumboTrace___ {
     public static void methodRetVoid(String className, String methodName, String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
-            indent -= 1;
             log(className, ".", methodName, " RETURNS void at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             enableLogging();
         }

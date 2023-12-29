@@ -158,8 +158,9 @@ public final class Transformer extends TreeTranslator {
         super.visitMethodDef(method);
         var body = method.getBody();
         if (body != null) {
+            var statsOuter = List.<JCStatement>nil();
             mk().at(body.pos);
-            body.stats = body.stats.prepend(mk().Exec(
+            statsOuter = statsOuter.append(mk().Exec(
                     instrumentation.logMethodEnter(
                             method.sym.owner.name.toString(),
                             method.name.toString(),
@@ -171,9 +172,17 @@ public final class Transformer extends TreeTranslator {
                             getStartCol(method)
                     )
             ));
+            List<JCStatement> statsInner;
+            if (method.sym.getKind().equals(ElementKind.CONSTRUCTOR)){
+                // If constructor, need to call the superclass constructor before starting the try-finally
+                statsOuter = statsOuter.append(body.stats.head);
+                statsInner = body.stats.tail;
+            } else {
+                statsInner = body.stats;
+            }
             if (method.type.asMethodType().getReturnType().getTag() == TypeTag.VOID) {
                 mk().at(body.stats.isEmpty() ? body.pos : body.stats.last().pos);
-                body.stats = body.stats.append(mk().Exec(
+                statsInner = statsInner.append(mk().Exec(
                         instrumentation.logImplicitReturn(
                                 method.name.toString(),
                                 currentFilename(),
@@ -182,6 +191,17 @@ public final class Transformer extends TreeTranslator {
                         )
                 ));
             }
+            statsOuter = statsOuter.append(mk().Try(
+                    mk().Block(0, statsInner),
+                    List.nil(),
+                    mk().Block(0, List.of(mk().Exec(instrumentation.logMethodExit(
+                            method.name.toString(),
+                            currentFilename(),
+                            getStartLine(method),
+                            getStartCol(method)
+                    ))))
+            ));
+            body.stats = statsOuter;
         }
         methodsStack.removeFirst();
     }

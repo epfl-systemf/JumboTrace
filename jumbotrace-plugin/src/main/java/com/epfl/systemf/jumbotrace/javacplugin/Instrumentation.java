@@ -104,6 +104,15 @@ public final class Instrumentation {
         );
     }
 
+    public JCExpression logMethodExit(String methodName, String filename, int line, int col){
+        return makeLogMethodCall(
+                "methodExit",
+                List.of(new Argument(st().stringType, mk().Literal(methodName)))
+                        .appendList(makeSinglePositionArgsList(filename, line, col)),
+                st().voidType
+        );
+    }
+
     //</editor-fold>
 
     //<editor-fold desc="Method returns">
