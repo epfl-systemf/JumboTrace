@@ -128,6 +128,7 @@ public final class Transformer extends TreeTranslator {
                 variableDecl.init = instrumentation.logLocalVarAssignment(
                         variableDecl.name.toString(),
                         variableDecl.init,
+                        variableDecl.type,
                         currentFilename(),
                         getStartLine(variableDecl),
                         getStartCol(variableDecl),
@@ -225,8 +226,8 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitApply(JCMethodInvocation invocation) {
-        if (!invocation.meth.type.getTag().equals(TypeTag.METHOD)) {  // for functional interfaces  TODO test with functional interface
-            invocation.meth = translate(invocation.meth);
+        if (invocation.meth instanceof JCFieldAccess fieldAccess){
+            fieldAccess.selected = translate(fieldAccess.selected);
         }
         invocation.args = translate(invocation.args);
         mk().at(invocation.pos);
@@ -1008,6 +1009,7 @@ public final class Transformer extends TreeTranslator {
         assignment.rhs = instrumentation.logLocalVarAssignment(
                 ident.name.toString(),
                 assignment.rhs,
+                assignment.lhs.type,
                 currentFilename(),
                 getStartLine(assignment),
                 getStartCol(assignment),
@@ -1034,6 +1036,7 @@ public final class Transformer extends TreeTranslator {
                                                                     instrumentation.logLocalVarAssignOp(
                                                                             localVarIdent.name.toString(),
                                                                             localVarIdent,
+                                                                            assignOp.lhs.type,
                                                                             oldValueAtom,
                                                                             assignOp.operator.name.toString(),
                                                                             rhsVarAtom,
@@ -1070,6 +1073,7 @@ public final class Transformer extends TreeTranslator {
                 className,
                 fieldName,
                 assignment.rhs,
+                assignment.lhs.type,
                 currentFilename(),
                 getStartLine(assignment),
                 getStartCol(assignment),
@@ -1097,6 +1101,7 @@ public final class Transformer extends TreeTranslator {
                                                                             className,
                                                                             fieldName,
                                                                             resultAtom,
+                                                                            assignOp.lhs.type,
                                                                             oldValueAtom,
                                                                             assignOp.operator.name.toString(),
                                                                             rhsVarAtom,
@@ -1142,6 +1147,7 @@ public final class Transformer extends TreeTranslator {
                             receiverVarAtom,
                             fieldName.toString(),
                             assignment.rhs,
+                            assignment.lhs.type,
                             currentFilename(),
                             getStartLine(assignment),
                             getStartCol(assignment),
@@ -1183,6 +1189,7 @@ public final class Transformer extends TreeTranslator {
                                                                         oldValueAtom,
                                                                         assignOp.operator.name.toString(),
                                                                         rhsAtom,
+                                                                        assignOp.lhs.type,
                                                                         currentFilename(),
                                                                         getStartLine(assignOp),
                                                                         getStartCol(assignOp),
