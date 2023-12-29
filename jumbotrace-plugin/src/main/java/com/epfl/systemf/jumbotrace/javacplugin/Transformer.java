@@ -467,7 +467,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitConditional(JCConditional conditional) {
-        super.visitConditional(conditional);  // TODO
+        super.visitConditional(conditional);
         mk().at(conditional.pos);
         deleteConstantFolding(conditional);
         conditional.cond = instrumentation.logTernaryCond(
