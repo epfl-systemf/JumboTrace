@@ -469,6 +469,32 @@ public class ___JumboTrace___ {
         return value;
     }
 
+    public static boolean ternaryCondition(boolean cond, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            log("TERNARY CONDITION evaluates to '", cond, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            enableLogging();
+        }
+        return cond;
+    }
+
+    public static boolean typeTest(boolean result, Object testedObject, String targetTypeName, String filename, int startLine, int startCol, int endLine, int endCol){
+        if (loggingEnabled){
+            disableLogging();
+            if (testedObject == null){
+                log("TYPE TEST null is not of type ", targetTypeName,
+                        " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            } else {
+                var actualType = testedObject.getClass().getTypeName();
+                var possiblyNegate = result ? "" : "not ";
+                log("TYPE TEST ", actualType, " is ", possiblyNegate, "of type ", targetTypeName,
+                        " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            }
+            enableLogging();
+        }
+        return result;
+    }
+
     private static String preOrPost(boolean isPre) {
         return isPre ? "PRE" : "POST";
     }

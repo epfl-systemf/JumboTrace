@@ -510,7 +510,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Exceptions, casts, assertions">
+    //<editor-fold desc="Exceptions, casts, assertions, type tests">
 
     public JCExpression logCaught(JCExpression exprYieldingThrowable,
                                   String filename, int startLine, int startCol, int endLine, int endCol) {
@@ -555,6 +555,19 @@ public final class Instrumentation {
                 List.of(
                         new Argument(st().booleanType, asserted),
                         new Argument(st().stringType, mk().Literal(assertedDescr))
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().booleanType
+        );
+    }
+
+    public JCExpression logTypeTest(JCExpression cond, JCExpression testedObj, String targetType,
+                                    String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "typeTest",
+                List.of(
+                        new Argument(st().booleanType, cond),
+                        new Argument(st().objectType, testedObj),
+                        new Argument(st().stringType, mk().Literal(targetType))
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().booleanType
         );
@@ -617,6 +630,15 @@ public final class Instrumentation {
                 List.of(
                         new Argument(st().booleanType, loopCond)
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                st().booleanType
+        );
+    }
+
+    public JCExpression logTernaryCond(JCExpression condition, String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "ternaryCondition",
+                List.of(new Argument(st().booleanType, condition))
+                        .appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().booleanType
         );
     }

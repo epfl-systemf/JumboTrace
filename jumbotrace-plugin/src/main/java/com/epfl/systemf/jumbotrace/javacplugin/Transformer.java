@@ -15,6 +15,8 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
+// FIXME solve the problem with pattern match
+
 // TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null". Also be careful with line numbers in error reporting
 
 // TODO keep in mind to use null in tests (and probably add nulls to existing tests). null seems to be a dangerous edge case for types handling
@@ -223,7 +225,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitApply(JCMethodInvocation invocation) {
-        if (!invocation.meth.type.getTag().equals(TypeTag.METHOD)){  // for functional interfaces  TODO test with functional interface
+        if (!invocation.meth.type.getTag().equals(TypeTag.METHOD)) {  // for functional interfaces  TODO test with functional interface
             invocation.meth = translate(invocation.meth);
         }
         invocation.args = translate(invocation.args);
@@ -468,6 +470,14 @@ public final class Transformer extends TreeTranslator {
         super.visitConditional(conditional);  // TODO
         mk().at(conditional.pos);
         deleteConstantFolding(conditional);
+        conditional.cond = instrumentation.logTernaryCond(
+                conditional.cond,
+                currentFilename(),
+                getStartLine(conditional),
+                getStartCol(conditional),
+                safeGetEndLine(conditional),
+                safeGetEndCol(conditional)
+        );
     }
 
     @Override
@@ -812,9 +822,25 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitTypeTest(JCInstanceOf instanceOf) {
-        super.visitTypeTest(instanceOf);  // TODO
+        super.visitTypeTest(instanceOf);
         mk().at(instanceOf.pos);
         deleteConstantFolding(instanceOf);
+        this.result = withNewLocal("testedobj", instanceOf.expr, (testedObjAtom, testedObjVarDecl) -> {
+            instanceOf.expr = testedObjAtom;
+            return mk().LetExpr(
+                    List.of(testedObjVarDecl),
+                    instrumentation.logTypeTest(
+                            instanceOf,
+                            testedObjAtom,
+                            instanceOf.type.tsym.name.toString(),
+                            currentFilename(),
+                            getStartLine(instanceOf),
+                            getStartCol(instanceOf),
+                            safeGetEndLine(instanceOf),
+                            safeGetEndCol(instanceOf)
+                    )
+            ).setType(st().booleanType);
+        });
     }
 
     @Override
@@ -1522,19 +1548,19 @@ public final class Transformer extends TreeTranslator {
         return type.equalsIgnoreMetadata(st().botType) ? st().objectType : type;
     }
 
-    private boolean isLocalVar(JCIdent ident){
+    private boolean isLocalVar(JCIdent ident) {
         return ident.sym != null && ident.sym.getKind().equals(ElementKind.LOCAL_VARIABLE);
     }
 
-    private boolean isField(JCIdent ident){
+    private boolean isField(JCIdent ident) {
         return ident.sym != null && ident.sym.getKind().equals(ElementKind.FIELD);
     }
 
-    private boolean isInstanceField(JCIdent ident){
+    private boolean isInstanceField(JCIdent ident) {
         return isField(ident) && !ident.sym.isStatic();
     }
 
-    private boolean isStaticField(JCIdent ident){
+    private boolean isStaticField(JCIdent ident) {
         return isField(ident) && ident.sym.isStatic();
     }
 
@@ -1547,7 +1573,7 @@ public final class Transformer extends TreeTranslator {
         var lineMap = cu.getLineMap();
         try {
             return lineMap.getColumnNumber(tree.pos);
-        } catch (ArrayIndexOutOfBoundsException e){
+        } catch (ArrayIndexOutOfBoundsException e) {
             // for an unknown reason, getColumnNumber sometimes throws an exception
             return Position.NOPOS;
         }
