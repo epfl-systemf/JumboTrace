@@ -1,8 +1,8 @@
 import os
 import shutil
 import sys
+from typing import List, Final, Tuple
 
-from typing import List, Final
 from termcolor import colored
 
 examples_dir: Final[str] = "../examples"
@@ -144,9 +144,10 @@ def copy_injection_to_example(example_name: str):
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
-def run_tests():
+def run_tests(examples: List[str] | Tuple[str] = ()):
     log("Running tests")
-    examples = os.listdir(examples_dir)
+    if len(examples) == 0:
+        examples = os.listdir(examples_dir)
     examples = [ex for ex in examples if ex not in test_excluded_examples]
     n_tests = len(examples)
     log("Example programs found: " + ", ".join(examples))
@@ -218,8 +219,8 @@ def main(args: List[str]):
             run_injectedgen(test_mode=False)
         case ["compile", "injected"]:
             compile_injected(test_mode=False)
-        case ["test"]:
-            run_tests()
+        case ["test", *test_names]:
+            run_tests(test_names)
         case _:
             print("unknown command: " + " ".join(args), file=sys.stderr)
 
