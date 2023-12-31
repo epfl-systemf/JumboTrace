@@ -1,12 +1,12 @@
 package com.epfl.systemf.jumbotrace.injected.raw;
 
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
-import com.epfl.systemf.jumbotrace.injected.events.Event;
-import com.epfl.systemf.jumbotrace.injected.events.NonStatementEvent;
-import com.epfl.systemf.jumbotrace.injected.events.NonStatementEvent.*;
-import com.epfl.systemf.jumbotrace.injected.events.StatementEvent;
-import com.epfl.systemf.jumbotrace.injected.events.StatementEvent.*;
-import com.epfl.systemf.jumbotrace.injected.events.Value;
+import com.epfl.systemf.jumbotrace.events.Event;
+import com.epfl.systemf.jumbotrace.events.NonStatementEvent;
+import com.epfl.systemf.jumbotrace.events.NonStatementEvent.*;
+import com.epfl.systemf.jumbotrace.events.StatementEvent;
+import com.epfl.systemf.jumbotrace.events.StatementEvent.*;
+import com.epfl.systemf.jumbotrace.events.Value;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -19,10 +19,10 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedList;
 
+import static com.epfl.systemf.jumbotrace.Config.LOG_FILE;
+
 @SuppressWarnings("unused")
 public class ___JumboTrace___ {
-
-    private static final String LOG_FILE = "./log.bin";
 
     // May be set to null by the code generation system
     private static final PrintStream PRINT_STREAM = System.out;

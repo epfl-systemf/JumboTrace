@@ -144,6 +144,15 @@ def copy_injection_to_example(example_name: str):
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
+def read_events(skip_compile=False):
+    if not skip_compile:
+        compile_injected(test_mode=False)
+    cmd(
+        f"java -cp {injected_dir}/target/classes com.epfl.systemf.jumbotrace.frontend.Frontend",
+        "reading events"
+    )
+
+
 def run_tests(examples: List[str] | Tuple[str] = ()):
     log("Running tests")
     if len(examples) == 0:
@@ -221,6 +230,10 @@ def main(args: List[str]):
             compile_injected(test_mode=False)
         case ["test", *test_names]:
             run_tests(test_names)
+        case["read", "events"]:
+            read_events()
+        case ["read", "events", "--skip-compile"]:
+            read_events(skip_compile=True)
         case _:
             print("unknown command: " + " ".join(args), file=sys.stderr)
 

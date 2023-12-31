@@ -1,4 +1,4 @@
-package com.epfl.systemf.jumbotrace.injected.events;
+package com.epfl.systemf.jumbotrace.events;
 
 import java.io.Serializable;
 
