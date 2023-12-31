@@ -384,7 +384,15 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Expressions">
+    //<editor-fold desc="Expressions and exec">
+
+    public JCExpression logExec(String filename, int startLine, int startCol, int endLine, int endCol){
+        return makeLogMethodCall(
+                "exec",
+                makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol),
+                st().voidType
+        );
+    }
 
     public JCExpression logLocalRead(JCExpression value, String varName, String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(value.type);

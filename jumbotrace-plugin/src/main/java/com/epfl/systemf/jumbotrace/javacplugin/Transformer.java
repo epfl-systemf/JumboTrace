@@ -214,25 +214,37 @@ public final class Transformer extends TreeTranslator {
          * Solution: special-case it (here)
          * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
          */
+        JCStatement transformedStat;
         if (exprStat.expr instanceof JCMethodInvocation invocation
                 && currentMethod().name.contentEquals(CONSTRUCTOR_NAME)
                 && invocation.meth.toString().equals("super")) {
             invocation.args = translate(invocation.args);
             mk().at(invocation.pos);
-            this.result = exprStat;
+            transformedStat = exprStat;
         } else if (exprStat.expr instanceof JCNewClass newClass) {
             newClass.args = translate(newClass.args);
             mk().at(newClass.pos);
             var instrPieces = makeConstructorCallInstrumentationPieces(newClass);
-            this.result = makeBlock(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
+            transformedStat = makeBlock(newClass, newClass.clazz.toString(), CONSTRUCTOR_NAME, instrPieces);
         } else if (exprStat.expr instanceof JCMethodInvocation invocation && invocation.meth.type.getReturnType().getTag() == TypeTag.VOID) {
             invocation.args = translate(invocation.args);
             mk().at(invocation.pos);
             var instrPieces = makeMethodCallInstrumentationPieces(invocation);
-            this.result = makeBlock(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
+            transformedStat = makeBlock(invocation, classNameOf(invocation.meth), methodNameOf(invocation.meth), instrPieces);
         } else {
             super.visitExec(exprStat);
+            transformedStat = exprStat;
         }
+        this.result = mk().Block(0, List.of(
+                mk().Exec(instrumentation.logExec(
+                        currentFilename(),
+                        getStartLine(exprStat),
+                        getStartCol(exprStat),
+                        safeGetEndLine(exprStat),
+                        safeGetEndCol(exprStat)
+                )),
+                transformedStat
+        ));
     }
 
     @Override
