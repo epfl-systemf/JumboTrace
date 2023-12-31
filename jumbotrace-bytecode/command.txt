@@ -1,1 +1,0 @@
-java -javaagent:../../jumbotrace-bytecode/target/JumboTrace-0.0.2-jar-with-dependencies.jar Main
