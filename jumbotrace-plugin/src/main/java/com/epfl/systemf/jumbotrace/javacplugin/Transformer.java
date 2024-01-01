@@ -69,7 +69,7 @@ public final class Transformer extends TreeTranslator {
     //<editor-fold desc="Context accessors">
 
     private String currentFilename() {
-        return cu.getSourceFile().getName();
+        return cu.getSourceFile().toUri().toString();
     }
 
     private Symbol.ClassSymbol currentClass() {

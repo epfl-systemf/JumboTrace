@@ -1,11 +1,15 @@
 package com.epfl.systemf.jumbotrace.events;
 
-public interface NonStatementEvent extends Event {
+public sealed interface NonStatementEvent extends Event {
+
+    record InitializationEvent(long id, long parentId, String timestamp) implements NonStatementEvent {
+    }
 
     record StaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
                             Value[] args,
                             String filename, int startLine, int startCol, int endLine,
                             int endCol) implements NonStatementEvent {
+
     }
 
     record NonStaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,

@@ -1,12 +1,13 @@
 package com.epfl.systemf.jumbotrace.injected.raw;
 
-import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
+import com.epfl.systemf.jumbotrace.Config;
 import com.epfl.systemf.jumbotrace.events.Event;
 import com.epfl.systemf.jumbotrace.events.NonStatementEvent;
 import com.epfl.systemf.jumbotrace.events.NonStatementEvent.*;
 import com.epfl.systemf.jumbotrace.events.StatementEvent;
 import com.epfl.systemf.jumbotrace.events.StatementEvent.*;
 import com.epfl.systemf.jumbotrace.events.Value;
+import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -14,7 +15,7 @@ import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -62,6 +63,8 @@ public class ___JumboTrace___ {
                 Files.createFile(path);
             }
             outputStream = new ObjectOutputStream(new FileOutputStream(LOG_FILE));
+            var time = LocalDateTime.now();
+            outputStream.writeObject(new InitializationEvent(genEventId(), Config.NO_PARENT_EVENT_CODE, time.toString()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -91,12 +94,12 @@ public class ___JumboTrace___ {
     }
 
     private static long currentEnclosingCallEventId() {
-        return callsStack.isEmpty() ? -1 : callsStack.getFirst().id();
+        return callsStack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : callsStack.getFirst().id();
     }
 
     private static long currentEnclosingStatementEventId() {
         if (statementEventsStack.isEmpty()){
-            return -1;
+            return Config.NO_PARENT_EVENT_CODE;
         } else {
             var first = statementEventsStack.getFirst();
             return first == null ? currentEnclosingCallEventId() : first.id();
@@ -1154,7 +1157,11 @@ public class ___JumboTrace___ {
     }
 
     private static String simplifyFilename(String filename) {
-        return Paths.get(filename).getFileName().toString();
+        var idx = filename.length()-1;
+        while (idx >= 0 && filename.charAt(idx) != '/'){
+            idx--;
+        }
+        return filename.substring(idx);
     }
 
 }

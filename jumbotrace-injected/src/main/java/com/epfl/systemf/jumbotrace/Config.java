@@ -6,6 +6,9 @@ public final class Config {
         throw new AssertionError("not instantiable");
     }
 
-    public static final String LOG_FILE = "./log.bin";
+    public static final long NO_PARENT_EVENT_CODE = -1;
+
+    public static final String LOG_FILE = "./jumbotrace-log.bin";
+    public static final String HTML_FILE = "./trace.html";
 
 }

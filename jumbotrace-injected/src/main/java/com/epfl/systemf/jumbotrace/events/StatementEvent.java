@@ -1,6 +1,6 @@
 package com.epfl.systemf.jumbotrace.events;
 
-public interface StatementEvent extends Event {
+public sealed interface StatementEvent extends Event {
 
     String filename();
 
@@ -13,8 +13,7 @@ public interface StatementEvent extends Event {
     int endCol();
 
     record ReturnStat(long id, long parentId, String methodName, String filename, int startLine, int startCol,
-                      int endLine,
-                      int endCol) implements StatementEvent {
+                      int endLine, int endCol) implements StatementEvent {
     }
 
     record BreakStat(long id, long parentId, String targetDescr, int targetLine, int targetCol,
