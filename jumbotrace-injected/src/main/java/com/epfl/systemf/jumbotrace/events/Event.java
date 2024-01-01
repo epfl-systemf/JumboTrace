@@ -7,4 +7,6 @@ public sealed interface Event extends Serializable permits StatementEvent, NonSt
     long id();
     long parentId();
 
+    String descr();
+
 }

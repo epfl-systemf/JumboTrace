@@ -1,6 +1,7 @@
 package com.epfl.systemf.jumbotrace.events;
 
 import java.io.Serializable;
+import java.util.StringJoiner;
 
 @SuppressWarnings("unused")
 public sealed interface Value extends Serializable {
@@ -103,14 +104,15 @@ public sealed interface Value extends Serializable {
 
     static Value valueFor(Object o){
         if (o == null){
-            return new ReferenceValue(0);
+            return new ReferenceValue(System.identityHashCode(null), "Null", "null");
         }
-        return new ReferenceValue(System.identityHashCode(o));
+        // FIXME it's bad to call toString here
+        return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), o.toString());
     }
 
     static Value valueFor(Object[] arr){
         if (arr == null){
-            return new ReferenceValue(0);
+            return new ReferenceValue(System.identityHashCode(null), "Null", "null");
         }
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -120,27 +122,77 @@ public sealed interface Value extends Serializable {
     }
 
     record BooleanValue(boolean b) implements Value {
+        @Override
+        public String toString() {
+            return Boolean.toString(b);
+        }
     }
 
     record ByteValue(byte b) implements Value {
+        @Override
+        public String toString() {
+            return Byte.toString(b);
+        }
     }
 
     record CharValue(char c) implements Value {
+        @Override
+        public String toString() {
+            return Character.toString(c);
+        }
     }
 
-    record ShortValue(short s) implements Value {}
-
-    record IntValue(int i) implements Value {}
-
-    record FloatValue(float f) implements Value {}
-
-    record LongValue(long l) implements Value {}
-
-    record DoubleValue(double d) implements Value {}
-
-    record ReferenceValue(int idHash) implements Value {
+    record ShortValue(short s) implements Value {
+        @Override
+        public String toString() {
+            return Short.toString(s);
+        }
     }
 
-    record ArrayValue(Value[] values) implements Value {}
+    record IntValue(int i) implements Value {
+        @Override
+        public String toString() {
+            return Integer.toString(i);
+        }
+    }
+
+    record FloatValue(float f) implements Value {
+        @Override
+        public String toString() {
+            return Float.toString(f);
+        }
+    }
+
+    record LongValue(long l) implements Value {
+        @Override
+        public String toString() {
+            return Long.toString(l);
+        }
+    }
+
+    record DoubleValue(double d) implements Value {
+        @Override
+        public String toString() {
+            return Double.toString(d);
+        }
+    }
+
+    record ReferenceValue(int idHash, String className, String descr) implements Value {
+        @Override
+        public String toString() {
+            return className + "@" + idHash + ": " + descr;
+        }
+    }
+
+    record ArrayValue(Value[] values) implements Value {
+        @Override
+        public String toString() {
+            var sj = new StringJoiner(", ", "[", "]");
+            for (Value value : values) {
+                sj.add(value.toString());
+            }
+            return sj.toString();
+        }
+    }
 
 }

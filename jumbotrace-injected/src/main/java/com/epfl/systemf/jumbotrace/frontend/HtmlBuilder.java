@@ -1,8 +1,18 @@
 package com.epfl.systemf.jumbotrace.frontend;
 
+import java.util.Map;
+
 public final class HtmlBuilder {
 
     private static final String INDENT = "   ";
+
+    private static final Map<Character, String> SPECIAL_CHARS = Map.of(
+            '"', "&quot",
+            '\'', "&apos",
+            '&', "&amp",
+            '<', "&lt",
+            '>', "&gt"
+    );
 
     private final StringBuilder sb = new StringBuilder();
     private int indentLevel = 0;
@@ -22,17 +32,18 @@ public final class HtmlBuilder {
     }
 
     public void text(String text){
+        for (var repl: SPECIAL_CHARS.entrySet()){
+            text = text.replace(repl.getKey().toString(), repl.getValue());
+        }
         addln(text);
     }
 
-    public String result(){
+    public String toString(){
         return sb.toString();
     }
 
     private void addln(String s){
-        for (int i = 0; i < indentLevel; i++) {
-            sb.append(INDENT);
-        }
+        sb.append(INDENT.repeat(indentLevel));
         sb.append(s);
         sb.append("\n");
     }
@@ -41,11 +52,11 @@ public final class HtmlBuilder {
         HTML, HEADER, BODY, DIV, DETAILS, SUMMARY, I, B, TITLE;
 
         public String open(String... options){
-            return "<" + name().toLowerCase() + mkString(" ", options) + ">";
+            return "<" + name().toLowerCase() + " " + mkString(" ", options) + ">";
         }
 
         public String close(String... options){
-            return "</" + name().toLowerCase() + mkString(" ", options) + ">";
+            return "</" + name().toLowerCase() + " " + mkString(" ", options) + ">";
         }
     }
 
