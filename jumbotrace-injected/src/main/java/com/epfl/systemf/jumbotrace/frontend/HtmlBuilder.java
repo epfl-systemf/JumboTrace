@@ -1,18 +1,8 @@
 package com.epfl.systemf.jumbotrace.frontend;
 
-import java.util.Map;
-
 public final class HtmlBuilder {
 
-    private static final String INDENT = "   ";
-
-    private static final Map<Character, String> SPECIAL_CHARS = Map.of(
-            '"', "&quot",
-            '\'', "&apos",
-            '&', "&amp",
-            '<', "&lt",
-            '>', "&gt"
-    );
+    private static final String INDENT = "\u00A0";
 
     private final StringBuilder sb = new StringBuilder();
     private int indentLevel = 0;
@@ -32,10 +22,11 @@ public final class HtmlBuilder {
     }
 
     public void text(String text){
-        for (var repl: SPECIAL_CHARS.entrySet()){
-            text = text.replace(repl.getKey().toString(), repl.getValue());
-        }
         addln(text);
+    }
+
+    public void br(){
+        addln("<br>");
     }
 
     public String toString(){
@@ -52,20 +43,23 @@ public final class HtmlBuilder {
         HTML, HEADER, BODY, DIV, DETAILS, SUMMARY, I, B, TITLE;
 
         public String open(String... options){
-            return "<" + name().toLowerCase() + " " + mkString(" ", options) + ">";
+            return "<" + name().toLowerCase() + formatOptions(options) + ">";
         }
 
         public String close(String... options){
-            return "</" + name().toLowerCase() + " " + mkString(" ", options) + ">";
+            return "</" + name().toLowerCase() + " " + formatOptions(options) + ">";
         }
     }
 
-    private static String mkString(String sep, String... strings){
+    private static String formatOptions(String... strings){
         var sb = new StringBuilder();
+        if (strings.length > 0){
+            sb.append(" ");
+        }
         for (int i = 0; i < strings.length; i++) {
             sb.append(strings[i]);
             if (i < strings.length - 1){
-                sb.append(sep);
+                sb.append(" ");
             }
         }
         return sb.toString();

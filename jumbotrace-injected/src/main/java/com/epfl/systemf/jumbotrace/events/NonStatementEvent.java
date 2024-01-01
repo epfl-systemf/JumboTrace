@@ -11,10 +11,16 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    sealed interface MethodCallEvent extends NonStatementEvent {
+        String className();
+        String methodName();
+        String methodSig();
+    }
+
     record StaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
                             Value[] args,
                             String filename, int startLine, int startCol, int endLine,
-                            int endCol) implements NonStatementEvent {
+                            int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
             return "invocation of static method " + className + "." + methodName + methodSig + " with arguments " +
@@ -25,7 +31,7 @@ public sealed interface NonStatementEvent extends Event {
     record NonStaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
                                Value receiver, Value[] args,
                                String filename, int startLine, int startCol, int endLine,
-                               int endCol) implements NonStatementEvent {
+                               int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
             return "invocation of non-static method " + className + "." + methodName + methodSig + " with receiver " +
@@ -34,6 +40,9 @@ public sealed interface NonStatementEvent extends Event {
     }
 
     sealed interface MethodEnterEvent extends NonStatementEvent {
+        String className();
+        String methodName();
+        String filename();
     }
 
     record InstrumentedMethodEnter(long id, long parentId, String className, String methodName, String methodSig,
@@ -44,8 +53,8 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
-    record NonInstrumentedMethodEnter(long id, long parentId, String className,
-                                      String methodName) implements MethodEnterEvent {
+    record NonInstrumentedMethodEnter(long id, long parentId, String className, String methodName,
+                                      String filename) implements MethodEnterEvent {
         @Override
         public String descr() {
             return "entering non-instrumented method " + className + "." + methodName + " [/!\\ logging not available]";
@@ -54,6 +63,13 @@ public sealed interface NonStatementEvent extends Event {
 
     record InstrumentedMethodExit(long id, long parentId, String methodName, String filename, int startLine,
                                   int startCol) implements NonStatementEvent {
+        @Override
+        public String descr() {
+            return "method " + methodName + " exits";
+        }
+    }
+
+    record NonInstrumentedMethodExit(long id, long parentId, String methodName) implements NonStatementEvent {
         @Override
         public String descr() {
             return "method " + methodName + " exits";
@@ -107,7 +123,7 @@ public sealed interface NonStatementEvent extends Event {
                     int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "exiting" + loopType;
+            return "exiting " + loopType;
         }
     }
 

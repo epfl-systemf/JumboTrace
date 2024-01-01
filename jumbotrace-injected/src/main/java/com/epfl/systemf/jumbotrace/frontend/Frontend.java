@@ -6,6 +6,7 @@ import com.epfl.systemf.jumbotrace.events.StatementEvent;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 import static com.epfl.systemf.jumbotrace.Config.HTML_FILE;
@@ -17,6 +18,7 @@ import static com.epfl.systemf.jumbotrace.frontend.HtmlBuilder.Tag.*;
 public final class Frontend {
 
     private static final String INDENT = "\u00A0";
+    private static final int LEFTMOST_COL_FOR_CODE_POSITION = 120;
 
     public static void main(String[] args) {
 
@@ -31,23 +33,31 @@ public final class Frontend {
         var rawEvents = readEvents();
         var eventsByParentId = computeParentToChildEventsMap(rawEvents);
 
-        var html = new HtmlBuilder();
-        //@formatter:off
-        html.open(HTML, "style=\"font-family: Arial;font-color:gray;\"");
+//        var html = new HtmlBuilder();
+//        //@formatter:off
+//        html.open(HTML, "style=\"font-family: Consolas; color:gray;\"");
+//
+//            html.open(HEADER);
+//                html.open(TITLE);
+//                    html.text("JumboTrace");
+//                html.close(TITLE);
+//            html.close(HEADER);
+//
+//            html.open(BODY);
+//                generateHtmlTrace(Config.NO_PARENT_EVENT_CODE, html, eventsByParentId, srcFiles, 0);
+//            html.close(BODY);
+//
+//        html.close(HTML);
+//        //@formatter:on
+//        writeHtml(html);
 
-            html.open(HEADER);
-                html.open(TITLE);
-                    html.text("JumboTrace");
-                html.close(TITLE);
-            html.close(HEADER);
-
-            html.open(BODY);
-                generateHtmlTrace(Config.NO_PARENT_EVENT_CODE, html, eventsByParentId, srcFiles, 0);
-            html.close(BODY);
-
-        html.close(HTML);
-        //@formatter:on
-        writeHtml(html);
+        for (var ev : rawEvents) {
+            System.out.print(ev.id() + " (" + ev.parentId() + ") " + ev.getClass().getSimpleName() + " ");
+            if (ev instanceof StatementEvent sev) {
+                System.out.print(codeFor(sev, srcFiles) + " ");
+            }
+            System.out.println(); // TODO remove
+        }
     }
 
     private static void generateHtmlTrace(
@@ -58,26 +68,27 @@ public final class Frontend {
             int indentLevel
     ) {
         for (var event : eventsByParentId.getOrDefault(rootId, List.of())) {
-            var indent = INDENT.repeat(indentLevel);
             if (event instanceof StatementEvent statementEvent) {
                 //@formatter:off
                 html.open(DETAILS);
-                    html.open(SUMMARY);
-                        html.open(DIV, "style=\"font-family: Consolas;font-color:black;\"");
-                            html.text(indent + codeFor(statementEvent, srcFiles));
+                    html.open(SUMMARY, "style=\"display: block;\"");
+                        html.open(DIV, "style=\"color:black;\"");
+                            html.text(codeFor(statementEvent, srcFiles));
                         html.close(DIV);
                     html.close(SUMMARY);
-                    html.open(DIV);
-                        html.text(indent + event.descr());
-                        generateHtmlTrace(event.id(), html, eventsByParentId, srcFiles, indentLevel + 1);
-                    html.close(DIV);
+                    html.open(I);
+                        html.text(event.descr());
+                        html.br();
+                        generateHtmlTrace(event.id(), html, eventsByParentId, srcFiles, indentLevel);
+                    html.close(I);
                 html.close(DETAILS);
                 //@formatter:on
             } else {
-                html.open(DIV);
-                html.text(indent + event.descr());
+                html.open(I);
+                html.text(event.descr());
+                html.br();
                 generateHtmlTrace(event.id(), html, eventsByParentId, srcFiles, indentLevel + 1);
-                html.close(DIV);
+                html.close(I);
             }
         }
     }
@@ -97,6 +108,19 @@ public final class Frontend {
             }
             sb.append(line, startCol, endCol);
         }
+        if (sb.toString().trim().isEmpty()) {
+            sb.append("[implicit statement]");
+        }
+        sb.append(" ");
+        sb.append(".".repeat(Math.max(0, LEFTMOST_COL_FOR_CODE_POSITION - sb.length())));
+        sb.append(" (");
+        // convert URI to simple path
+        sb.append(Path.of(statementEvent.filename().replaceFirst("file:/", "")).getFileName());
+        sb.append(":");
+        sb.append(statementEvent.startLine());
+        sb.append(":");
+        sb.append(statementEvent.startCol());
+        sb.append(")");
         return sb.toString();
     }
 
