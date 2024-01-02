@@ -1,5 +1,9 @@
 package com.epfl.systemf.jumbotrace.events;
 
+import com.epfl.systemf.jumbotrace.Formatting;
+
+import static com.epfl.systemf.jumbotrace.Formatting.lastNameOnly;
+
 public sealed interface StatementEvent extends Event {
 
     String filename();
@@ -60,6 +64,17 @@ public sealed interface StatementEvent extends Event {
         @Override
         public String descr() {
             return "variable declarator statement for variable " + varName + " of type " + typeDescr;
+        }
+    }
+
+    record InitializedFieldDeclStat(long id, long parentId, String className, String fieldName, String typeDescr,
+                                    Object value,
+                                    String filename, int startLine, int startCol, int endLine,
+                                    int endCol) implements StatementEvent {
+        @Override
+        public String descr() {
+            return "field " + fieldName + " of class " + lastNameOnly(className) + " with type " + typeDescr +
+                    " initialized with value " + value;
         }
     }
 

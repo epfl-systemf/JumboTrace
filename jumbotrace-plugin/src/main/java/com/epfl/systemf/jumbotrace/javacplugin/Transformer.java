@@ -155,10 +155,23 @@ public final class Transformer extends TreeTranslator {
             /* Do not log the call to the constructor inside an enum case
              * This crashes the lowering phase, which is expecting an NewClass, not a LetExpr
              */
-            // TODO try to find a solution
+            // FIXME solve this problem
             this.result = varDecl;
         } else {
             super.visitVarDef(varDecl);
+            if (varDecl.sym.owner instanceof Symbol.ClassSymbol classSymbol && varDecl.init != null){
+                varDecl.init = instrumentation.logInitializedFieldDeclaration(
+                        classSymbol.name.toString(),
+                        varDecl.name.toString(),
+                        varDecl.vartype.toString(),
+                        varDecl.init,
+                        currentFilename(),
+                        getStartLine(varDecl),
+                        getStartCol(varDecl),
+                        safeGetEndLine(varDecl),
+                        safeGetEndCol(varDecl)
+                );
+            }
         }
     }
 

@@ -30,8 +30,8 @@ public sealed interface NonStatementEvent extends Event {
         @Override
         public String descr() {
             StringBuilder str = new StringBuilder(
-                    "invocation of static method " + className + "." + methodName + methodSig + " with arguments " +
-                            argsListToString(args)
+                    "invocation of static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
+                            " with arguments " + argsListToString(args)
             );
             if (!nonInstrumentedEnclosingMethods.isEmpty()) {
                 str.append(" enclosed in the following method invocations:");
@@ -51,8 +51,8 @@ public sealed interface NonStatementEvent extends Event {
         @Override
         public String descr() {
             StringBuilder str = new StringBuilder(
-                    "invocation of non-static method " + className + "." + methodName + methodSig + " with receiver " +
-                            receiver + " and arguments " + argsListToString(args)
+                    "invocation of non-static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
+                            " with receiver " + receiver + " and arguments " + argsListToString(args)
             );
             if (!nonInstrumentedEnclosingMethods.isEmpty()) {
                 str.append(" enclosed in the following method invocations:");
@@ -64,10 +64,11 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
-    record NonInstrumentedMethod(String className, String methodName, String filename, int lineNumber) implements Serializable {
+    record NonInstrumentedMethod(String className, String methodName, String filename,
+                                 int lineNumber) implements Serializable {
         @Override
         public String toString() {
-            return lastNameOnly(className) + "." + lastNameOnly(methodName) + " in " + lastNameOnly(filename) + " l." + lineNumber;
+            return lastNameOnly(className) + "." + methodName + " in " + filename + " l." + lineNumber;
         }
     }
 
@@ -75,11 +76,12 @@ public sealed interface NonStatementEvent extends Event {
                        String filename, int startLine, int startCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "entering instrumented method " + className + "." + methodName + methodSig;
+            return "entering instrumented method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig);
         }
     }
 
-    record MethodExit(long id, long parentId, long correspondingEnterId, String methodName, String filename, int startLine,
+    record MethodExit(long id, long parentId, long correspondingEnterId, String methodName, String filename,
+                      int startLine,
                       int startCol) implements NonStatementEvent {
         @Override
         public String descr() {
@@ -92,7 +94,7 @@ public sealed interface NonStatementEvent extends Event {
                            int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "method " + className + "." + methodName + " returned " + retValue;
+            return "method " + lastNameOnly(className) + "." + methodName + " returned " + retValue;
         }
     }
 
@@ -101,7 +103,7 @@ public sealed interface NonStatementEvent extends Event {
                             int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "method " + className + "." + methodName + " returned void";
+            return "method " + lastNameOnly(className) + "." + methodName + " returned void";
         }
     }
 
@@ -183,7 +185,7 @@ public sealed interface NonStatementEvent extends Event {
                                  int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "assigning value " + assignedValue + " to static field " + fieldName + " of class " + className;
+            return "assigning value " + assignedValue + " to static field " + fieldName + " of class " + lastNameOnly(className);
         }
     }
 
@@ -193,7 +195,7 @@ public sealed interface NonStatementEvent extends Event {
                                int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "updating static field " + fieldName + " of class " + className + " from value " + oldValue +
+            return "updating static field " + fieldName + " of class " + lastNameOnly(className) + " from value " + oldValue +
                     " to value " + newValue + " using operator " + operator + " (right-hand side was " + rhs + ")";
         }
     }
@@ -205,7 +207,7 @@ public sealed interface NonStatementEvent extends Event {
         @Override
         public String descr() {
             // TODO maybe save operator to be more precise?
-            return "updating static field " + fieldName + " of class " + className + " from value " + oldValue +
+            return "updating static field " + fieldName + " of class " + lastNameOnly(className) + " from value " + oldValue +
                     " to value " + newValue + " (result is " + result + ")";
         }
     }
@@ -216,7 +218,7 @@ public sealed interface NonStatementEvent extends Event {
         @Override
         public String descr() {
             return "assigning value " + assignedValue + " to field " + fieldName + " of instance " + instance +
-                    " (field is defined in class " + className + ")";
+                    " (field is defined in class " + lastNameOnly(className) + ")";
         }
     }
 
@@ -229,7 +231,7 @@ public sealed interface NonStatementEvent extends Event {
         public String descr() {
             return "updating field " + fieldName + " of instance " + instance + " from value " + oldValue +
                     " to value " + newValue + " using operator " + operator + " (right-hand side was " + rhs +
-                    " and field is defined in class " + className + ")";
+                    " and field is defined in class " + lastNameOnly(className) + ")";
         }
     }
 
@@ -242,7 +244,7 @@ public sealed interface NonStatementEvent extends Event {
         public String descr() {
             // TODO maybe save operator to be more precise?
             return "updating field " + fieldName + " of instance " + instance + " from value " + oldValue +
-                    " to value " + newValue + " (field is defined in class " + className + " and result is " + result + ")";
+                    " to value " + newValue + " (field is defined in class " + lastNameOnly(className) + " and result is " + result + ")";
         }
     }
 
@@ -318,7 +320,7 @@ public sealed interface NonStatementEvent extends Event {
                            int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "access to static field " + fieldName + " of class " + className + " yields value " + value;
+            return "access to static field " + fieldName + " of class " + lastNameOnly(className) + " yields value " + value;
         }
     }
 
@@ -328,7 +330,7 @@ public sealed interface NonStatementEvent extends Event {
         @Override
         public String descr() {
             return "access to field " + fieldName + " of instance " + owner + " yields value " + value +
-                    "(field is defined in class " + className + ")";
+                    " (field is defined in class " + lastNameOnly(className) + ")";
         }
     }
 
@@ -364,6 +366,25 @@ public sealed interface NonStatementEvent extends Event {
             sj.add(arg.toString());
         }
         return sj.toString();
+    }
+
+    private static String formatMethodSig(String signature) {
+        if (!signature.startsWith("(")) {
+            throw new IllegalArgumentException();
+        }
+        var outerSplit = signature.substring(1).split("[)]", 2);
+        var innerSplit = outerSplit[0].split(",");
+        var sb = new StringBuilder();
+        sb.append("(");
+        for (int i = 0; i < innerSplit.length; i++) {
+            sb.append(lastNameOnly(innerSplit[i]));
+            if (i < innerSplit.length - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append(")");
+        sb.append(lastNameOnly(outerSplit[1]));
+        return sb.toString();
     }
 
 }

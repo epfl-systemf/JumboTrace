@@ -91,10 +91,10 @@ public class ___JumboTrace___ {
     private static void disableLogging() {
         loggingEnabled = false;
     }
-    
+
     private static final Deque<Long> stack = new LinkedList<>();
-    
-    private static long getEnclosingEnterId(){
+
+    private static long getEnclosingEnterId() {
         return stack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : stack.getFirst();
     }
 
@@ -105,16 +105,18 @@ public class ___JumboTrace___ {
             throw new RuntimeException(e);
         }
     }
-    
-    /** WARNING caller-sensitive method */
-    private static List<NonInstrumentedMethod> getNonInstrumentedEnclosingMethods(){
+
+    /**
+     * WARNING caller-sensitive method
+     */
+    private static List<NonInstrumentedMethod> getNonInstrumentedEnclosingMethods() {
         final var methodNestingShift = 2;
         var rawStackTrace = (new Exception()).getStackTrace();
         var gapSize = rawStackTrace.length - stack.size() - methodNestingShift;
-        if (gapSize > 0){
+        if (gapSize > 0) {
             var stackTrace = new ReversedArray<>(rawStackTrace);
             var nonInstrMethods = new ArrayList<NonInstrumentedMethod>(gapSize);
-            for (var i = stack.size(); i < stackTrace.length()-methodNestingShift; i++){
+            for (var i = stack.size(); i < stackTrace.length() - methodNestingShift; i++) {
                 var ste = stackTrace.get(i);
                 nonInstrMethods.add(new NonInstrumentedMethod(ste.getClassName(), ste.getMethodName(),
                         ste.getFileName(), ste.getLineNumber()));
@@ -364,16 +366,29 @@ public class ___JumboTrace___ {
             disableLogging();
             var switchTypeDescr = isExpr ? " (switch expression)" : " (switch statement)";
             log("SWITCH selector='", selector, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
-            writeEvent(new SwitchExpr(
-                    genEventId(),
-                    getEnclosingEnterId(),
-                    Value.valueFor(selector),
-                    filename,
-                    startLine,
-                    startCol,
-                    endLine,
-                    endCol
-            ));
+            if (isExpr) {
+                writeEvent(new SwitchExpr(
+                        genEventId(),
+                        getEnclosingEnterId(),
+                        Value.valueFor(selector),
+                        filename,
+                        startLine,
+                        startCol,
+                        endLine,
+                        endCol
+                ));
+            } else {
+                writeEvent(new SwitchStat(
+                        genEventId(),
+                        getEnclosingEnterId(),
+                        Value.valueFor(selector),
+                        filename,
+                        startLine,
+                        startCol,
+                        endLine,
+                        endCol
+                ));
+            }
             enableLogging();
         }
         return selector;
@@ -815,6 +830,31 @@ public class ___JumboTrace___ {
         }
     }
 
+    public static @Specialize Object initializedFieldDeclared(String className, String fieldName, String typeDescr,
+                                                              @Specialize Object value,
+                                                              String filename, int startLine, int startCol, int endLine, int endCol) {
+        if (loggingEnabled) {
+            disableLogging();
+            log("FIELD INIT: ", className, ".", fieldName, " of static type ", typeDescr, " = ",
+                    value, formatPositionInterval(filename, startLine, startCol, endLine, endCol));
+            writeEvent(new InitializedFieldDeclStat(
+                    genEventId(),
+                    getEnclosingEnterId(),
+                    className,
+                    fieldName,
+                    typeDescr,
+                    value,
+                    filename,
+                    startLine,
+                    startCol,
+                    endLine,
+                    endCol
+            ));
+            enableLogging();
+        }
+        return value;
+    }
+
     public static void caught(Throwable throwable, String filename, int startLine, int startCol, int endLine, int endCol) {
         if (loggingEnabled) {
             disableLogging();
@@ -1140,14 +1180,14 @@ public class ___JumboTrace___ {
     }
 
     // TODO disable once tested
-    private static void checkAssertion(boolean assertion){
-        if (!assertion){
+    private static void checkAssertion(boolean assertion) {
+        if (!assertion) {
             throw new AssertionError();
         }
     }
 
-    private static void checkAreEquals(String l, String r){
-        if (!l.equals(r)){
+    private static void checkAreEquals(String l, String r) {
+        if (!l.equals(r)) {
             throw new AssertionError(l + " != " + r);
         }
     }

@@ -105,9 +105,24 @@ public sealed interface Value extends Serializable {
     static Value valueFor(Object o){
         if (o == null){
             return new ReferenceValue(System.identityHashCode(null), "Null", "null");
-        }
-        if (o instanceof String s){
+        } else if (o instanceof String s){
             return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), "\"" + s + "\"");
+        } else if (o instanceof Boolean b){
+            return valueFor(b.booleanValue());
+        } else if (o instanceof Byte b){
+            return valueFor(b.byteValue());
+        } else if (o instanceof Short s){
+            return valueFor(s.shortValue());
+        } else if (o instanceof Integer i){
+            return valueFor(i.intValue());
+        } else if (o instanceof Long l){
+            return valueFor(l.longValue());
+        } else if (o instanceof Character c){
+            return valueFor(c.charValue());
+        } else if (o instanceof Float f){
+            return valueFor(f.floatValue());
+        } else if (o instanceof Double d){
+            return valueFor(d.doubleValue());
         }
         // FIXME it's bad to call toString here (it can have side-effects)
         String descr;

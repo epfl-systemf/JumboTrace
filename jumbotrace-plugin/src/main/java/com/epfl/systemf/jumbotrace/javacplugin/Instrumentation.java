@@ -104,7 +104,7 @@ public final class Instrumentation {
         );
     }
 
-    public JCExpression logMethodExit(String methodName, String filename, int line, int col){
+    public JCExpression logMethodExit(String methodName, String filename, int line, int col) {
         return makeLogMethodCall(
                 "methodExit",
                 List.of(new Argument(st().stringType, mk().Literal(methodName)))
@@ -167,7 +167,7 @@ public final class Instrumentation {
 
     //</editor-fold>
 
-    //<editor-fold desc="Assignments and variable declaration">
+    //<editor-fold desc="Assignments, variable declaration, field declaration">
 
     public JCExpression logVariableDeclaration(String varName, String typeDescr,
                                                String filename, int startLine, int startCol, int endLine, int endCol) {
@@ -179,6 +179,22 @@ public final class Instrumentation {
                 ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
                 st().voidType
         );
+    }
+
+    public JCExpression logInitializedFieldDeclaration(String className, String fieldName, String typeDescr, JCExpression value,
+                                                       String filename, int startLine, int startCol, int endLine, int endCol) {
+        var higherType = topmostTypeFor(value.type);
+        var apply = makeLogMethodCall(
+                "initializedFieldDeclared",
+                List.of(
+                        new Argument(st().stringType, mk().Literal(className)),
+                        new Argument(st().stringType, mk().Literal(fieldName)),
+                        new Argument(st().stringType, mk().Literal(typeDescr)),
+                        new Argument(higherType, value)
+                ).appendList(makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol)),
+                higherType
+        );
+        return castIfNeeded(value.type, apply);
     }
 
     public JCExpression logLocalVarAssignment(String varName, JCExpression rhs, Type varType,
@@ -386,7 +402,7 @@ public final class Instrumentation {
 
     //<editor-fold desc="Expressions and exec">
 
-    public JCExpression logExec(String filename, int startLine, int startCol, int endLine, int endCol){
+    public JCExpression logExec(String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "exec",
                 makePositionIntervalArgsList(filename, startLine, startCol, endLine, endCol),
@@ -408,7 +424,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logStaticFieldRead(JCExpression value, String className, String fieldName,
-                                           String filename, int startLine, int startCol, int endLine, int endCol){
+                                           String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(value.type);
         var apply = makeLogMethodCall(
                 "staticFieldRead",
@@ -423,7 +439,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logInstanceFieldRead(JCExpression value, JCExpression owner, String className, String fieldName,
-                                             String filename, int startLine, int startCol, int endLine, int endCol){
+                                             String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(value.type);
         var apply = makeLogMethodCall(
                 "instanceFieldRead",
@@ -439,7 +455,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logArrayAccess(JCExpression value, JCExpression array, JCExpression index,
-                                    String filename, int startLine, int startCol, int endLine, int endCol){
+                                       String filename, int startLine, int startCol, int endLine, int endCol) {
         var higherType = topmostTypeFor(value.type);
         var apply = makeLogMethodCall(
                 "arrayAccess",
@@ -579,7 +595,7 @@ public final class Instrumentation {
     }
 
     public JCExpression logTypeTest(JCExpression cond, JCExpression testedObj, String targetType,
-                                    String filename, int startLine, int startCol, int endLine, int endCol){
+                                    String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "typeTest",
                 List.of(
@@ -652,7 +668,7 @@ public final class Instrumentation {
         );
     }
 
-    public JCExpression logTernaryCond(JCExpression condition, String filename, int startLine, int startCol, int endLine, int endCol){
+    public JCExpression logTernaryCond(JCExpression condition, String filename, int startLine, int startCol, int endLine, int endCol) {
         return makeLogMethodCall(
                 "ternaryCondition",
                 List.of(new Argument(st().booleanType, condition))

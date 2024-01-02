@@ -16,6 +16,9 @@ public final class DebugPrintVisitor extends TreeTranslator {   // possibly exis
             System.out.println();
             System.out.println(classDecl.name);
             for (var df: classDecl.defs){
+                if (df instanceof JCTree.JCMethodDecl){
+                    continue;
+                }
                 String string = df.toString();
                 System.out.println(" > " + df.getClass() + " : " + string.substring(0, Math.min(string.length(), 50)));
             }
