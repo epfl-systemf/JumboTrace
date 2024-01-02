@@ -1,6 +1,10 @@
 package com.epfl.systemf.jumbotrace.events;
 
+import java.io.Serializable;
+import java.util.List;
 import java.util.StringJoiner;
+
+import static com.epfl.systemf.jumbotrace.Formatting.lastNameOnly;
 
 public sealed interface NonStatementEvent extends Event {
 
@@ -13,63 +17,70 @@ public sealed interface NonStatementEvent extends Event {
 
     sealed interface MethodCallEvent extends NonStatementEvent {
         String className();
+
         String methodName();
+
         String methodSig();
     }
 
     record StaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
-                            Value[] args,
+                            Value[] args, List<NonInstrumentedMethod> nonInstrumentedEnclosingMethods,
                             String filename, int startLine, int startCol, int endLine,
                             int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
-            return "invocation of static method " + className + "." + methodName + methodSig + " with arguments " +
-                   argsListToString(args);
+            StringBuilder str = new StringBuilder(
+                    "invocation of static method " + className + "." + methodName + methodSig + " with arguments " +
+                            argsListToString(args)
+            );
+            if (!nonInstrumentedEnclosingMethods.isEmpty()) {
+                str.append(" enclosed in the following method invocations:");
+                for (NonInstrumentedMethod meth : nonInstrumentedEnclosingMethods) {
+                    str.append("\n").append(meth);
+                }
+            }
+            return str.toString();
         }
     }
 
     record NonStaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
                                Value receiver, Value[] args,
+                               List<NonInstrumentedMethod> nonInstrumentedEnclosingMethods,
                                String filename, int startLine, int startCol, int endLine,
                                int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
-            return "invocation of non-static method " + className + "." + methodName + methodSig + " with receiver " +
-                    receiver + " and arguments " + argsListToString(args);
+            StringBuilder str = new StringBuilder(
+                    "invocation of non-static method " + className + "." + methodName + methodSig + " with receiver " +
+                            receiver + " and arguments " + argsListToString(args)
+            );
+            if (!nonInstrumentedEnclosingMethods.isEmpty()) {
+                str.append(" enclosed in the following method invocations:");
+                for (NonInstrumentedMethod meth : nonInstrumentedEnclosingMethods) {
+                    str.append("\n").append(meth);
+                }
+            }
+            return str.toString();
         }
     }
 
-    sealed interface MethodEnterEvent extends NonStatementEvent {
-        String className();
-        String methodName();
-        String filename();
+    record NonInstrumentedMethod(String className, String methodName, String filename, int lineNumber) implements Serializable {
+        @Override
+        public String toString() {
+            return lastNameOnly(className) + "." + lastNameOnly(methodName) + " in " + lastNameOnly(filename) + " l." + lineNumber;
+        }
     }
 
-    record InstrumentedMethodEnter(long id, long parentId, String className, String methodName, String methodSig,
-                                   String filename, int startLine, int startCol) implements MethodEnterEvent {
+    record MethodEnter(long id, long parentId, String className, String methodName, String methodSig,
+                       String filename, int startLine, int startCol) implements NonStatementEvent {
         @Override
         public String descr() {
             return "entering instrumented method " + className + "." + methodName + methodSig;
         }
     }
 
-    record NonInstrumentedMethodEnter(long id, long parentId, String className, String methodName,
-                                      String filename) implements MethodEnterEvent {
-        @Override
-        public String descr() {
-            return "entering non-instrumented method " + className + "." + methodName + " [/!\\ logging not available]";
-        }
-    }
-
-    record InstrumentedMethodExit(long id, long parentId, String methodName, String filename, int startLine,
-                                  int startCol) implements NonStatementEvent {
-        @Override
-        public String descr() {
-            return "method " + methodName + " exits";
-        }
-    }
-
-    record NonInstrumentedMethodExit(long id, long parentId, String methodName) implements NonStatementEvent {
+    record MethodExit(long id, long parentId, long correspondingEnterId, String methodName, String filename, int startLine,
+                      int startCol) implements NonStatementEvent {
         @Override
         public String descr() {
             return "method " + methodName + " exits";
@@ -127,27 +138,11 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
-    record LoopCond(long id, long parentId, Value evalRes, String loopType, String filename, int startLine,
-                    int startCol, int endLine, int endCol) implements NonStatementEvent {
-        @Override
-        public String descr() {
-            return "condition of " + loopType + " evaluates to " + evalRes;
-        }
-    }
-
     record ForEachLoopNextIter(long id, long parentId, Value newElem, String filename, int startLine, int startCol,
                                int endLine, int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
             return "starting a new iteration of for-each loop, new value is " + newElem;
-        }
-    }
-
-    record IfCond(long id, long parentId, Value evalRes, String filename, int startLine, int startCol, int endLine,
-                  int endCol) implements NonStatementEvent {
-        @Override
-        public String descr() {
-            return "condition of if evaluates to " + evalRes;
         }
     }
 
@@ -266,7 +261,7 @@ public sealed interface NonStatementEvent extends Event {
                              int endCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "updating slot of index " + index + " in array " + array + " from value " + oldValue +" to value " +
+            return "updating slot of index " + index + " in array " + array + " from value " + oldValue + " to value " +
                     newValue + " using operator " + operator + " (right-hand side was " + rhs + ")";
         }
     }
@@ -346,6 +341,7 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    // TODO should appear as a statement
     record TernaryCondition(long id, long parentId, Value cond, String filename, int startLine, int startCol,
                             int endLine, int endCol) implements NonStatementEvent {
         @Override
@@ -362,7 +358,7 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
-    private static String argsListToString(Value[] args){
+    private static String argsListToString(Value[] args) {
         var sj = new StringJoiner(", ", "[", "]");
         for (Value arg : args) {
             sj.add(arg.toString());

@@ -106,8 +106,18 @@ public sealed interface Value extends Serializable {
         if (o == null){
             return new ReferenceValue(System.identityHashCode(null), "Null", "null");
         }
-        // FIXME it's bad to call toString here
-        return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), o.toString());
+        if (o instanceof String s){
+            return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), "\"" + s + "\"");
+        }
+        // FIXME it's bad to call toString here (it can have side-effects)
+        String descr;
+        try {
+            descr = o.toString();
+        } catch (Throwable throwable){
+            // relies on program-defined toString, so we have to recover from exceptions to preserve program semantics
+            descr = "<??>";
+        }
+        return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), descr);
     }
 
     static Value valueFor(Object[] arr){

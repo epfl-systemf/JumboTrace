@@ -41,6 +41,8 @@
                         <arg>${javac.package}.code=JumboTrace</arg>
                         <arg>--add-exports</arg>
                         <arg>${javac.package}.jvm=JumboTrace</arg>
+                        <arg>--add-exports</arg>
+                        <arg>${javac.package}.comp=JumboTrace</arg>
                     </compilerArgs>
                     <source>17</source>
                     <target>17</target>

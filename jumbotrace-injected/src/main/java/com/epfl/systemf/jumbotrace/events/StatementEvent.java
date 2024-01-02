@@ -96,4 +96,20 @@ public sealed interface StatementEvent extends Event {
         }
     }
 
+    record IfCond(long id, long parentId, Value evalRes, String filename, int startLine, int startCol, int endLine,
+                  int endCol) implements StatementEvent {
+        @Override
+        public String descr() {
+            return "condition of if evaluates to " + evalRes;
+        }
+    }
+
+    record LoopCond(long id, long parentId, Value evalRes, String loopType, String filename, int startLine,
+                    int startCol, int endLine, int endCol) implements StatementEvent {
+        @Override
+        public String descr() {
+            return "condition of " + loopType + " evaluates to " + evalRes;
+        }
+    }
+
 }

@@ -66,7 +66,7 @@ def run_example(example_name: str, main_class_name: str = "Main",
         command += " 2> " + stderr_target
         msg += f" stderr redirected to {stderr_target}"
     cmd(command, msg)
-    generate_html([this_example_dir], skip_compile=True)
+    run_frontend([this_example_dir], skip_compile=True)
 
 
 def run_example_raw(example_name: str, main_class_name: str = "Main",
@@ -103,7 +103,7 @@ def run_example_project(example_name: str, test_mode: bool = False):
         f"java -ea -cp {examples_dir}/{example_name}/target/classes {main_class} \"{args}\"",
         f"running example {example_name} [not instrumented]"
     )
-    generate_html([f"{examples_dir}/{example_name}/src"], skip_compile=True)
+    run_frontend([f"{examples_dir}/{example_name}/src"], skip_compile=True)
 
 
 def compile_plugin():
@@ -147,12 +147,12 @@ def copy_injection_to_example(example_name: str):
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
-def generate_html(src_dirs_paths: List[str], skip_compile=False):
+def run_frontend(src_dirs_paths: List[str], skip_compile=False):
     if not skip_compile:
         compile_injected(test_mode=False)
     cmd(
         f"java -cp {injected_dir}/target/classes com.epfl.systemf.jumbotrace.frontend.Frontend {" ".join(src_dirs_paths)}",
-        "generating HTML report"
+        "running frontend"
     )
 
 
@@ -233,10 +233,10 @@ def main(args: List[str]):
             compile_injected(test_mode=False)
         case ["test", *test_names]:
             run_tests(test_names)
-        case ["gen", "html", "--skip-compile", *src_dirs]:
-            generate_html(src_dirs, skip_compile=True)
-        case ["gen", "html", *src_dirs]:
-            generate_html(src_dirs)
+        case ["run", "frontend", "--skip-compile", *src_dirs]:
+            run_frontend(src_dirs, skip_compile=True)
+        case ["run", "frontend", *src_dirs]:
+            run_frontend(src_dirs)
         case _:
             print("unknown command: " + " ".join(args), file=sys.stderr)
 

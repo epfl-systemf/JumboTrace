@@ -1,8 +1,11 @@
 package com.epfl.systemf.jumbotrace.javacplugin;
 
 import com.sun.tools.javac.code.*;
-import com.sun.tools.javac.tree.*;
+import com.sun.tools.javac.tree.EndPosTable;
+import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
+import com.sun.tools.javac.tree.TreeMaker;
+import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Names;
@@ -26,6 +29,7 @@ public final class Transformer extends TreeTranslator {
     //<editor-fold desc="Constants">
 
     private static final String CONSTRUCTOR_NAME = "<init>";
+    private static final String CLS_INIT_NAME = "<clinit>";
 
     //</editor-fold>
 
@@ -96,9 +100,51 @@ public final class Transformer extends TreeTranslator {
     //<editor-fold desc="Visitor implementation">
 
     @Override
-    public void visitClassDef(JCClassDecl tree) {
-        classesStack.addFirst(tree.sym);
-        super.visitClassDef(tree);
+    public void visitClassDef(JCClassDecl classDecl) {
+        classesStack.addFirst(classDecl.sym);
+        super.visitClassDef(classDecl);
+        classDecl.defs = classDecl.defs.prepend(
+                mk().Block(Flags.STATIC, List.of(mk().Exec(instrumentation.logMethodEnter(
+                        classDecl.name.toString(),
+                        CLS_INIT_NAME,
+                        new Type.MethodType(List.nil(), st().voidType, List.nil(), classDecl.sym),
+                        currentFilename(),
+                        getStartLine(classDecl),
+                        getStartCol(classDecl)
+                ))))
+        ).append(
+                mk().Block(Flags.STATIC, List.of(mk().Exec(instrumentation.logMethodExit(
+                        CLS_INIT_NAME,
+                        currentFilename(),
+                        safeGetEndLine(classDecl),
+                        safeGetEndCol(classDecl)
+                ))))
+        );
+        for (var rem = classDecl.defs; rem.nonEmpty(); rem = rem.tail){
+            var currDef = rem.head;
+            if (currDef instanceof JCBlock staticInitBlock){
+                // catch exceptions in static initialization blocks and call methodExit if such an exception happens
+                var throwableVarSymbol = new Symbol.VarSymbol(0, m.nextId("throwable"), st().throwableType, currentMethod());
+                staticInitBlock.stats = List.of(
+                        mk().Try(
+                                mk().Block(0, staticInitBlock.stats),
+                                List.of(mk().Catch(
+                                        mk().VarDef(throwableVarSymbol, null),
+                                        mk().Block(0, List.of(
+                                                mk().Exec(instrumentation.logMethodExit(
+                                                        CLS_INIT_NAME,
+                                                        currentFilename(),
+                                                        safeGetEndLine(classDecl),
+                                                        safeGetEndCol(classDecl)
+                                                )),
+                                                mk().Throw(mk().Ident(throwableVarSymbol).setType(st().throwableType))
+                                        ))
+                                )),
+                                null
+                        )
+                );
+            }
+        }
         classesStack.removeFirst();
     }
 
@@ -154,6 +200,14 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitMethodDef(JCMethodDecl method) {
+        /* Do not log enum constructors. They are called before the <clinit> of the enum and its superclass
+         * (java.lang.Enum), which confuses the tracing system */
+        // TODO fix this problem (possibly by converting enums to regular classes)
+        var isEnumInit = method.name.contentEquals(CONSTRUCTOR_NAME) && Flags.isEnum(method.sym.owner);
+        if (isEnumInit){
+            this.result = method;
+            return;
+        }
         methodsStack.addFirst(method.sym);
         super.visitMethodDef(method);
         var body = method.getBody();

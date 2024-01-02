@@ -3,12 +3,10 @@ package com.epfl.systemf.jumbotrace.injected.raw;
 import com.epfl.systemf.jumbotrace.Config;
 import com.epfl.systemf.jumbotrace.events.Event;
 import com.epfl.systemf.jumbotrace.events.NonStatementEvent.*;
-import com.epfl.systemf.jumbotrace.events.StatementEvent;
 import com.epfl.systemf.jumbotrace.events.StatementEvent.*;
 import com.epfl.systemf.jumbotrace.events.Value;
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
 import com.epfl.systemf.jumbotrace.util.ReversedArray;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.FileOutputStream;
@@ -18,17 +16,16 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Deque;
-import java.util.LinkedList;
+import java.util.*;
 
 import static com.epfl.systemf.jumbotrace.Config.LOG_FILE;
 
 @SuppressWarnings("unused")
 public class ___JumboTrace___ {
 
-    // May be set to null by the code generation system
-    private static final PrintStream PRINT_STREAM = System.out;
+    // Set to null to disable logging during execution
+    // May be set to null by the code generation system for testing purposes
+    private static final @Nullable PrintStream PRINT_STREAM = null; //System.out;
 
     private static final int NO_POS = -1;
 
@@ -55,152 +52,6 @@ public class ___JumboTrace___ {
     }
 
     private static final ObjectOutputStream outputStream;
-
-    private static final class Frame {
-        String className;
-        String methodName;
-        String signature;
-        int depth;
-        Long callId;
-        Long enterId;
-        long parentId;
-        boolean enterIsInstrumented;
-        Long currentStat;
-
-        public Frame(@NotNull String className, @NotNull String methodName, @Nullable String signature,
-                     int depth,
-                     @Nullable Long callId, @Nullable Long enterId, long parentId, boolean enterIsInstrumented,
-                     @Nullable Long currentStat) {
-            this.className = className;
-            this.methodName = methodName;
-            this.signature = signature;
-            this.depth = depth;
-            this.callId = callId;
-            this.enterId = enterId;
-            this.parentId = parentId;
-            this.enterIsInstrumented = enterIsInstrumented;
-            this.currentStat = currentStat;
-        }
-
-        @Override
-        public String toString() {
-            return "Frame{" +
-                    "className='" + className + '\'' +
-                    ", methodName='" + methodName + '\'' +
-                    ", signature='" + signature + '\'' +
-                    ", depth=" + depth +
-                    ", callId=" + callId +
-                    ", enterId=" + enterId +
-                    ", parentId=" + parentId +
-                    ", enterIsInstrumented=" + enterIsInstrumented +
-                    ", currentStat=" + currentStat +
-                    '}';
-        }
-    }
-
-    private static final Deque<Frame> stack = new LinkedList<>();
-    private static Frame pendingCall = null;
-
-    private static void updateStackForCall(MethodCallEvent event) {
-        pendingCall = new Frame(
-                event.className(), event.methodName(), event.methodSig(),
-                stack.size() + 1,
-                event.id(), null, event.parentId(), false,null);
-    }
-
-    /**
-     * WARNING this method is sensitive to where it is called from
-     */
-    private static void updateStackForEnter(InstrumentedMethodEnter event) {
-        if (stack.isEmpty()){   // happens during initial call to main
-            pendingCall = new Frame(event.className(), event.methodName(), event.methodSig(),
-                    0, Config.NO_PARENT_EVENT_CODE, null, event.parentId(), false, null);
-        }
-        var stackTrace = new ReversedArray<>((new Exception()).getStackTrace());
-        var interestingStackTraceLength = stackTrace.length() - 2;  // subtract nesting depth inside this class
-//        System.out.println("Stack:");   // TODO remove
-//        System.out.println(stack);
-//        System.out.println("Stacktrace:");
-//        System.out.println(stackTrace);
-//        System.out.println("----------------------------");
-        if (stack.size() + 1 == interestingStackTraceLength) {
-            // called from an instrumented location, no layer missing
-            checkAssertion(pendingCall != null);
-            var frame = pendingCall;
-            pendingCall = null;
-            frame.enterId = event.id();
-            frame.enterIsInstrumented = true;
-            stack.addFirst(frame);
-        } else {  // called from a non-instrumented location, so at least 1 layer is missing
-            // FIRST handle the last method called from an instrumented location
-            var lastInstrumentedCallFrame = pendingCall;
-            pendingCall = null;
-            var firstNonInstrEnterStackTraceElem = stackTrace.get(stack.size());
-            checkAssertion(lastInstrumentedCallFrame.methodName.equals(firstNonInstrEnterStackTraceElem.getMethodName()));
-            log("[non-instrumented] ENTER ", firstNonInstrEnterStackTraceElem.getClassName(), ".",
-                    firstNonInstrEnterStackTraceElem.getMethodName());
-            var firstNonInstrEnterEvent = new NonInstrumentedMethodEnter(
-                    genEventId(), lastInstrumentedCallFrame.callId,
-                    firstNonInstrEnterStackTraceElem.getClassName(), firstNonInstrEnterStackTraceElem.getMethodName(),
-                    firstNonInstrEnterStackTraceElem.getFileName()
-            );
-            writeEvent(firstNonInstrEnterEvent);
-            lastInstrumentedCallFrame.enterId = firstNonInstrEnterEvent.id();
-            lastInstrumentedCallFrame.enterIsInstrumented = false;
-            stack.addFirst(lastInstrumentedCallFrame);
-            // THEN handle the intermediate enter events (the ones for which neither the call nor the enter are instrumented)
-            var parentId = firstNonInstrEnterEvent.id();
-            for (var depth = stack.size(); depth < interestingStackTraceLength-1; depth++){
-                var stackTraceElem = stackTrace.get(depth);
-                var className = stackTraceElem.getClassName();
-                var methodName = stackTraceElem.getMethodName();
-                var filename = stackTraceElem.getFileName();
-                log("[non-instrumented] ENTER ", className, ".", methodName);
-                var methEnter = new NonInstrumentedMethodEnter(genEventId(), parentId, className, methodName, filename);
-                writeEvent(methEnter);
-                stack.addFirst(new Frame(className, methodName, null, depth, null, methEnter.id(),
-                        parentId, false, null));
-                parentId = methEnter.id();
-            }
-            // FINALLY handle the "come-back" to an instrumented location
-            var stackTraceElem = stackTrace.get(interestingStackTraceLength-1);
-            checkAssertion(event.methodName().equals(stackTraceElem.getMethodName()));
-            var firstReInstrCallFrame = new Frame(event.className(), event.methodName(), event.methodSig(),
-                    interestingStackTraceLength, null, event.id(), parentId, true, null);
-            stack.addFirst(firstReInstrCallFrame);
-        }
-    }
-
-    private static void updateStackForMethodExit(){
-        Frame frame = stack.removeFirst();
-        while (frame.callId == null){
-            log("[non-instrumented] EXIT ", frame.methodName);
-            writeEvent(new NonInstrumentedMethodExit(
-                    genEventId(),
-                    frame.parentId,
-                    frame.methodName
-            ));
-            frame = stack.removeFirst();
-        }
-    }
-
-    private static void updateStackForStatement(StatementEvent event) {
-        stack.getFirst().currentStat = event.id();
-    }
-
-    private static long getEnclosingCallId(){
-        return stack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : stack.getFirst().callId;
-    }
-
-    private static long getEnclosingEnterId(){
-        return stack.getFirst().enterId;
-    }
-
-    private static long getEnclosingStatIdOrElseEnter(){
-        // stat can be null in a call to super-constructor (or to other constructor of same class)
-        Long stat = stack.getFirst().currentStat;
-        return stat == null ? getEnclosingEnterId() : stat;
-    }
 
     static {
         try {
@@ -240,16 +91,37 @@ public class ___JumboTrace___ {
     private static void disableLogging() {
         loggingEnabled = false;
     }
+    
+    private static final Deque<Long> stack = new LinkedList<>();
+    
+    private static long getEnclosingEnterId(){
+        return stack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : stack.getFirst();
+    }
 
     private static void writeEvent(Event event) {
         try {
             outputStream.writeObject(event);
-            if (event instanceof StatementEvent statementEvent){
-                updateStackForStatement(statementEvent);
-            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+    
+    /** WARNING caller-sensitive method */
+    private static List<NonInstrumentedMethod> getNonInstrumentedEnclosingMethods(){
+        final var methodNestingShift = 2;
+        var rawStackTrace = (new Exception()).getStackTrace();
+        var gapSize = rawStackTrace.length - stack.size() - methodNestingShift;
+        if (gapSize > 0){
+            var stackTrace = new ReversedArray<>(rawStackTrace);
+            var nonInstrMethods = new ArrayList<NonInstrumentedMethod>(gapSize);
+            for (var i = stack.size(); i < stackTrace.length()-methodNestingShift; i++){
+                var ste = stackTrace.get(i);
+                nonInstrMethods.add(new NonInstrumentedMethod(ste.getClassName(), ste.getMethodName(),
+                        ste.getFileName(), ste.getLineNumber()));
+            }
+            return nonInstrMethods;
+        }
+        return List.of();
     }
 
     public static void staticMethodCall(String className, String methodName, String methodSig, Object[] args,
@@ -260,11 +132,12 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             var event = new StaticMethodCall(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     methodName,
                     methodSig,
                     makeArgsValuesArray(args),
+                    getNonInstrumentedEnclosingMethods(),
                     filename,
                     startLine,
                     startCol,
@@ -272,7 +145,6 @@ public class ___JumboTrace___ {
                     endCol
             );
             writeEvent(event);
-            updateStackForCall(event);
             enableLogging();
         }
     }
@@ -285,12 +157,13 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             var event = new NonStaticMethodCall(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     methodName,
                     methodSig,
                     Value.valueFor(receiver),
                     makeArgsValuesArray(args),
+                    getNonInstrumentedEnclosingMethods(),
                     filename,
                     startLine,
                     startCol,
@@ -298,7 +171,6 @@ public class ___JumboTrace___ {
                     endCol
             );
             writeEvent(event);
-            updateStackForCall(event);
             enableLogging();
         }
     }
@@ -306,12 +178,12 @@ public class ___JumboTrace___ {
     public static void methodEnter(String className, String methodName, String methodSig, String filename, int line, int col) {
         if (loggingEnabled) {
             disableLogging();
-            indent += 1;
-            log("ENTER: ", className, ".", methodName, methodSig, " at ", formatPosition(filename, line, col));
             // TODO check stacktrace using an exception
-            var event = new InstrumentedMethodEnter(
+            log("ENTER: ", className, ".", methodName, methodSig, " at ", formatPosition(filename, line, col));
+            indent += 1;
+            var event = new MethodEnter(
                     genEventId(),
-                    getEnclosingCallId(),
+                    getEnclosingEnterId(),
                     className,
                     methodName,
                     methodSig,
@@ -319,8 +191,8 @@ public class ___JumboTrace___ {
                     line,
                     col
             );
+            stack.addFirst(event.id());
             writeEvent(event);
-            updateStackForEnter(event);
             enableLogging();
         }
     }
@@ -328,17 +200,19 @@ public class ___JumboTrace___ {
     public static void methodExit(String methodName, String filename, int line, int col) {
         if (loggingEnabled) {
             disableLogging();
-            updateStackForMethodExit();
+            indent -= 1;
             log("METHOD EXIT ", methodName, " at ", formatPosition(filename, line, col));
-            writeEvent(new InstrumentedMethodExit(
+            var correspondingEnterId = stack.removeFirst();
+            var event = new MethodExit(
                     genEventId(),
-                    getEnclosingCallId(),
+                    getEnclosingEnterId(),
+                    correspondingEnterId,
                     methodName,
                     filename,
                     line,
                     col
-            ));
-            indent -= 1;
+            );
+            writeEvent(event);
             enableLogging();
         }
     }
@@ -350,7 +224,7 @@ public class ___JumboTrace___ {
             log(className, ".", methodName, " RETURNS '", retValue, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new MethodReturnVal(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     methodName,
                     Value.valueFor(retValue),
@@ -371,7 +245,7 @@ public class ___JumboTrace___ {
             log(className, ".", methodName, " RETURNS void at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new MethodReturnVoid(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     methodName,
                     filename,
@@ -492,7 +366,7 @@ public class ___JumboTrace___ {
             log("SWITCH selector='", selector, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol), switchTypeDescr);
             writeEvent(new SwitchExpr(
                     genEventId(),
-                    isExpr ? getEnclosingStatIdOrElseEnter() : getEnclosingEnterId(),
+                    getEnclosingEnterId(),
                     Value.valueFor(selector),
                     filename,
                     startLine,
@@ -511,7 +385,7 @@ public class ___JumboTrace___ {
             log("ENTER LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LoopEnter(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     loopType,
                     filename,
                     startLine,
@@ -529,7 +403,7 @@ public class ___JumboTrace___ {
             log("EXIT LOOP (", loopType, ") at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LoopExit(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     loopType,
                     filename,
                     startLine,
@@ -547,7 +421,7 @@ public class ___JumboTrace___ {
             log("LOOP CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LoopCond(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(evalRes),
                     loopType,
                     filename,
@@ -585,7 +459,7 @@ public class ___JumboTrace___ {
             log("IF CONDITION evaluates to '", evalRes, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new IfCond(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(evalRes),
                     filename,
                     startLine,
@@ -605,7 +479,7 @@ public class ___JumboTrace___ {
             log("VAR ASSIGN ", varName, " = ", assignedValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LocalVarAssignment(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     varName,
                     Value.valueFor(assignedValue),
                     filename,
@@ -628,7 +502,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LocalVarAssignOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     varName,
                     Value.valueFor(newValue),
                     Value.valueFor(oldValue),
@@ -659,7 +533,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LocalVarIncDecOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     varName,
                     Value.valueFor(result),
                     Value.valueFor(newValue),
@@ -683,7 +557,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new StaticFieldAssignment(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     fieldName,
                     Value.valueFor(assignedValue),
@@ -707,7 +581,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new StaticFieldAssignOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     fieldName,
                     Value.valueFor(newValue),
@@ -739,7 +613,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new StaticFieldIncDecOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     fieldName,
                     Value.valueFor(result),
@@ -764,7 +638,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new InstanceFieldAssignment(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     Value.valueFor(instance),
                     fieldName,
@@ -789,7 +663,7 @@ public class ___JumboTrace___ {
                     oldValue, " -> ", newValue, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new InstanceFieldAssignOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     Value.valueFor(instance),
                     fieldName,
@@ -822,7 +696,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new InstanceFieldIncDecOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     className,
                     Value.valueFor(instance),
                     fieldName,
@@ -848,7 +722,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new ArrayElemSet(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(array),
                     Value.valueFor(index),
                     Value.valueFor(assignedValue),
@@ -871,7 +745,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new ArrayElemAssignOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(array),
                     Value.valueFor(index),
                     Value.valueFor(newValue),
@@ -903,7 +777,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new ArrayElemIncDecOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(array),
                     Value.valueFor(index),
                     Value.valueFor(result),
@@ -968,7 +842,7 @@ public class ___JumboTrace___ {
                     formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new CastAttempt(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(value),
                     targetTypeDescr,
                     willSucceed,
@@ -1033,7 +907,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new UnaryOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(res),
                     Value.valueFor(arg),
                     operator,
@@ -1056,7 +930,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new BinaryOp(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(lhs),
                     Value.valueFor(rhs),
                     operator,
@@ -1078,7 +952,7 @@ public class ___JumboTrace___ {
             log("VAR READ ", varName, " : ", value, " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new LocalVarRead(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(value),
                     varName,
                     filename,
@@ -1100,7 +974,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new StaticFieldRead(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(value),
                     className,
                     fieldName,
@@ -1123,7 +997,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new InstanceFieldRead(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(value),
                     Value.valueFor(owner),
                     className,
@@ -1147,7 +1021,7 @@ public class ___JumboTrace___ {
                     " at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new ArrayAccess(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(value),
                     Value.valueFor(array),
                     Value.valueFor(index),
@@ -1168,7 +1042,7 @@ public class ___JumboTrace___ {
             log("TERNARY CONDITION evaluates to '", cond, "' at ", formatPositionInterval(filename, startLine, startCol, endLine, endCol));
             writeEvent(new TernaryCondition(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(cond),
                     filename,
                     startLine,
@@ -1195,7 +1069,7 @@ public class ___JumboTrace___ {
             }
             writeEvent(new TypeTest(
                     genEventId(),
-                    getEnclosingStatIdOrElseEnter(),
+                    getEnclosingEnterId(),
                     Value.valueFor(result),
                     Value.valueFor(testedObject),
                     targetTypeName,
@@ -1269,6 +1143,12 @@ public class ___JumboTrace___ {
     private static void checkAssertion(boolean assertion){
         if (!assertion){
             throw new AssertionError();
+        }
+    }
+
+    private static void checkAreEquals(String l, String r){
+        if (!l.equals(r)){
+            throw new AssertionError(l + " != " + r);
         }
     }
 
