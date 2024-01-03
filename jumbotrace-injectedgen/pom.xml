@@ -36,7 +36,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>com.epfl.systemf.jumbotrace.injectedgen.Main</mainClass>
+                    <mainClass>ch.epfl.systemf.jumbotrace.injectedgen.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>

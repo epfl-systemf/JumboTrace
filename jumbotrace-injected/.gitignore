@@ -35,4 +35,4 @@ build/
 ### Mac OS ###
 .DS_Store
 
-src/main/java/com/epfl/systemf/jumbotrace/injected/processed/___JumboTrace___.java
+src/main/java/ch/epfl/systemf/jumbotrace/injected/processed/___JumboTrace___.java

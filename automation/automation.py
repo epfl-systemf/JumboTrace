@@ -141,8 +141,8 @@ def compile_injected(test_mode: bool):
 
 def copy_injection_to_example(example_name: str):
     example_dir = f"{examples_dir}/{example_name}"
-    src = f"{injected_dir}/target/classes/com"
-    dst = f"{examples_dir}/{example_dir}/com"
+    src = f"{injected_dir}/target/classes/ch"
+    dst = f"{examples_dir}/{example_dir}/ch"
     log(f"copying {src} -> {dst}")
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
@@ -152,7 +152,7 @@ def run_frontend(src_dirs_path: str, verbose=True, skip_compile=False):
         compile_injected(test_mode=False)
     opt_verbose = "-verbose" if verbose else ""
     cmd(
-        f"java -cp {injected_dir}/target/classes com.epfl.systemf.jumbotrace.frontend.Frontend {src_dirs_path} {opt_verbose}",
+        f"java -cp {injected_dir}/target/classes ch.epfl.systemf.jumbotrace.frontend.Frontend {src_dirs_path} {opt_verbose}",
         "running frontend"
     )
 
