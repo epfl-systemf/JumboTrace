@@ -18,9 +18,11 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
-// FIXME solve the problem with pattern match
+// FIXME add linting pass before transformation to check that we don't redefine existing identifiers + reject synchronized
 
-// TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null". Also be careful with line numbers in error reporting
+// FIXME pattern matching (type-test with bindings, e.g. x instanceof String s) is currently not supported
+
+// TODO try to avoid error messages like "cannot invoke method because its receiver $579_arg is null"
 
 // TODO keep in mind to use null in tests (and probably add nulls to existing tests). null seems to be a dangerous edge case for types handling
 
@@ -275,11 +277,12 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitExec(JCExpressionStatement exprStat) {
-        // TODO check that this comment is up to date
         /* Problem: it seems that having an invocation of a method returning void as the expression of a let crashes the codegen
          * Assumption: all such calls are wrapped in a JCExpressionStatement or a lambda
          * Solution: special-case it (here)
-         * We also exclude the call to the super constructor, as super(...) must always be the very first instruction in <init>
+         * We also exclude the call to the underlying constructor (super(...) or this(...)) because logging it seems
+         * to violate the obligation for this call to be the first instruction executed by the constructor on its
+         * receiver
          */
         JCStatement transformedStat;
         if (exprStat.expr instanceof JCMethodInvocation invocation
@@ -720,7 +723,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitNewArray(JCNewArray newArray) {
-        super.visitNewArray(newArray);  // TODO
+        super.visitNewArray(newArray);  // TODO maybe save created value?
         mk().at(newArray.pos);
     }
 
@@ -945,20 +948,8 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitBindingPattern(JCBindingPattern bindingPattern) {
-        super.visitBindingPattern(bindingPattern);  // TODO
+        super.visitBindingPattern(bindingPattern);  // TODO log variable binding
         mk().at(bindingPattern.pos);
-    }
-
-    @Override
-    public void visitDefaultCaseLabel(JCDefaultCaseLabel defaultCaseLabel) {
-        super.visitDefaultCaseLabel(defaultCaseLabel);  // TODO
-        mk().at(defaultCaseLabel.pos);
-    }
-
-    @Override
-    public void visitGuardPattern(JCGuardPattern guardPattern) {
-        super.visitGuardPattern(guardPattern);  // TODO
-        mk().at(guardPattern.pos);
     }
 
     @Override
@@ -1033,7 +1024,8 @@ public final class Transformer extends TreeTranslator {
     @Override
     public void visitReference(JCMemberReference memberReference) {
         // things like Foo::bar
-        super.visitReference(memberReference);  // TODO
+        // TODO maybe log such values (but we need to find a way of representing lambdas/methods)
+        super.visitReference(memberReference);
         mk().at(memberReference.pos);
         deleteConstantFolding(memberReference);
     }
