@@ -122,9 +122,9 @@ public final class Transformer extends TreeTranslator {
                         safeGetEndCol(classDecl)
                 ))))
         );
-        for (var rem = classDecl.defs; rem.nonEmpty(); rem = rem.tail){
+        for (var rem = classDecl.defs; rem.nonEmpty(); rem = rem.tail) {
             var currDef = rem.head;
-            if (currDef instanceof JCBlock staticInitBlock){
+            if (currDef instanceof JCBlock staticInitBlock) {
                 // catch exceptions in static initialization blocks and call methodExit if such an exception happens
                 var throwableVarSymbol = new Symbol.VarSymbol(0, m.nextId("throwable"), st().throwableType, currentMethod());
                 staticInitBlock.stats = List.of(
@@ -161,7 +161,7 @@ public final class Transformer extends TreeTranslator {
             this.result = varDecl;
         } else {
             super.visitVarDef(varDecl);
-            if (varDecl.sym.owner instanceof Symbol.ClassSymbol classSymbol && varDecl.init != null){
+            if (varDecl.sym.owner instanceof Symbol.ClassSymbol classSymbol && varDecl.init != null) {
                 varDecl.init = instrumentation.logInitializedFieldDeclaration(
                         classSymbol.name.toString(),
                         varDecl.name.toString(),
@@ -219,7 +219,7 @@ public final class Transformer extends TreeTranslator {
          * (java.lang.Enum), which confuses the tracing system */
         // TODO fix this problem (possibly by converting enums to regular classes)
         var isEnumInit = method.name.contentEquals(CONSTRUCTOR_NAME) && Flags.isEnum(method.sym.owner);
-        if (isEnumInit){
+        if (isEnumInit) {
             this.result = method;
             return;
         }
@@ -242,7 +242,7 @@ public final class Transformer extends TreeTranslator {
                     )
             ));
             List<JCStatement> statsInner;
-            if (method.sym.getKind().equals(ElementKind.CONSTRUCTOR)){
+            if (method.sym.getKind().equals(ElementKind.CONSTRUCTOR)) {
                 // If constructor, need to call the superclass constructor before starting the try-finally
                 statsOuter = statsOuter.append(body.stats.head);
                 statsInner = body.stats.tail;
@@ -328,7 +328,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitApply(JCMethodInvocation invocation) {
-        if (invocation.meth instanceof JCFieldAccess fieldAccess){
+        if (invocation.meth instanceof JCFieldAccess fieldAccess) {
             fieldAccess.selected = translate(fieldAccess.selected);
         }
         invocation.args = translate(invocation.args);
@@ -1323,27 +1323,31 @@ public final class Transformer extends TreeTranslator {
     private void handleArrayAssignment(JCAssign assignment, JCArrayAccess arrayAccess) {
         this.result =
                 withNewLocal("array", arrayAccess.indexed, (arrayAtom, arrayVarDef) ->
-                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDef) -> {
-                            arrayAccess.indexed = arrayAtom;
-                            arrayAccess.index = indexAtom;
-                            return mk().LetExpr(
-                                    List.of(
-                                            arrayVarDef,
-                                            indexVarDef,
-                                            mk().Exec(instrumentation.logArrayElemSet(
-                                                    arrayAtom,
-                                                    indexAtom,
-                                                    assignment.rhs,
-                                                    currentFilename(),
-                                                    getStartLine(assignment),
-                                                    getStartCol(assignment),
-                                                    safeGetEndLine(assignment),
-                                                    safeGetEndCol(assignment)
-                                            ))
-                                    ),
-                                    assignment
-                            ).setType(arrayAccess.type);
-                        }));
+                        withNewLocal("index", arrayAccess.index, (indexAtom, indexVarDef) ->
+                                withNewLocal("rhs", assignment.rhs, (rhsAtom, rhsVarDef) -> {
+                                    arrayAccess.indexed = arrayAtom;
+                                    arrayAccess.index = indexAtom;
+                                    assignment.rhs = rhsAtom;
+                                    return mk().LetExpr(
+                                            List.of(
+                                                    arrayVarDef,
+                                                    indexVarDef,
+                                                    rhsVarDef,
+                                                    mk().Exec(instrumentation.logArrayElemSet(
+                                                            arrayAtom,
+                                                            indexAtom,
+                                                            rhsAtom,
+                                                            currentFilename(),
+                                                            getStartLine(assignment),
+                                                            getStartCol(assignment),
+                                                            safeGetEndLine(assignment),
+                                                            safeGetEndCol(assignment)
+                                                    ))
+                                            ),
+                                            assignment
+                                    ).setType(arrayAccess.type);
+                                })
+                        ));
     }
 
     private void handleArrayAssignOp(JCAssignOp assignOp, JCArrayAccess arrayAccess) {
