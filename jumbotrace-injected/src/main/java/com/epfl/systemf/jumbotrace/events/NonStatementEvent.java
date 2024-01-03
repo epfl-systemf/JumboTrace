@@ -24,48 +24,29 @@ public sealed interface NonStatementEvent extends Event {
     }
 
     record StaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
-                            Value[] args, List<NonInstrumentedMethod> nonInstrumentedEnclosingMethods,
+                            Value[] args,
                             String filename, int startLine, int startCol, int endLine,
                             int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
-            StringBuilder str = new StringBuilder(
-                    "invocation of static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
-                            " with arguments " + argsListToString(args)
-            );
-            if (!nonInstrumentedEnclosingMethods.isEmpty()) {
-                str.append(" enclosed in the following method invocations:");
-                for (NonInstrumentedMethod meth : nonInstrumentedEnclosingMethods) {
-                    str.append("\n").append(meth);
-                }
-            }
-            return str.toString();
+            return "invocation of static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
+                    " with arguments " + argsListToString(args);
         }
     }
 
     record NonStaticMethodCall(long id, long parentId, String className, String methodName, String methodSig,
                                Value receiver, Value[] args,
-                               List<NonInstrumentedMethod> nonInstrumentedEnclosingMethods,
                                String filename, int startLine, int startCol, int endLine,
                                int endCol) implements MethodCallEvent {
         @Override
         public String descr() {
-            StringBuilder str = new StringBuilder(
-                    "invocation of non-static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
-                            " with receiver " + receiver + " and arguments " + argsListToString(args)
-            );
-            if (!nonInstrumentedEnclosingMethods.isEmpty()) {
-                str.append(" enclosed in the following method invocations:");
-                for (NonInstrumentedMethod meth : nonInstrumentedEnclosingMethods) {
-                    str.append("\n").append(meth);
-                }
-            }
-            return str.toString();
+            return "invocation of non-static method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig) +
+                    " with receiver " + receiver + " and arguments " + argsListToString(args);
         }
     }
 
-    record NonInstrumentedMethod(String className, String methodName, String filename,
-                                 int lineNumber) implements Serializable {
+    record NonInstrumentedEnter(String className, String methodName, String filename,
+                                int lineNumber) implements Serializable {
         @Override
         public String toString() {
             return lastNameOnly(className) + "." + methodName + " in " + filename + " l." + lineNumber;
@@ -73,10 +54,25 @@ public sealed interface NonStatementEvent extends Event {
     }
 
     record MethodEnter(long id, long parentId, String className, String methodName, String methodSig,
+                       List<NonInstrumentedEnter> nonInstrumentedEnters,
                        String filename, int startLine, int startCol) implements NonStatementEvent {
         @Override
         public String descr() {
-            return "entering instrumented method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig);
+            StringBuilder sb = new StringBuilder("entering instrumented method " + lastNameOnly(className) + "." + methodName + formatMethodSig(methodSig));
+            if (!nonInstrumentedEnters.isEmpty()){
+                sb.append(" enclosed in: ");
+                var isFirst = true;
+                for (var nonInstrCall: nonInstrumentedEnters){
+                    if (!isFirst){
+                        sb.append(" > ");
+                    }
+                    sb.append("[");
+                    sb.append(nonInstrCall.toString());
+                    sb.append("]");
+                    isFirst = false;
+                }
+            }
+            return sb.toString();
         }
     }
 

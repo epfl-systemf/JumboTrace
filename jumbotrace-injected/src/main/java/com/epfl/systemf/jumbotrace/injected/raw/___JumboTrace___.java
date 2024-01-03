@@ -6,7 +6,7 @@ import com.epfl.systemf.jumbotrace.events.NonStatementEvent.*;
 import com.epfl.systemf.jumbotrace.events.StatementEvent.*;
 import com.epfl.systemf.jumbotrace.events.Value;
 import com.epfl.systemf.jumbotrace.injected.annot.Specialize;
-import com.epfl.systemf.jumbotrace.util.ReversedArray;
+import com.epfl.systemf.jumbotrace.injected.StackTraceWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.FileOutputStream;
@@ -92,10 +92,30 @@ public class ___JumboTrace___ {
         loggingEnabled = false;
     }
 
-    private static final Deque<Long> stack = new LinkedList<>();
+    private record Frame(long id, int depth) {
+    }
+
+    private static final Deque<Frame> stack = new LinkedList<>();
 
     private static long getEnclosingEnterId() {
-        return stack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : stack.getFirst();
+        return stack.isEmpty() ? Config.NO_PARENT_EVENT_CODE : stack.getFirst().id;
+    }
+
+    private static int getEnclosingDepth(){
+        return stack.isEmpty() ? 0 : stack.getFirst().depth;
+    }
+
+    private static List<NonInstrumentedEnter> computeNonInstrumentedEnters(StackTraceWrapper stackTrace) {
+        var enclosingDepth = getEnclosingDepth();
+        var thisDepth = stackTrace.length();
+        var nonInstrumentedEnters = new ArrayList<NonInstrumentedEnter>(thisDepth - enclosingDepth - 1);
+        for (var i = enclosingDepth; i < thisDepth-1; i++){
+            var ste = stackTrace.get(i);
+            nonInstrumentedEnters.add(new NonInstrumentedEnter(
+                    ste.getClassName(), ste.getMethodName(), ste.getFileName(), ste.getLineNumber()
+            ));
+        }
+        return nonInstrumentedEnters;
     }
 
     private static void writeEvent(Event event) {
@@ -104,26 +124,6 @@ public class ___JumboTrace___ {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * WARNING caller-sensitive method
-     */
-    private static List<NonInstrumentedMethod> getNonInstrumentedEnclosingMethods() {
-        final var methodNestingShift = 2;
-        var rawStackTrace = (new Exception()).getStackTrace();
-        var gapSize = rawStackTrace.length - stack.size() - methodNestingShift;
-        if (gapSize > 0) {
-            var stackTrace = new ReversedArray<>(rawStackTrace);
-            var nonInstrMethods = new ArrayList<NonInstrumentedMethod>(gapSize);
-            for (var i = stack.size(); i < stackTrace.length() - methodNestingShift; i++) {
-                var ste = stackTrace.get(i);
-                nonInstrMethods.add(new NonInstrumentedMethod(ste.getClassName(), ste.getMethodName(),
-                        ste.getFileName(), ste.getLineNumber()));
-            }
-            return nonInstrMethods;
-        }
-        return List.of();
     }
 
     public static void staticMethodCall(String className, String methodName, String methodSig, Object[] args,
@@ -139,7 +139,6 @@ public class ___JumboTrace___ {
                     methodName,
                     methodSig,
                     makeArgsValuesArray(args),
-                    getNonInstrumentedEnclosingMethods(),
                     filename,
                     startLine,
                     startCol,
@@ -165,7 +164,6 @@ public class ___JumboTrace___ {
                     methodSig,
                     Value.valueFor(receiver),
                     makeArgsValuesArray(args),
-                    getNonInstrumentedEnclosingMethods(),
                     filename,
                     startLine,
                     startCol,
@@ -180,20 +178,22 @@ public class ___JumboTrace___ {
     public static void methodEnter(String className, String methodName, String methodSig, String filename, int line, int col) {
         if (loggingEnabled) {
             disableLogging();
-            // TODO check stacktrace using an exception
             log("ENTER: ", className, ".", methodName, methodSig, " at ", formatPosition(filename, line, col));
             indent += 1;
+            var stackTrace = new StackTraceWrapper((new Exception()).getStackTrace(), 1);
+            var nonInstrumentedEnters = computeNonInstrumentedEnters(stackTrace);
             var event = new MethodEnter(
                     genEventId(),
                     getEnclosingEnterId(),
                     className,
                     methodName,
                     methodSig,
+                    nonInstrumentedEnters,
                     filename,
                     line,
                     col
             );
-            stack.addFirst(event.id());
+            stack.addFirst(new Frame(event.id(), stackTrace.length()));
             writeEvent(event);
             enableLogging();
         }
@@ -204,7 +204,7 @@ public class ___JumboTrace___ {
             disableLogging();
             indent -= 1;
             log("METHOD EXIT ", methodName, " at ", formatPosition(filename, line, col));
-            var correspondingEnterId = stack.removeFirst();
+            var correspondingEnterId = stack.removeFirst().id;
             var event = new MethodExit(
                     genEventId(),
                     getEnclosingEnterId(),
