@@ -2,9 +2,10 @@ package com.epfl.systemf.jumbotrace.frontend;
 
 // source of the constants: https://stackoverflow.com/questions/5762491/how-to-print-color-in-console-using-system-out-println
 
+@SuppressWarnings("unused")
 public final class Colors {
 
-    private Colors(){
+    private Colors() {
         throw new AssertionError("not instantiable");
     }
 

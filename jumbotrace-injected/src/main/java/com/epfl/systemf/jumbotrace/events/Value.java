@@ -6,11 +6,11 @@ import java.util.StringJoiner;
 @SuppressWarnings("unused")
 public sealed interface Value extends Serializable {
 
-    static BooleanValue valueFor(boolean b){
+    static BooleanValue valueFor(boolean b) {
         return new BooleanValue(b);
     }
 
-    static ArrayValue valueFor(boolean[] arr){
+    static ArrayValue valueFor(boolean[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -18,11 +18,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static ByteValue valueFor(byte b){
+    static ByteValue valueFor(byte b) {
         return new ByteValue(b);
     }
 
-    static ArrayValue valueFor(byte[] arr){
+    static ArrayValue valueFor(byte[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -30,11 +30,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static CharValue valueFor(char c){
+    static CharValue valueFor(char c) {
         return new CharValue(c);
     }
 
-    static ArrayValue valueFor(char[] arr){
+    static ArrayValue valueFor(char[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -42,11 +42,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static ShortValue valueFor(short s){
+    static ShortValue valueFor(short s) {
         return new ShortValue(s);
     }
 
-    static ArrayValue valueFor(short[] arr){
+    static ArrayValue valueFor(short[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -54,11 +54,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static IntValue valueFor(int i){
+    static IntValue valueFor(int i) {
         return new IntValue(i);
     }
 
-    static ArrayValue valueFor(int[] arr){
+    static ArrayValue valueFor(int[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -66,11 +66,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static FloatValue valueFor(float f){
+    static FloatValue valueFor(float f) {
         return new FloatValue(f);
     }
 
-    static ArrayValue valueFor(float[] arr){
+    static ArrayValue valueFor(float[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -78,11 +78,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static LongValue valueFor(long l){
+    static LongValue valueFor(long l) {
         return new LongValue(l);
     }
 
-    static ArrayValue valueFor(long[] arr){
+    static ArrayValue valueFor(long[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -90,11 +90,11 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static DoubleValue valueFor(double d){
+    static DoubleValue valueFor(double d) {
         return new DoubleValue(d);
     }
 
-    static ArrayValue valueFor(double[] arr){
+    static ArrayValue valueFor(double[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
             values[i] = valueFor(arr[i]);
@@ -102,41 +102,41 @@ public sealed interface Value extends Serializable {
         return new ArrayValue(values);
     }
 
-    static Value valueFor(Object o){
-        if (o == null){
+    static Value valueFor(Object o) {
+        if (o == null) {
             return new ReferenceValue(System.identityHashCode(null), "Null", "null");
-        } else if (o instanceof String s){
+        } else if (o instanceof String s) {
             return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), "\"" + s + "\"");
-        } else if (o instanceof Boolean b){
+        } else if (o instanceof Boolean b) {
             return valueFor(b.booleanValue());
-        } else if (o instanceof Byte b){
+        } else if (o instanceof Byte b) {
             return valueFor(b.byteValue());
-        } else if (o instanceof Short s){
+        } else if (o instanceof Short s) {
             return valueFor(s.shortValue());
-        } else if (o instanceof Integer i){
+        } else if (o instanceof Integer i) {
             return valueFor(i.intValue());
-        } else if (o instanceof Long l){
+        } else if (o instanceof Long l) {
             return valueFor(l.longValue());
-        } else if (o instanceof Character c){
+        } else if (o instanceof Character c) {
             return valueFor(c.charValue());
-        } else if (o instanceof Float f){
+        } else if (o instanceof Float f) {
             return valueFor(f.floatValue());
-        } else if (o instanceof Double d){
+        } else if (o instanceof Double d) {
             return valueFor(d.doubleValue());
         }
         // FIXME it's bad to call toString here (it can have side-effects)
         String descr;
         try {
             descr = o.toString();
-        } catch (Throwable throwable){
+        } catch (Throwable throwable) {
             // relies on program-defined toString, so we have to recover from exceptions to preserve program semantics
             descr = "<??>";
         }
         return new ReferenceValue(System.identityHashCode(o), o.getClass().getName(), descr);
     }
 
-    static Value valueFor(Object[] arr){
-        if (arr == null){
+    static Value valueFor(Object[] arr) {
+        if (arr == null) {
             return new ReferenceValue(System.identityHashCode(null), "Null", "null");
         }
         var values = new Value[arr.length];

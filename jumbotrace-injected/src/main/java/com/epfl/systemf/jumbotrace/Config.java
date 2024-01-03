@@ -2,7 +2,7 @@ package com.epfl.systemf.jumbotrace;
 
 public final class Config {
 
-    private Config(){
+    private Config() {
         throw new AssertionError("not instantiable");
     }
 

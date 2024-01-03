@@ -1,7 +1,5 @@
 package com.epfl.systemf.jumbotrace.events;
 
-import com.epfl.systemf.jumbotrace.Formatting;
-
 import static com.epfl.systemf.jumbotrace.Formatting.lastNameOnly;
 
 public sealed interface StatementEvent extends Event {

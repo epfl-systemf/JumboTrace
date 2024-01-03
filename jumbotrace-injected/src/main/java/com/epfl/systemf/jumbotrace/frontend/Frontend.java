@@ -9,7 +9,8 @@ import java.nio.file.Files;
 import java.util.*;
 
 import static com.epfl.systemf.jumbotrace.Config.LOG_FILE;
-import static com.epfl.systemf.jumbotrace.Formatting.*;
+import static com.epfl.systemf.jumbotrace.Formatting.insertNewlineWhenTooLong;
+import static com.epfl.systemf.jumbotrace.Formatting.lastNamesOnly;
 import static com.epfl.systemf.jumbotrace.frontend.Colors.*;
 
 // TODO rename jumbotrace-injected into jumbotrace-logging
@@ -100,9 +101,9 @@ public final class Frontend {
             var nLeadingSpaces = nLeadingSpaces(line);
             sb.append(line, nLeadingSpaces, startCol - 1);
             sb.append(ANSI_YELLOW);
-            sb.append(line.charAt(startCol-1));
+            sb.append(line.charAt(startCol - 1));
             sb.append(ANSI_RESET);
-            if (startCol < line.length()){
+            if (startCol < line.length()) {
                 sb.append(line.substring(startCol));
             }
         }
@@ -197,6 +198,7 @@ public final class Frontend {
         return events;
     }
 
+    @SuppressWarnings("unused")
     private static void require(boolean cond) {
         if (!cond) {
             throw new IllegalArgumentException();
