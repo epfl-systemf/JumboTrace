@@ -108,14 +108,14 @@ def run_example_project(example_name: str, test_mode: bool = False):
 
 def compile_plugin():
     cmd(
-        f"mvn -f {plugin_dir}/pom.xml clean:clean compiler:compile resources:copy-resources",
+        f"mvn -f {plugin_dir}/pom.xml compiler:compile resources:copy-resources",
         "compiling javac plugin"
     )
 
 
 def compile_injectedgen():
     cmd(
-        f"mvn -f {injectedgen_dir}/pom.xml clean:clean compiler:compile",
+        f"mvn -f {injectedgen_dir}/pom.xml compiler:compile",
         "compiling injectedgen"
     )
 
@@ -134,7 +134,7 @@ def run_injectedgen(test_mode: bool):
 def compile_injected(test_mode: bool):
     run_injectedgen(test_mode)
     cmd(
-        f"mvn -f {injected_dir}/pom.xml clean:clean compiler:compile",
+        f"mvn -f {injected_dir}/pom.xml compiler:compile",
         f"compiling injected code (test mode {"enabled" if test_mode else "disabled"})"
     )
 
