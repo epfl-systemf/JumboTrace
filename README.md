@@ -46,9 +46,9 @@ If you want to add a test, simply add an example program in a new directory in [
 ## Setup
 
 In order to be able to run all the functionalities of this repository, you need:
- - Java (both `javac` and `java`, https://www.oracle.com/java/technologies/downloads/)
- - Maven (https://maven.apache.org/install.html)
- - Python (https://www.python.org/downloads/)
+ - Java ≥ 17.0.6 (both `javac` and `java`, https://www.oracle.com/java/technologies/downloads/)
+ - Maven (https://maven.apache.org/install.html, tested on Maven 3.8.1)
+ - Python ≥ 3.12.0 (https://www.python.org/downloads/) for the automation script
  - make might also be useful as Makefiles are provided to run the example programs without instrumentation, but this is not strictly required (Installation instructions: [Ubuntu](https://linuxhint.com/install-make-ubuntu/), [Windows](https://www.technewstoday.com/install-and-use-make-in-windows/))
 
 
