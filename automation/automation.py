@@ -10,6 +10,7 @@ plugin_dir: Final[str] = "../jumbotrace-plugin"
 injected_dir: Final[str] = "../jumbotrace-injected"
 injectedgen_dir: Final[str] = "../jumbotrace-injectedgen"
 
+# The example directories listed here will be excluded from the automated tests
 test_excluded_examples: Final[List[str]] = [
     "Chemistry",    # currently no support for tests based on whole projects
     "Counters",     # FIXME this one should work but does not
@@ -21,6 +22,9 @@ def log(colored_str: str, uncolored_str: str = ""):
 
 
 def limit_str_length(s: str, max_len: int) -> str:
+    """
+    Limits the length of the given string to the given length
+    """
     if len(s) <= max_len:
         return s
     else:
@@ -28,6 +32,9 @@ def limit_str_length(s: str, max_len: int) -> str:
 
 
 def cmd(command: str, msg: str):
+    """
+    executes the command and displays the description message
+    """
     log(f"{msg} > ", limit_str_length(command, 150))
     ret_code = os.system(command)
     if ret_code != 0:
@@ -147,17 +154,20 @@ def copy_injection_to_example(example_name: str):
     shutil.copytree(src=src, dst=dst, dirs_exist_ok=True)
 
 
-def run_frontend(src_dirs_path: str, verbose=True, skip_compile=False):
+def run_frontend(src_dir_path: str, verbose=True, skip_compile=False):
     if not skip_compile:
         compile_injected(test_mode=False)
     opt_verbose = "-verbose" if verbose else ""
     cmd(
-        f"java -cp {injected_dir}/target/classes ch.epfl.systemf.jumbotrace.frontend.Frontend {src_dirs_path} {opt_verbose}",
+        f"java -cp {injected_dir}/target/classes ch.epfl.systemf.jumbotrace.frontend.Frontend {src_dir_path} {opt_verbose}",
         "running frontend"
     )
 
 
 def run_tests(examples: List[str] | Tuple[str] = ()):
+    """
+    :param examples: the examples to use in tests - leave empty to use all examples
+    """
     log("Running tests")
     if len(examples) == 0:
         examples = os.listdir(examples_dir)
@@ -188,7 +198,10 @@ def assert_files_equal(raw_out, instr_out):
         assert len(raw_lines) == len(instr_lines), "output lengths differ"
 
 
-def read_config_file(directory: str):
+def read_config_file(directory: str) -> Tuple[str, str]:
+    """
+    Parse parameters from jumbotrace.config file (for complete example projects)
+    """
     with open(f"{directory}/jumbotrace.config", mode="r") as f:
         lines = f.read().split('\n')
         lines = [line.strip() for line in lines if len(line.strip()) > 0]
@@ -210,6 +223,7 @@ def find_all_java_files(directory: str) -> List[str]:
 
 
 def main(args: List[str]):
+    # Execute the command passed by the user
     if len(args) == 0:
         print("No argument given to automation script. Exiting", file=sys.stderr)
         exit(0)
@@ -237,7 +251,7 @@ def main(args: List[str]):
         case ["run", "frontend", "-verbose", src_dir]:
             run_frontend(src_dir, verbose=True)
         case ["run", "frontend", src_dir]:
-            run_frontend(src_dir)
+            run_frontend(src_dir, verbose=False)
         case _:
             print("unknown command: " + " ".join(args), file=sys.stderr)
 
