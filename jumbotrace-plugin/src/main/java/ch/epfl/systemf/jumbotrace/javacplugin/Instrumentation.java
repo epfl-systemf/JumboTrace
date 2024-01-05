@@ -10,6 +10,9 @@ import com.sun.tools.javac.util.Names;
 
 import static com.sun.tools.javac.tree.JCTree.JCExpression;
 
+/**
+ * Maker for calls to logging method calls in ___JumboTrace___
+ */
 public final class Instrumentation {
 
     //<editor-fold desc="Constants">
@@ -745,6 +748,9 @@ public final class Instrumentation {
     private record Argument(Type type, JCExpression expr) {
     }
 
+    /**
+     * @return the highest type in the type hierarchy that is a supertype of the argument
+     */
     private Type topmostTypeFor(Type rawType) {
         return rawType.isPrimitive() ? rawType : st().objectType;
     }

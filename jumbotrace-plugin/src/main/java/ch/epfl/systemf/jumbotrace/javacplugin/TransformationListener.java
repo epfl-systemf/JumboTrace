@@ -28,11 +28,14 @@ public final class TransformationListener implements TaskListener {
                     endPosTable
             );
             transformer.translate(cu);
+            // BEGIN debug zone
 //            cu.accept(new DebugPrintVisitor());
 //            print(cu);
+            // END debug zone
         }
     }
 
+    @SuppressWarnings("unused")
     private void print(JCTree.JCCompilationUnit cu){
         for (var df: cu.defs){
             if (df instanceof JCTree.JCClassDecl decl){

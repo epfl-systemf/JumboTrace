@@ -6,8 +6,15 @@ import java.util.StringJoiner;
 
 import static ch.epfl.systemf.jumbotrace.Formatting.lastNameOnly;
 
+// Further work would probably benefit from splitting this category of events into several categories (e.g. ExpressionEvents)
+/**
+ * An event related to something else than the execution of a statement
+ */
 public sealed interface NonStatementEvent extends Event {
 
+    /**
+     * Issued when the ___JumboTrace___ class is loaded for the first time (serves to save the start time of the program execution)
+     */
     record InitializationEvent(long id, long parentId, String timestamp) implements NonStatementEvent {
         @Override
         public String descr() {
@@ -45,6 +52,11 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * This is NOT an event in the strict sense, just additional metadata to be saved in some MethodEnters
+     * <p>
+     * Represents an invocation of a non-instrumented method
+     */
     record NonInstrumentedEnter(String className, String methodName, String filename,
                                 int lineNumber) implements Serializable {
         @Override
@@ -53,6 +65,10 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * Beginning of the execution of a method
+     * @param nonInstrumentedEnters directly enclosing invocations of non-instrumented methods
+     */
     record MethodEnter(long id, long parentId, String className, String methodName, String methodSig,
                        List<NonInstrumentedEnter> nonInstrumentedEnters,
                        String filename, int startLine, int startCol) implements NonStatementEvent {
@@ -76,6 +92,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * End of the execution of a method. Should be issued even if the method exits exceptionnally
+     */
     record MethodExit(long id, long parentId, long correspondingEnterId, String methodName, String filename,
                       int startLine,
                       int startCol) implements NonStatementEvent {
@@ -85,6 +104,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * When the execution of the caller resumes after the callee returned a value
+     */
     record MethodReturnVal(long id, long parentId, String className, String methodName, Value retValue,
                            String filename, int startLine, int startCol, int endLine,
                            int endCol) implements NonStatementEvent {
@@ -94,6 +116,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * When the execution of the caller resumes after the callee returned void
+     */
     record MethodReturnVoid(long id, long parentId, String className, String methodName,
                             String filename, int startLine, int startCol, int endLine,
                             int endCol) implements NonStatementEvent {
@@ -103,6 +128,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * When a void method returns after reaching the end of its body
+     */
     record ImplicitReturn(long id, long parentId, String methodName, String filename, int startLine,
                           int startCol) implements NonStatementEvent {
         @Override
@@ -136,6 +164,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * Beginning of a new iteration in a for-each loop
+     */
     record ForEachLoopNextIter(long id, long parentId, Value newElem, String filename, int startLine, int startCol,
                                int endLine, int endCol) implements NonStatementEvent {
         @Override
@@ -164,6 +195,9 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
+    /**
+     * x++, --y, etc.
+     */
     record LocalVarIncDecOp(long id, long parentId, String varName, Value result,
                             Value newValue, Value oldValue,
                             String filename, int startLine, int startCol, int endLine,
@@ -339,7 +373,7 @@ public sealed interface NonStatementEvent extends Event {
         }
     }
 
-    // TODO should appear as a statement
+    // TODO improve the handling of ternary expressions by displaying the branches as "statements"
     record TernaryCondition(long id, long parentId, Value cond, String filename, int startLine, int startCol,
                             int endLine, int endCol) implements NonStatementEvent {
         @Override
@@ -364,6 +398,9 @@ public sealed interface NonStatementEvent extends Event {
         return sj.toString();
     }
 
+    /**
+     * Removes package prefix from class names in the given method signature
+     */
     private static String formatMethodSig(String signature) {
         if (!signature.startsWith("(")) {
             throw new IllegalArgumentException();

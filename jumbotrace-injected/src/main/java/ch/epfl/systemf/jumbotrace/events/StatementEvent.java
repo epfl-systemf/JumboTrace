@@ -2,6 +2,11 @@ package ch.epfl.systemf.jumbotrace.events;
 
 import static ch.epfl.systemf.jumbotrace.Formatting.lastNameOnly;
 
+/**
+ * An event corresponding to the execution of a statement
+ * <p>
+ * The distinction with NonStatementEvents is motivated by the need to display code along with StatementEvents
+ */
 public sealed interface StatementEvent extends Event {
 
     String filename();
@@ -84,6 +89,9 @@ public sealed interface StatementEvent extends Event {
         }
     }
 
+    /**
+     * When an exception is caught
+     */
     record Caught(long id, long parentId, Value throwable, String filename, int startLine, int startCol,
                   int endLine, int endCol) implements StatementEvent {
         @Override
@@ -101,6 +109,9 @@ public sealed interface StatementEvent extends Event {
         }
     }
 
+    /**
+     * Execution of an expression statement
+     */
     record Exec(long id, long parentId,
                 String filename, int startLine, int startCol, int endLine, int endCol) implements StatementEvent {
         @Override

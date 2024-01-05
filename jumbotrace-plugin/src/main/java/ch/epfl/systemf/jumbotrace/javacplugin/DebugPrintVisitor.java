@@ -7,6 +7,8 @@ import java.io.PrintStream;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+// This class is intended to be used for debugging
+
 @SuppressWarnings("unused")
 public final class DebugPrintVisitor extends TreeTranslator {   // possibly exists better than TreeTranslator for this purpose
     private static final PrintStream s = System.out;

@@ -13,8 +13,6 @@ import static ch.epfl.systemf.jumbotrace.Formatting.insertNewlineWhenTooLong;
 import static ch.epfl.systemf.jumbotrace.Formatting.lastNamesOnly;
 import static ch.epfl.systemf.jumbotrace.frontend.Colors.*;
 
-// TODO rename jumbotrace-injected into jumbotrace-logging
-
 /**
  * This frontend is meant to be used only for debugging and demo purposes, to show the data collected by the tracing system.
  * Its output should be formatted in a clearer way before using it in real use-cases.
@@ -71,6 +69,10 @@ public final class Frontend {
         }
     }
 
+    /**
+     * Retrieves the code in the source files that corresponds to the statement event and adds to it the description of
+     * the event and the position of the code
+     */
     private static String codeFor(StatementEvent statementEvent, Map<String, List<String>> srcFiles) {
         var filename = statementEvent.filename();
         var fileLines = Objects.requireNonNull(srcFiles.get(filename));
@@ -120,6 +122,9 @@ public final class Frontend {
         return sb.toString();
     }
 
+    /**
+     * Retrieves the method declaration of the entered method in the source files
+     */
     private static String methodDeclaration(NonStatementEvent.MethodEnter methodEnter, Map<String, List<String>> srcFiles) {
         var filename = methodEnter.filename();
         var startLine = methodEnter.startLine();
@@ -167,6 +172,9 @@ public final class Frontend {
         return cnt;
     }
 
+    /**
+     * Populates `filesMap` with the read java files
+     */
     private static void readJavaFiles(Map<String, List<String>> filesMap, File directory) {
         for (var file : Objects.requireNonNull(directory.listFiles())) {
             if (file.isDirectory()) {
@@ -181,6 +189,9 @@ public final class Frontend {
         }
     }
 
+    /**
+     * Reads the events written as serialized objects in the logging file
+     */
     private static ArrayList<Event> readEvents() {
         var events = new ArrayList<Event>();
         try (

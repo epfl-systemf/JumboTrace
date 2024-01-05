@@ -8,6 +8,9 @@ import com.sun.tools.javac.util.Names;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * This class bundles together several symbols generators and nodes generators that are needed during the transformation of the AST
+ */
 public final class TreeMakingContainer {
 
     private final TreeMaker treeMaker;

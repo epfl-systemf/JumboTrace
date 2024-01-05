@@ -7,6 +7,9 @@ import com.sun.tools.javac.util.List;
 import java.io.IOException;
 import java.io.Writer;
 
+// Improves the support of let-expression compared to the default Pretty
+// Intended to be used for debugging
+
 public final class LetSupportingPrintVisitor extends Pretty {
 
     public LetSupportingPrintVisitor(Writer out, boolean sourceOutput) {

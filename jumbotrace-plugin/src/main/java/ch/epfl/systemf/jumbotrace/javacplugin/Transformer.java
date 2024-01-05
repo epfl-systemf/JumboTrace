@@ -74,14 +74,23 @@ public final class Transformer extends TreeTranslator {
 
     //<editor-fold desc="Context accessors">
 
+    /**
+     * @return the name of the file this transformer is working on
+     */
     private String currentFilename() {
         return cu.getSourceFile().toUri().toString();
     }
 
+    /**
+     * @return the symbol of the class that the transformer is currently working on
+     */
     private Symbol.ClassSymbol currentClass() {
         return classesStack.getFirst();
     }
 
+    /**
+     * @return the symbol to the method this transformer is currently working on
+     */
     private Symbol.MethodSymbol currentMethod() {
         return isInsideMethod() ?
                 methodsStack.getFirst() :
@@ -93,6 +102,10 @@ public final class Transformer extends TreeTranslator {
                 );
     }
 
+    /**
+     * @return true iff the transformer is currently working inside a method (i.e. if a call to `currentMethod`
+     * would return something else than a default value)
+     */
     private boolean isInsideMethod() {
         return !methodsStack.isEmpty();
     }
@@ -319,7 +332,7 @@ public final class Transformer extends TreeTranslator {
 
     @Override
     public void visitLambda(JCLambda lambda) {
-        // TODO
+        // TODO log lambdas
         if (lambda.body instanceof JCExpression bodyExpr && lambda.body.type.getTag() == TypeTag.VOID) {
             lambda.body = mk().at(lambda.pos).Exec(bodyExpr);
         }
@@ -1415,6 +1428,7 @@ public final class Transformer extends TreeTranslator {
                         }));
     }
 
+    // helps the expansion of assignment operators, e.g. x += 1
     private JCExpression expandAssignOp(JCAssignOp assignOp, JCExpression savedValueVar) {
         var type = assignOp.type;
         return mk().Assign(
@@ -1429,6 +1443,9 @@ public final class Transformer extends TreeTranslator {
         ).setType(type);
     }
 
+    /**
+     * @return the actual node `rawTarget` represents (discarding labeled statements)
+     */
     private JCTree resolveJumpTarget(JCTree rawTarget) {
         Assertions.checkPrecondition(rawTarget != null, "target must not be null");
         if (rawTarget instanceof JCLabeledStatement labeledStatement) {
@@ -1438,6 +1455,9 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
+    /**
+     * Generates the code pieces that are needed to log a method invocation
+     */
     private CallInstrumentationPieces makeMethodCallInstrumentationPieces(JCMethodInvocation invocation) {
         var receiver = getInvocationReceiver(invocation.meth);
         var allArgs = (receiver == null) ? invocation.args : invocation.args.prepend(receiver);
@@ -1481,6 +1501,9 @@ public final class Transformer extends TreeTranslator {
         return new CallInstrumentationPieces(argsDecls, loggingStat, invocation);
     }
 
+    /**
+     * Generates the code pieces that are needed to log a constructor invocation
+     */
     private CallInstrumentationPieces makeConstructorCallInstrumentationPieces(JCNewClass newClass) {
         var precomputation = makeArgsPrecomputations(newClass.args, newClass.constructorType.getParameterTypes(), newClass.varargsElement);
         var argsDecls = precomputation._1;
@@ -1506,6 +1529,14 @@ public final class Transformer extends TreeTranslator {
         return new CallInstrumentationPieces(argsDecls, loggingStat, newClass);
     }
 
+    /**
+     * Bundles the common patterns between method invocations and constructor invocations
+     *
+     * @param argsLocalsDefs          Statements declaring the additional variables for arguments
+     * @param logMethodCall           The statement invoking the logging method
+     * @param initialMethodInvocation The method invocation (when passed to this record it has already been modified,
+     *                                mainly to take the additional variables as arguments)
+     */
     private record CallInstrumentationPieces(
             List<JCStatement> argsLocalsDefs,
             JCStatement logMethodCall,
@@ -1513,11 +1544,24 @@ public final class Transformer extends TreeTranslator {
     ) {
     }
 
+    /**
+     * Similar to `withNewLocalForceType` except that the variable type is inferred from the type of `valueExpr`
+     * @see Transformer#withNewLocalForceType(String, JCExpression, Type, BiFunction)
+     */
     private <T extends JCTree> T withNewLocal(String debugHint, JCExpression valueExpr,
                                               BiFunction<JCIdent, JCVariableDecl, T> treeProducer) {
         return withNewLocalForceType(debugHint, valueExpr, valueExpr.type, treeProducer);
     }
 
+    /**
+     * Creates a new variable with unique name, and makes it available inside `treeProducer`, as well as a statement declaring it
+     * @param debugHint - a string that will be appended to the variable name to provide information on it and help debugging
+     * @param valueExpr - the expression producing the value that will be assigned to this variable
+     * @param type - the type of the variable
+     * @param treeProducer - a lambda producing a node using the new variable and its defining statement
+     * @return the node produced by `treeProducer`
+     * @param <T> the node type
+     */
     private <T extends JCTree> T withNewLocalForceType(String debugHint, JCExpression valueExpr, Type type,
                                                        BiFunction<JCIdent, JCVariableDecl, T> treeProducer) {
         var symbol = new Symbol.VarSymbol(0, m.nextId(debugHint), type, currentMethod());
@@ -1527,6 +1571,9 @@ public final class Transformer extends TreeTranslator {
         return treeProducer.apply(ident, varDecl);
     }
 
+    /**
+     * Makes a let-expression from a CallInstrumentationPieces
+     */
     private JCExpression makeLet(JCExpression invocation, String className, String methodName, CallInstrumentationPieces instrPieces) {
         return mk().LetExpr(
                 instrPieces.argsLocalsDefs,
@@ -1546,6 +1593,9 @@ public final class Transformer extends TreeTranslator {
         ).setType(invocation.type);
     }
 
+    /**
+     * Makes a block from a CallInstrumentationPieces
+     */
     private JCBlock makeBlock(JCExpression call, String className, String methodName, CallInstrumentationPieces instrPieces) {
         return mk().Block(0,
                 instrPieces.argsLocalsDefs
@@ -1563,6 +1613,9 @@ public final class Transformer extends TreeTranslator {
         );
     }
 
+    /**
+     * @return a list of variables and a list of the statement declaring these variables
+     */
     private Pair<List<JCStatement>, List<JCExpression>> makeArgsPrecomputations(
             List<JCExpression> args, List<Type> argTypes, @Nullable Type varargsType
     ) {
@@ -1580,6 +1633,9 @@ public final class Transformer extends TreeTranslator {
         return new Pair<>(argsDecls, argsIds);
     }
 
+    /**
+     * Creates an argument types list with the desired number of repetitions of the vararg type
+     */
     private List<Type> expandVararg(List<Type> types, int totalLength, Type varargsType) {
         Assertions.checkPrecondition(varargsType != null, "must not be null");
         Assertions.checkAssertion(types.length() <= totalLength, "unexpected lengths");
@@ -1620,6 +1676,9 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
+    /**
+     * Makes a block enclosing the statement if this statement is not already a block
+     */
     private JCBlock makeBlock(JCStatement stat) {
         if (stat instanceof JCBlock block) {
             return block;
@@ -1628,6 +1687,9 @@ public final class Transformer extends TreeTranslator {
         }
     }
 
+    /**
+     * Creates a reference to the `this` pointer
+     */
     private JCExpression makeThisExpr() {
         return mk().Ident(new Symbol.VarSymbol(0, n()._this, currentClass().type, currentMethod()))
                 .setType(currentClass().type);
@@ -1640,6 +1702,9 @@ public final class Transformer extends TreeTranslator {
     }
 
     // constant folding sometimes causes the codegen to not include the injected logging code into the bytecode
+    /**
+     * Deletes the precomputed value written by constant folding into the type of this expression
+     */
     private void deleteConstantFolding(JCExpression expr) {
         while (expr.type != null && expr.type.constValue() != null) {
             expr.type = expr.type.baseType();
@@ -1650,18 +1715,30 @@ public final class Transformer extends TreeTranslator {
         return type.equalsIgnoreMetadata(st().botType) ? st().objectType : type;
     }
 
+    /**
+     * @return true iff the identifier refers to a local variable
+     */
     private boolean isLocalVar(JCIdent ident) {
         return ident.sym != null && ident.sym.getKind().equals(ElementKind.LOCAL_VARIABLE);
     }
 
+    /**
+     * @return true iff the identifier refers to a field
+     */
     private boolean isField(JCIdent ident) {
         return ident.sym != null && ident.sym.getKind().equals(ElementKind.FIELD);
     }
 
+    /**
+     * @return true iff the identifier refers to an instance field
+     */
     private boolean isInstanceField(JCIdent ident) {
         return isField(ident) && !ident.sym.isStatic();
     }
 
+    /**
+     * @return true iff the identifier refers to a static field
+     */
     private boolean isStaticField(JCIdent ident) {
         return isField(ident) && ident.sym.isStatic();
     }

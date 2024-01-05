@@ -20,10 +20,13 @@ import java.util.*;
 
 import static ch.epfl.systemf.jumbotrace.Config.LOG_FILE;
 
+/**
+ * The class containing the logging methods to create event records and save them to the log file
+ */
 @SuppressWarnings("unused")
 public class ___JumboTrace___ {
 
-    // Set to null to disable logging during execution
+    // Set PRINT_STREAM to null to disable messages display during the execution
     // May be set to null by the code generation system for testing purposes
     private static final @Nullable PrintStream PRINT_STREAM = null; //System.out;
 
@@ -33,6 +36,9 @@ public class ___JumboTrace___ {
     private static final String COLOR_RED_CODE = "\u001B[31m";
     private static final String COLOR_RESET_CODE = "\u001B[0m";
 
+    /**
+     * Displays its arguments to PRINT_STREAM, unless it is null
+     */
     private static void log(Object... objects) {
         if (PRINT_STREAM != null) {
             StringBuilder sb = new StringBuilder();
@@ -75,12 +81,14 @@ public class ___JumboTrace___ {
         }));
     }
 
+    // Events ids generation
     private static long nextEventId = 1;
 
     private static long genEventId() {
         return nextEventId++;
     }
 
+    // Logging has to be disabled during calls toString from the tracer to avoid infinite recursion (because toString itself may be instrumented)
     private static boolean loggingEnabled = true;
     private static int indent = 0;
 
@@ -92,6 +100,11 @@ public class ___JumboTrace___ {
         loggingEnabled = false;
     }
 
+    /**
+     * Representation of a frame on the stack
+     * @param id the id of the method enter event
+     * @param depth the depth in the stack
+     */
     private record Frame(long id, int depth) {
     }
 
@@ -105,6 +118,10 @@ public class ___JumboTrace___ {
         return stack.isEmpty() ? 0 : stack.getFirst().depth;
     }
 
+    /**
+     * To populate nonInstrumentedEnters in MethodEnter
+     * @see MethodEnter#nonInstrumentedEnters
+     */
     private static List<NonInstrumentedEnter> computeNonInstrumentedEnters(StackTraceWrapper stackTrace) {
         var enclosingDepth = getEnclosingDepth();
         var thisDepth = stackTrace.length();
@@ -118,6 +135,9 @@ public class ___JumboTrace___ {
         return nonInstrumentedEnters;
     }
 
+    /**
+     * Writes the event to the binary file using serialization
+     */
     private static void writeEvent(Event event) {
         try {
             outputStream.writeObject(event);
@@ -1177,19 +1197,6 @@ public class ___JumboTrace___ {
             idx--;
         }
         return filename.substring(idx);
-    }
-
-    // TODO disable once tested
-    private static void checkAssertion(boolean assertion) {
-        if (!assertion) {
-            throw new AssertionError();
-        }
-    }
-
-    private static void checkAreEquals(String l, String r) {
-        if (!l.equals(r)) {
-            throw new AssertionError(l + " != " + r);
-        }
     }
 
 }

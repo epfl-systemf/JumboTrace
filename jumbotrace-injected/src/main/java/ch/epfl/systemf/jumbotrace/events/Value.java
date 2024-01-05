@@ -3,13 +3,16 @@ package ch.epfl.systemf.jumbotrace.events;
 import java.io.Serializable;
 import java.util.StringJoiner;
 
-@SuppressWarnings("unused")
+/**
+ * A value saved from the traced program
+ */
 public sealed interface Value extends Serializable {
 
     static BooleanValue valueFor(boolean b) {
         return new BooleanValue(b);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(boolean[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -22,6 +25,7 @@ public sealed interface Value extends Serializable {
         return new ByteValue(b);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(byte[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -34,6 +38,7 @@ public sealed interface Value extends Serializable {
         return new CharValue(c);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(char[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -46,6 +51,7 @@ public sealed interface Value extends Serializable {
         return new ShortValue(s);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(short[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -58,6 +64,7 @@ public sealed interface Value extends Serializable {
         return new IntValue(i);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(int[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -70,6 +77,7 @@ public sealed interface Value extends Serializable {
         return new FloatValue(f);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(float[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -82,6 +90,7 @@ public sealed interface Value extends Serializable {
         return new LongValue(l);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(long[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {
@@ -94,6 +103,7 @@ public sealed interface Value extends Serializable {
         return new DoubleValue(d);
     }
 
+    @SuppressWarnings("unused")
     static ArrayValue valueFor(double[] arr) {
         var values = new Value[arr.length];
         for (int i = 0; i < arr.length; i++) {

@@ -8,6 +8,9 @@ import com.sun.tools.javac.comp.Lower;
 import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.util.Names;
 
+/**
+ * The JumboTrace plugin
+ */
 public class JumboTrace implements Plugin {
 
     @Override

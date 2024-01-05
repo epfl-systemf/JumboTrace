@@ -21,6 +21,11 @@ import java.util.stream.Stream;
 
 import static com.github.javaparser.ast.type.PrimitiveType.*;
 
+/**
+ * Performs the specialization of methods annotated with @Specialize
+ * <p>
+ * Replicates the methods to generate one copy for each of the topmost types in the type hierarchy
+ */
 public final class Transformer extends ModifierVisitor<Void> {
 
     private static final String TARGET_ANNOTATION_NAME = "Specialize";
@@ -28,9 +33,16 @@ public final class Transformer extends ModifierVisitor<Void> {
     private static final String MODIFIED_METH_ANNOTATION_NAME = "Specialized";
     private static final String MODIFIED_METH_ANNOT_FLD_KEY = "typeName";
 
+    /**
+     * The numeric primitive types of the Java type system
+     */
     private static final List<Type> NUMERIC_TOPMOST_TYPES = List.of(
             intType(), shortType(), longType(), floatType(), doubleType(), charType(), byteType()
     );
+
+    /**
+     * The topmost types of the Java types hierachy
+     */
     private static final List<Type> TOPMOST_TYPES = Stream.concat(
             NUMERIC_TOPMOST_TYPES.stream(),
             Stream.of(booleanType(), StaticJavaParser.parseType("java.lang.Object"))
@@ -135,7 +147,7 @@ public final class Transformer extends ModifierVisitor<Void> {
                 }
             }
         }
-        if (found != null){
+        if (found != null) {
             annotations.remove(found);
         }
         return found;
