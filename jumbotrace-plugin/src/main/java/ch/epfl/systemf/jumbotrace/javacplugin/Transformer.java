@@ -1777,9 +1777,6 @@ public final class Transformer extends TreeTranslator {
     private record Pair<A, B>(A _1, B _2) {
     }
 
-    private record Triple<A, B, C>(A _1, B _2, C _3) {
-    }
-
     //</editor-fold>
 
 }
